@@ -7,7 +7,8 @@ from database import (
     update_word_after_review, 
     check_and_auto_upgrade,
     get_word_by_id,
-    update_word_status
+    update_word_status,
+    get_db
 )
 
 app = Flask(__name__)
@@ -304,6 +305,130 @@ def api_fill_evaluate():
             
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+# API GET /api/stats -> retrieves comprehensive progress statistics
+@app.route('/api/stats')
+def api_stats():
+    try:
+        stats = get_stats()
+        total = stats.get('total', 0)
+        total_score_sum = stats.get('total_score_sum', 0)
+        
+        avg_score = 0.0
+        if total > 0:
+            avg_score = round(total_score_sum / total, 2)
+            
+        stats['avg_score'] = avg_score
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# API GET /api/words/list -> retrieves sorted and paginated words list
+@app.route('/api/words/list')
+def api_words_list():
+    status = request.args.get('status', 'all')
+    sort = request.args.get('sort', 'score_desc')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 30, type=int)
+    
+    if page < 1:
+        page = 1
+    if per_page < 1:
+        per_page = 30
+        
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    query_cond = ""
+    params = []
+    if status != 'all':
+        query_cond = "WHERE status = ?"
+        params.append(status)
+        
+    count_query = f"SELECT COUNT(*) FROM words {query_cond}"
+    cursor.execute(count_query, params)
+    total = cursor.fetchone()[0]
+    
+    sort_orders = {
+        'score_desc': 'total_score DESC, id DESC',
+        'score_asc': 'total_score ASC, id ASC',
+        'alpha': 'word COLLATE NOCASE ASC',
+        'date_added': 'date_added DESC, id DESC',
+        'last_reviewed': 'last_reviewed DESC, id DESC'
+    }
+    order_clause = sort_orders.get(sort, 'total_score DESC, id DESC')
+    
+    limit = per_page
+    offset = (page - 1) * per_page
+    
+    fetch_query = f"""
+        SELECT id, word, phonetic, short_translation, status, total_score, review_count, last_reviewed, translation
+        FROM words
+        {query_cond}
+        ORDER BY {order_clause}
+        LIMIT ? OFFSET ?
+    """
+    
+    fetch_params = list(params)
+    fetch_params.extend([limit, offset])
+    
+    cursor.execute(fetch_query, fetch_params)
+    rows = cursor.fetchall()
+    conn.close()
+    
+    words_list = []
+    for row in rows:
+        words_list.append({
+            'id': row['id'],
+            'word': row['word'],
+            'phonetic': row['phonetic'],
+            'short_translation': row['short_translation'],
+            'translation': row['translation'],
+            'status': row['status'],
+            'total_score': row['total_score'],
+            'review_count': row['review_count'],
+            'last_reviewed': row['last_reviewed']
+        })
+        
+    import math
+    pages = math.ceil(total / per_page) if total > 0 else 1
+    
+    return jsonify({
+        'words': words_list,
+        'total': total,
+        'page': page,
+        'pages': pages
+    })
+
+# API GET /api/words/top -> retrieves top n words with highest score
+@app.route('/api/words/top')
+def api_words_top():
+    n = request.args.get('n', 5, type=int)
+    if n < 1:
+        n = 5
+        
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, word, total_score, status, review_count 
+        FROM words 
+        ORDER BY total_score DESC, id DESC 
+        LIMIT ?
+    """, (n,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    top_words = []
+    for r in rows:
+        top_words.append({
+            'id': r['id'],
+            'word': r['word'],
+            'total_score': r['total_score'],
+            'status': r['status'],
+            'review_count': r['review_count']
+        })
+        
+    return jsonify(top_words)
 
 if __name__ == '__main__':
     # Initialize SQLite database and tables

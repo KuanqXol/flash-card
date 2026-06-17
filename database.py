@@ -190,7 +190,7 @@ def get_stats():
     total = row_count[0] if row_count else 0
     
     # Reviewed today count
-    cursor.execute("SELECT COUNT(*) FROM review_history WHERE DATE(reviewed_at) = DATE('now', 'localtime')")
+    cursor.execute("SELECT COUNT(*) FROM words WHERE DATE(last_reviewed) = DATE('now', 'localtime')")
     row_today = cursor.fetchone()
     reviewed_today = row_today[0] if row_today else 0
     
