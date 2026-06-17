@@ -504,6 +504,275 @@
         .toast-error { background: rgba(244, 63, 94, 0.9); border: 1px solid rgba(244, 63, 94, 0.3); }
         .toast-info { background: rgba(59, 130, 246, 0.9); border: 1px solid rgba(59, 130, 246, 0.3); }
         .toast-icon { font-size: 1.2rem; }
+
+        /* Data Management Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 0.75rem;
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .toolbar button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .bulk-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            padding: 0.35rem 1rem;
+            border-radius: 0.75rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        #selected-count {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #818cf8;
+        }
+
+        #bulk-action-select {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-primary);
+            padding: 0.35rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.8rem;
+            outline: none;
+            cursor: pointer;
+        }
+
+        #btn-bulk-apply {
+            background: var(--color-accent) !important;
+            border-color: var(--color-accent) !important;
+            color: white !important;
+            padding: 0.35rem 0.85rem !important;
+        }
+
+        #btn-bulk-apply:hover {
+            background: var(--color-accent-hover) !important;
+        }
+
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid var(--card-border);
+            border-radius: 1.5rem;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            animation: modalScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+        }
+
+        @keyframes modalScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 1rem;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.01);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .drop-zone.dragover {
+            border-color: var(--color-accent);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .drop-zone-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .select-file-btn {
+            background: var(--color-accent);
+            border: none;
+            color: white;
+            padding: 0.45rem 1.25rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-display);
+            transition: background 0.2s ease;
+        }
+
+        .select-file-btn:hover {
+            background: var(--color-accent-hover);
+        }
+
+        .format-help {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        /* File Preview */
+        .file-preview {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .file-icon {
+            font-size: 2rem;
+        }
+
+        #preview-filename {
+            font-weight: 600;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+        .btn-import-start {
+            background: #10b981;
+            border: none;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-display);
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .btn-import-start:hover {
+            background: #059669;
+        }
+
+        /* Loading */
+        .import-loading {
+            text-align: center;
+            padding: 2rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--color-accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Result */
+        .import-result {
+            text-align: center;
+            padding: 1rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .result-icon {
+            font-size: 3rem;
+        }
+
+        .btn-close-result {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        .btn-close-result:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -600,11 +869,28 @@
                 </select>
             </div>
 
+            <!-- Data Management Toolbar -->
+            <div class="toolbar">
+                <button id="btn-import" onclick="openImportModal()">📥 Import CSV</button>
+                <button id="btn-export" onclick="exportProgress()">📤 Export tiến độ</button>
+                <div class="bulk-actions" id="bulk-actions-panel" style="display:none">
+                    <span id="selected-count">0 từ đã chọn</span>
+                    <select id="bulk-action-select">
+                        <option value="">-- Hành động --</option>
+                        <option value="mark_learned">Đánh dấu Đã thuộc</option>
+                        <option value="mark_learning">Đánh dấu Đang học</option>
+                        <option value="reset">Reset về Từ mới</option>
+                    </select>
+                    <button id="btn-bulk-apply" onclick="applyBulkAction()">Áp dụng</button>
+                </div>
+            </div>
+
             <!-- Vocabulary Table -->
             <div style="overflow-x: auto;">
                 <table class="words-table">
                     <thead>
                         <tr>
+                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this.checked)"></th>
                             <th style="width: 110px;">Trạng thái</th>
                             <th>Từ vựng</th>
                             <th>Dịch nghĩa rút gọn</th>
@@ -753,11 +1039,16 @@
 
         // Render Table Row elements
         function renderWordList(words) {
+            // Uncheck master checkbox on list change
+            const selectAllCheck = document.getElementById('select-all-checkbox');
+            if (selectAllCheck) selectAllCheck.checked = false;
+            onCheckboxChange(); // Hide bulk actions panel
+            
             const tableBody = document.getElementById('words-table-body');
             tableBody.innerHTML = '';
             
             if (words.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Không tìm thấy từ vựng nào khớp với bộ lọc.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Không tìm thấy từ vựng nào khớp với bộ lọc.</td></tr>`;
                 return;
             }
             
@@ -780,6 +1071,7 @@
                 mainRow.setAttribute('onclick', `toggleExpand(${w.id})`);
                 
                 mainRow.innerHTML = `
+                    <td style="text-align: center;" onclick="event.stopPropagation()"><input type="checkbox" class="word-checkbox" data-id="${w.id}" onchange="onCheckboxChange()"></td>
                     <td><span class="badge badge-${w.status}" id="badge-${w.id}">${getStatusLabel(w.status)}</span></td>
                     <td><span class="word-display">${w.word}</span>${phoneticText}</td>
                     <td><div class="trans-display">${shortTransText}</div></td>
@@ -793,7 +1085,7 @@
                 detailRow.id = `detail-row-${w.id}`;
                 
                 detailRow.innerHTML = `
-                    <td colspan="5">
+                    <td colspan="6">
                         <div class="detail-content">
                             <p style="margin-bottom: 0.5rem;"><strong>Nghĩa đầy đủ:</strong> ${w.translation || 'Chưa cập nhật'}</p>
                             <p style="font-size: 0.8rem; color: var(--text-secondary);">
@@ -936,11 +1228,235 @@
             }
         }
 
+        // Checkboxes & Bulk select state
+        function onCheckboxChange() {
+            const checkboxes = document.querySelectorAll('.word-checkbox');
+            const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+            const checkedCount = checkedBoxes.length;
+            
+            const bulkPanel = document.getElementById('bulk-actions-panel');
+            const selectedCountLabel = document.getElementById('selected-count');
+            
+            if (bulkPanel && selectedCountLabel) {
+                if (checkedCount > 0) {
+                    selectedCountLabel.textContent = `${checkedCount} từ đã chọn`;
+                    bulkPanel.style.display = 'flex';
+                } else {
+                    bulkPanel.style.display = 'none';
+                }
+            }
+            
+            // Sync select-all checkbox state
+            const selectAllCheck = document.getElementById('select-all-checkbox');
+            if (selectAllCheck && checkboxes.length > 0) {
+                selectAllCheck.checked = (checkedCount === checkboxes.length);
+            }
+        }
+
+        function toggleSelectAll(checked) {
+            const checkboxes = document.querySelectorAll('.word-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = checked;
+            });
+            onCheckboxChange();
+        }
+
+        async function applyBulkAction() {
+            const actionSelect = document.getElementById('bulk-action-select');
+            const action = actionSelect.value;
+            if (!action) {
+                showToast("Vui lòng chọn hành động!", "error");
+                return;
+            }
+            
+            const checkboxes = document.querySelectorAll('.word-checkbox:checked');
+            const wordIds = Array.from(checkboxes).map(cb => parseInt(cb.getAttribute('data-id')));
+            
+            if (wordIds.length === 0) {
+                showToast("Chưa chọn từ vựng nào!", "error");
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/words/bulk-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action, word_ids: wordIds })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast(`Đã áp dụng hành động cho ${data.affected} từ!`, "success");
+                    
+                    // Reset action select
+                    actionSelect.value = '';
+                    
+                    // Refresh data
+                    fetchStats();
+                    fetchWordList();
+                } else {
+                    showToast(data.message || "Lỗi áp dụng hành động!", "error");
+                }
+            } catch (err) {
+                console.error("Bulk action error:", err);
+                showToast("Lỗi kết nối máy chủ!", "error");
+            }
+        }
+
+        // Export Progress
+        function exportProgress() {
+            showToast("Đang chuẩn bị file tải về...", "info");
+            window.location = '/api/export';
+        }
+
+        // Import Modal Actions
+        let selectedFile = null;
+
+        function openImportModal() {
+            const modal = document.getElementById('import-modal');
+            modal.style.display = 'flex';
+            
+            // Reset modal body states
+            document.getElementById('drop-zone').style.display = 'flex';
+            document.getElementById('file-preview').style.display = 'none';
+            document.getElementById('import-loading').style.display = 'none';
+            document.getElementById('import-result').style.display = 'none';
+            document.getElementById('file-input').value = '';
+            selectedFile = null;
+            
+            // Setup Drag and Drop event listeners if not already done
+            const dropZone = document.getElementById('drop-zone');
+            if (dropZone && !dropZone.dataset.listenersAttached) {
+                dropZone.dataset.listenersAttached = 'true';
+                
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropZone.classList.add('dragover');
+                    }, false);
+                });
+                
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropZone.classList.remove('dragover');
+                    }, false);
+                });
+                
+                dropZone.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    handleFileSelect(files);
+                }, false);
+            }
+        }
+
+        function closeImportModal(shouldRefresh = false) {
+            document.getElementById('import-modal').style.display = 'none';
+            if (shouldRefresh) {
+                fetchStats();
+                fetchWordList();
+            }
+        }
+
+        function handleFileSelect(files) {
+            if (files.length === 0) return;
+            const file = files[0];
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showToast("Vui lòng chọn file định dạng CSV!", "error");
+                return;
+            }
+            
+            selectedFile = file;
+            document.getElementById('preview-filename').textContent = file.name;
+            document.getElementById('drop-zone').style.display = 'none';
+            document.getElementById('file-preview').style.display = 'flex';
+        }
+
+        async function startImport() {
+            if (!selectedFile) return;
+            
+            document.getElementById('file-preview').style.display = 'none';
+            document.getElementById('import-loading').style.display = 'flex';
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            try {
+                const response = await fetch('/api/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                document.getElementById('import-loading').style.display = 'none';
+                document.getElementById('import-result').style.display = 'flex';
+                
+                const resultSummary = document.getElementById('result-summary');
+                const resultDetails = document.getElementById('result-details');
+                
+                if (data.success) {
+                    resultSummary.textContent = "Hoàn thành!";
+                    resultDetails.innerHTML = `✅ ${data.imported} từ mới | ♻️ ${data.updated} từ cập nhật | ⚠️ ${data.skipped} từ bỏ qua | Tổng cộng: ${data.total} hàng`;
+                    showToast("Import dữ liệu thành công!", "success");
+                } else {
+                    resultSummary.textContent = "Thất bại!";
+                    resultDetails.textContent = data.error || "Lỗi xử lý file CSV.";
+                    showToast("Import dữ liệu thất bại!", "error");
+                }
+            } catch (err) {
+                console.error("Import error:", err);
+                document.getElementById('import-loading').style.display = 'none';
+                document.getElementById('import-result').style.display = 'flex';
+                document.getElementById('result-summary').textContent = "Thất bại!";
+                document.getElementById('result-details').textContent = "Lỗi kết nối máy chủ!";
+                showToast("Lỗi máy chủ khi import!", "error");
+            }
+        }
+
         // On Load Page Initialization
         window.addEventListener('DOMContentLoaded', () => {
             fetchStats();
             fetchWordList();
         });
     </script>
+
+    <!-- Import Modal -->
+    <div id="import-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📥 Import từ vựng từ CSV</h3>
+                <button class="close-btn" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="drop-zone" class="drop-zone">
+                    <span class="drop-zone-icon">📁</span>
+                    <p>Kéo và thả file CSV ở đây hoặc</p>
+                    <button class="select-file-btn" onclick="document.getElementById('file-input').click()">Chọn file</button>
+                    <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleFileSelect(this.files)">
+                    <p class="format-help">Định dạng: CSV (cột Word, Translation, và tùy chọn Phonetic, Date)</p>
+                </div>
+                
+                <div id="file-preview" class="file-preview" style="display:none">
+                    <span class="file-icon">📄</span>
+                    <span id="preview-filename">filename.csv</span>
+                    <button class="btn-import-start" id="btn-start-import" onclick="startImport()">Bắt đầu import</button>
+                </div>
+                
+                <div id="import-loading" class="import-loading" style="display:none">
+                    <div class="spinner"></div>
+                    <p>Đang xử lý dữ liệu...</p>
+                </div>
+                
+                <div id="import-result" class="import-result" style="display:none">
+                    <div class="result-icon">🎉</div>
+                    <h4 id="result-summary">Hoàn thành!</h4>
+                    <p id="result-details" style="color: var(--text-secondary); margin-top: 0.5rem;"></p>
+                    <button class="btn-close-result" onclick="closeImportModal(true)">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

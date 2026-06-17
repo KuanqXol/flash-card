@@ -12,20 +12,20 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 def parse_short_translation(full_translation: str) -> str:
     """
-    Parses full translation by taking the first segment before a semicolon,
-    stripping specific word-type prefixes, and cleaning up extra whitespace.
-    
-    Example:
-    "n. người đại diện đại diện tượng trưng; adj. đại diện" -> "người đại diện đại diện tượng trưng"
+    Parses full translation by taking the first segment before a semicolon (or the whole string if none),
+    stripping word-type prefixes, and truncating to max 60 chars (appending '...').
     """
     if not isinstance(full_translation, str) or not full_translation:
         return ""
     
-    # Split by semicolon and get the first part
-    first_part = full_translation.split(';')[0].strip()
+    # Split by semicolon and get the first part if present
+    if ';' in full_translation:
+        first_part = full_translation.split(';')[0].strip()
+    else:
+        first_part = full_translation.strip()
     
     # Prefix list to strip from the beginning of the string (case-insensitive)
-    prefixes = ["n. ", "v. ", "adj. ", "adv. ", "web. "]
+    prefixes = ["n. ", "v. ", "adj. ", "adv. ", "prep. ", "conj. ", "web. ", "pron. "]
     
     changed = True
     while changed:
@@ -36,12 +36,16 @@ def parse_short_translation(full_translation: str) -> str:
                 changed = True
                 break
                 
+    if len(first_part) > 60:
+        first_part = first_part[:60] + "..."
+        
     return first_part
 
-def import_from_csv(csv_path: str):
+def import_from_csv(csv_path: str) -> dict:
     """
     Reads a CSV file containing Word, Phonetic, Translation, and Date columns,
     and performs a case-insensitive upsert in the database.
+    Returns: { 'imported': int, 'updated': int, 'skipped': int, 'total': int }
     """
     if not os.path.exists(csv_path):
         print(f"Error: File '{csv_path}' does not exist.")
@@ -61,13 +65,18 @@ def import_from_csv(csv_path: str):
     
     new_count = 0
     update_count = 0
+    skipped_count = 0
     
     for _, row in df.iterrows():
-        word = str(row.get('Word', '')).strip()
+        word = str(row.get('Word', '')).strip() if pd.notna(row.get('Word')) else ''
         if not word:
+            skipped_count += 1
             continue
             
         phonetic = str(row.get('Phonetic', '')).strip() if pd.notna(row.get('Phonetic')) else None
+        if phonetic == '--':
+            phonetic = ''
+            
         translation = str(row.get('Translation', '')).strip() if pd.notna(row.get('Translation')) else ""
         date_added = str(row.get('Date', '')).strip() if pd.notna(row.get('Date')) else None
         
@@ -96,8 +105,15 @@ def import_from_csv(csv_path: str):
     conn.commit()
     conn.close()
     
-    total_count = new_count + update_count
-    print(f"✅ Import: {new_count} từ mới | ♻️ Update: {update_count} từ | Tổng: {total_count}")
+    total_count = new_count + update_count + skipped_count
+    print(f"✅ Import: {new_count} từ mới | ♻️ Update: {update_count} từ | Skipped: {skipped_count} | Tổng: {total_count}")
+    
+    return {
+        'imported': new_count,
+        'updated': update_count,
+        'skipped': skipped_count,
+        'total': total_count
+    }
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:

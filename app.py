@@ -1,4 +1,9 @@
-from flask import Flask, render_template, request, jsonify
+import os
+import tempfile
+import csv
+from io import StringIO
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, make_response
 from database import (
     init_db, 
     get_stats, 
@@ -415,6 +420,169 @@ def api_words_top():
         })
         
     return jsonify(top_words)
+
+# API POST /api/import -> uploads and imports a CSV file
+@app.route('/api/import', methods=['POST'])
+def api_import_csv():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file part in request'}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+    if not file.filename.endswith('.csv'):
+        return jsonify({'success': False, 'error': 'Uploaded file is not a CSV'}), 400
+        
+    try:
+        # Save file to a temporary location
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+            temp_path = temp_file.name
+            file.save(temp_path)
+            
+        try:
+            # Import from CSV
+            from import_csv import import_from_csv
+            result = import_from_csv(temp_path)
+            return jsonify({
+                'success': True,
+                'imported': result['imported'],
+                'updated': result['updated'],
+                'skipped': result['skipped'],
+                'total': result['total']
+            })
+        finally:
+            # Cleanup temp file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# API GET /api/export -> exports database content as downloadable CSV
+@app.route('/api/export')
+def api_export_progress():
+    export_format = request.args.get('format', 'csv')
+    if export_format != 'csv':
+        return jsonify({'success': False, 'error': 'Unsupported format'}), 400
+        
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Retrieve all words for CSV construction
+    cursor.execute("""
+        SELECT word, phonetic, translation, status, total_score, review_count, last_reviewed, date_added
+        FROM words
+        ORDER BY word COLLATE NOCASE ASC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    
+    # Generate CSV using StringIO
+    si = StringIO()
+    cw = csv.writer(si)
+    
+    # Header row
+    cw.writerow(['word', 'phonetic', 'translation', 'status', 'total_score', 'review_count', 'last_reviewed', 'date_added'])
+    
+    # Data rows
+    for r in rows:
+        cw.writerow([
+            r['word'],
+            r['phonetic'] or '',
+            r['translation'] or '',
+            r['status'],
+            r['total_score'],
+            r['review_count'],
+            r['last_reviewed'] or '',
+            r['date_added'] or ''
+        ])
+        
+    output = si.getvalue()
+    si.close()
+    
+    # Filename format: flashvocab_export_YYYYMMDD.csv
+    date_str = datetime.now().strftime('%Y%m%d')
+    filename = f"flashvocab_export_{date_str}.csv"
+    
+    response = make_response(output)
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    response.headers["Content-type"] = "text/csv; charset=utf-8"
+    
+    return response
+
+# API POST /api/word/<id>/reset -> resets statistics for a single word
+@app.route('/api/word/<int:word_id>/reset', methods=['POST'])
+def api_reset_word(word_id):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE words
+            SET status = 'new',
+                total_score = 0,
+                has_been_rated_five = 0,
+                review_count = 0,
+                last_reviewed = NULL
+            WHERE id = ?
+        """, (word_id,))
+        
+        if cursor.rowcount == 0:
+            return jsonify({'success': False, 'error': 'Word not found'}), 404
+            
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+# API POST /api/words/bulk-action -> applies status overrides or resets on list of words
+@app.route('/api/words/bulk-action', methods=['POST'])
+def api_words_bulk_action():
+    data = request.get_json() or {}
+    action = data.get('action')
+    word_ids = data.get('word_ids', [])
+    
+    if not action or not word_ids:
+        return jsonify({'success': False, 'message': 'Missing action or word_ids'}), 400
+        
+    if action not in ['mark_learned', 'mark_learning', 'reset']:
+        return jsonify({'success': False, 'message': 'Invalid action'}), 400
+        
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        
+        # Build query parameters placeholders e.g. (?, ?, ?)
+        placeholders = ','.join('?' for _ in word_ids)
+        
+        if action == 'mark_learned':
+            cursor.execute(f"UPDATE words SET status = 'learned' WHERE id IN ({placeholders})", word_ids)
+        elif action == 'mark_learning':
+            cursor.execute(f"UPDATE words SET status = 'learning' WHERE id IN ({placeholders})", word_ids)
+        elif action == 'reset':
+            cursor.execute(f"""
+                UPDATE words
+                SET status = 'new',
+                    total_score = 0,
+                    has_been_rated_five = 0,
+                    review_count = 0,
+                    last_reviewed = NULL
+                WHERE id IN ({placeholders})
+            """, word_ids)
+            
+        affected = cursor.rowcount
+        conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'affected': affected
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
     # Initialize SQLite database and tables
