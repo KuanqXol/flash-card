@@ -246,6 +246,65 @@ def api_matching_result():
         'total_delta': total_delta
     })
 
+# API GET /api/fill/next -> retrieves 1 random word for fill-in-the-blank game
+@app.route('/api/fill/next')
+def api_fill_next():
+    status = request.args.get('status', 'all')
+    exclude_id = request.args.get('exclude_id', None, type=int)
+    
+    words = get_random_words(1, status, exclude_id)
+    if not words:
+        if exclude_id is not None:
+            words = get_random_words(1, status, None)
+            
+        if not words:
+            return jsonify({'error': 'no_words'})
+            
+    word = words[0]
+    return jsonify({
+        'id': word['id'],
+        'word': word['word'],
+        'phonetic': word['phonetic'],
+        'translation': word['translation'],
+        'short_translation': word['short_translation'],
+        'status': word['status'],
+        'total_score': word['total_score']
+    })
+
+# API POST /api/fill/evaluate -> evaluates user spelling/meaning guess and updates score
+@app.route('/api/fill/evaluate', methods=['POST'])
+def api_fill_evaluate():
+    data = request.get_json() or {}
+    word_id = data.get('word_id')
+    is_correct = data.get('is_correct')
+    
+    if word_id is None or is_correct is None:
+        return jsonify({'success': False, 'message': 'Missing word_id or is_correct'}), 400
+        
+    delta = 5 if is_correct else -3
+    
+    try:
+        success = update_word_after_review(
+            word_id=int(word_id),
+            delta=delta,
+            mode='fill',
+            is_correct=bool(is_correct)
+        )
+        
+        if success:
+            word = get_word_by_id(word_id)
+            new_score = word['total_score'] if word else 0
+            return jsonify({
+                'success': True,
+                'new_score': new_score,
+                'delta': delta
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Word not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 if __name__ == '__main__':
     # Initialize SQLite database and tables
     init_db()
