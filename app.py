@@ -173,6 +173,79 @@ def api_mark_learning():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# API GET /api/matching/words -> retrieves n random words for matching game
+@app.route('/api/matching/words')
+def api_matching_words():
+    n = request.args.get('n', 6, type=int)
+    if n < 4:
+        n = 4
+    elif n > 10:
+        n = 10
+        
+    status = request.args.get('status', 'all')
+    
+    words = get_random_words(n, status)
+    if len(words) < n:
+        matching_count = len(get_words_by_status(status))
+        return jsonify({'error': 'not_enough_words', 'available': matching_count})
+        
+    formatted_words = []
+    for word in words:
+        short_translation = word.get('short_translation', '')
+        if not short_translation or short_translation.strip() == '':
+            translation = word.get('translation', '') or ''
+            short_translation = translation[:30].strip()
+            
+        formatted_words.append({
+            'id': word['id'],
+            'word': word['word'],
+            'short_translation': short_translation
+        })
+        
+    return jsonify({'words': formatted_words})
+
+# API POST /api/matching/result -> submits review results for matching game
+@app.route('/api/matching/result', methods=['POST'])
+def api_matching_result():
+    data = request.get_json() or {}
+    results = data.get('results', [])
+    
+    updated = []
+    total_delta = 0
+    
+    for item in results:
+        word_id = item.get('word_id')
+        is_correct = item.get('is_correct')
+        
+        if word_id is None or is_correct is None:
+            continue
+            
+        delta = 3 if is_correct else -2
+        total_delta += delta
+        
+        try:
+            update_word_after_review(
+                word_id=int(word_id),
+                delta=delta,
+                mode='matching',
+                is_correct=bool(is_correct)
+            )
+            
+            word = get_word_by_id(word_id)
+            if word:
+                updated.append({
+                    'word_id': int(word_id),
+                    'delta': delta,
+                    'new_score': word['total_score']
+                })
+        except Exception as e:
+            print(f"Error updating word {word_id} in matching result: {e}")
+            
+    return jsonify({
+        'updated': updated,
+        'total_delta': total_delta
+    })
+
 if __name__ == '__main__':
     # Initialize SQLite database and tables
     init_db()
