@@ -1,545 +1,301 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AetherCard - Spelling Practice</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-start: #080710;
-            --bg-end: #0f172a;
-            --card-border: rgba(255, 255, 255, 0.08);
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --color-accent: #6366f1;
-            --color-accent-hover: #4f46e5;
-            
-            --card-bg: rgba(30, 41, 59, 0.55);
-            
-            --font-display: 'Outfit', sans-serif;
-            --font-sans: 'Inter', sans-serif;
-        }
+{% extends "base.html" %}
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+{% block title %}Điền Nghĩa - FlashVocab{% endblock %}
 
-        body {
-            background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
-            color: var(--text-primary);
-            font-family: var(--font-sans);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-            position: relative;
-        }
+{% block styles %}
+<style>
+    /* Specific styles for Spelling / Fill in the blank page */
+    .session-info {
+        background: var(--primary-light);
+        border: 1px solid rgba(79, 70, 229, 0.15);
+        padding: 0.6rem 1.2rem;
+        border-radius: 1rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        font-family: var(--font-display);
+        margin-bottom: 1.5rem;
+        color: var(--primary);
+        display: inline-block;
+        box-shadow: var(--shadow-sm);
+    }
 
-        .background-glow {
-            position: absolute;
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0) 70%);
-            top: 40%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 0;
-            pointer-events: none;
-        }
+    .session-info span {
+        color: var(--primary-dark);
+        font-weight: 700;
+    }
 
-        .container {
-            width: 100%;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 1.5rem 1.5rem;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            z-index: 10;
-            position: relative;
-        }
+    /* Card prompt stage */
+    .prompt-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 2.5rem;
+        box-shadow: var(--shadow-lg);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 280px;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
 
-        /* Header Layout */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 1rem 1.5rem;
-            border-radius: 1.25rem;
-            backdrop-filter: blur(10px);
-        }
+    .card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 1.25rem;
-            flex-wrap: wrap;
-        }
+    .card-bottom {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        border-top: 1px solid var(--border);
+        padding-top: 0.85rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
 
-        .logo {
-            font-family: var(--font-display);
-            font-size: 1.6rem;
-            font-weight: 800;
-            background: linear-gradient(to right, #818cf8, #fb7185);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-decoration: none;
-            margin-right: 0.5rem;
-        }
+    .flag-icon {
+        font-size: 2.2rem;
+    }
 
-        .controls-group {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
+    .question-hint-label {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
 
-        .btn-toggle {
-            background: rgba(99, 102, 241, 0.15);
-            border: 1px solid rgba(129, 140, 248, 0.3);
-            color: #818cf8;
-            padding: 0.45rem 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
+    .prompt-display {
+        font-family: var(--font-display);
+        font-size: 2.8rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+        word-wrap: break-word;
+        padding: 0 1rem;
+    }
 
-        .btn-toggle:hover {
-            background: rgba(99, 102, 241, 0.25);
-            border-color: rgba(129, 140, 248, 0.5);
-            color: #ffffff;
-        }
+    .phonetic-display {
+        font-size: 1.15rem;
+        color: var(--primary);
+        font-weight: 500;
+        margin-top: 0.5rem;
+    }
 
-        .ctrl-select {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: var(--text-primary);
-            padding: 0.45rem 1.5rem 0.45rem 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.85rem;
-            font-weight: 500;
-            outline: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
+    /* Input section */
+    .input-area {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+        margin-bottom: 1.5rem;
+    }
 
-        .ctrl-select:focus {
-            border-color: var(--color-accent);
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
-        }
+    .answer-input {
+        width: 100%;
+        background: var(--card-bg);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.1rem;
+        font-size: 1.1rem;
+        color: var(--text-primary);
+        text-align: center;
+        outline: none;
+        transition: all var(--transition);
+    }
 
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: var(--text-primary);
-            padding: 0.5rem 1.25rem;
-            border-radius: 0.75rem;
-            text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
+    .answer-input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 10px rgba(79, 70, 229, 0.15);
+    }
 
-        .back-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: translateX(-2px);
-        }
+    .answer-input:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        border-color: var(--border);
+    }
 
-        /* Session counter */
-        .session-info {
-            align-self: flex-end;
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(244, 63, 94, 0.05) 100%);
-            border: 1px solid rgba(129, 140, 248, 0.2);
-            padding: 0.5rem 1.2rem;
-            border-radius: 1rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-            font-family: var(--font-display);
-            margin-bottom: 1.5rem;
-            backdrop-filter: blur(8px);
-        }
+    .btn-check {
+        align-self: center;
+    }
 
-        .session-info span {
-            color: #818cf8;
-        }
+    /* Answer feedback box */
+    .answer-box {
+        display: none;
+        background: var(--warning-light);
+        border: 1px solid #fde68a;
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        animation: fadeIn 0.4s ease-out;
+        color: #78350f;
+    }
 
-        /* Card prompt stage (60% height equivalent) */
-        .prompt-card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 1.75rem;
-            padding: 2.5rem;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            min-height: 280px;
-            margin-bottom: 1.5rem;
-            position: relative;
-        }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 
-        .card-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-        }
+    .ans-label {
+        font-family: var(--font-sans);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        color: #b45309;
+        margin-bottom: 0.5rem;
+    }
 
-        .card-bottom {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            padding-top: 0.85rem;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
+    .ans-short {
+        font-family: var(--font-display);
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #78350f;
+        margin-bottom: 0.5rem;
+    }
 
-        .flag-icon {
-            font-size: 2.2rem;
-        }
+    .ans-full {
+        font-size: 0.95rem;
+        color: #92400e;
+        line-height: 1.5;
+        border-top: 1px solid rgba(180, 83, 9, 0.1);
+        padding-top: 0.5rem;
+    }
 
-        .question-hint-label {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
+    /* Self Evaluation Actions */
+    .eval-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.25rem;
+    }
 
-        .prompt-display {
-            font-family: var(--font-display);
-            font-size: 2.8rem;
-            font-weight: 800;
-            color: #ffffff;
-            letter-spacing: -0.01em;
-            line-height: 1.2;
-            word-wrap: break-word;
-            padding: 0 1rem;
-        }
+    .btn-eval {
+        flex: 1;
+        border: none;
+        padding: 0.9rem 1rem;
+        border-radius: var(--radius);
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all var(--transition);
+        color: white;
+    }
 
-        .phonetic-display {
-            font-size: 1.15rem;
-            color: #818cf8;
-            font-weight: 500;
-            margin-top: 0.5rem;
-        }
+    .btn-correct {
+        background: var(--success);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
 
-        /* Badges */
-        .status-badge {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            text-transform: uppercase;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-        }
+    .btn-correct:hover {
+        background: #059669;
+        transform: translateY(-2px);
+    }
 
-        .badge-new { background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); }
-        .badge-learning { background-color: rgba(251, 113, 133, 0.1); color: #fb7185; border: 1px solid rgba(251, 113, 133, 0.2); }
-        .badge-learned { background-color: rgba(52, 211, 153, 0.1); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.2); }
-        .badge-empty { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+    .btn-wrong {
+        background: var(--danger);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
 
-        /* Input section */
-        .input-area {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            width: 100%;
-            margin-bottom: 1.5rem;
-        }
+    .btn-wrong:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+    }
 
-        .answer-input {
-            width: 100%;
-            background: rgba(15, 23, 42, 0.6);
-            border: 2px solid rgba(255, 255, 255, 0.08);
-            border-radius: 1rem;
-            padding: 1.1rem;
-            font-size: 1.1rem;
-            color: white;
-            text-align: center;
-            outline: none;
-            transition: all 0.3s ease;
-        }
+    /* Skip actions */
+    .skip-action {
+        display: flex;
+        justify-content: center;
+        margin-top: auto;
+        padding-top: 1rem;
+    }
+</style>
+{% endblock %}
 
-        .answer-input:focus {
-            border-color: var(--color-accent);
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
-        }
+{% block content %}
+<div class="page-header" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; color: var(--text-primary);">✏️ Điền Nghĩa</h2>
+        <p style="color: var(--text-secondary); font-size: 0.95rem;">Luyện viết từ vựng hoặc dịch nghĩa để thử thách bản thân.</p>
+    </div>
+    
+    <div class="controls-group" style="display: flex; align-items: center; gap: 0.75rem;">
+        <!-- Toggle translation direction -->
+        <button class="btn btn-ghost" id="btn-toggle-mode" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🇬🇧 EN → 🇻🇳 VI</button>
+        
+        <select class="filter-select" id="filter-dropdown" style="background: var(--card-bg); border: 1px solid var(--border); color: var(--text-primary); padding: 0.45rem 1.5rem 0.45rem 0.75rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 500; outline: none; cursor: pointer;">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="new">Từ mới</option>
+            <option value="learning">Đang học</option>
+            <option value="learned">Đã thuộc</option>
+        </select>
+    </div>
+</div>
 
-        .answer-input:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            border-color: rgba(255, 255, 255, 0.05);
-        }
+<!-- Empty State (hidden by default) -->
+<div id="fill-empty-state" class="empty-state" style="display:none;">
+    <div class="empty-state-icon">📭</div>
+    <p>Không có từ nào phù hợp.</p>
+    <small>Không có từ nào trong nhóm này. Thử chọn 'Tất cả'!</small>
+    <a href="/">Về Dashboard</a>
+</div>
 
-        .btn-check {
-            background: var(--color-accent);
-            color: white;
-            border: none;
-            padding: 0.9rem 2.5rem;
-            border-radius: 1rem;
-            font-family: var(--font-display);
-            font-size: 1.05rem;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25);
-            transition: all 0.3s ease;
-            align-self: center;
-        }
+<div id="fill-stage-container" style="display: block; width: 100%;">
+    <!-- Session Statistics Counter -->
+    <div class="session-info">
+        Đã ôn: <span id="session-count">0</span> từ | Điểm: <span id="session-score">0</span> hôm nay
+    </div>
 
-        .btn-check:hover {
-            background: var(--color-accent-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
-        }
-
-        /* Answer feedback box */
-        .answer-box {
-            display: none;
-            background: #fffbeb;
-            border: 1px solid #fde68a;
-            border-radius: 1.25rem;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            animation: fadeIn 0.4s ease-out;
-            color: #78350f; /* Dark amber text for readability on yellow */
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .ans-label {
-            font-family: var(--font-sans);
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-weight: 600;
-            color: #b45309;
-            margin-bottom: 0.5rem;
-        }
-
-        .ans-short {
-            font-family: var(--font-display);
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: #78350f;
-            margin-bottom: 0.5rem;
-        }
-
-        .ans-full {
-            font-size: 0.95rem;
-            color: #92400e;
-            line-height: 1.5;
-            border-top: 1px solid rgba(180, 83, 9, 0.1);
-            padding-top: 0.5rem;
-        }
-
-        /* Self Evaluation Actions */
-        .eval-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1.25rem;
-        }
-
-        .btn-eval {
-            flex: 1;
-            border: none;
-            padding: 0.9rem 1rem;
-            border-radius: 0.75rem;
-            font-family: var(--font-display);
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            color: white;
-        }
-
-        .btn-correct {
-            background: #10b981;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-        }
-
-        .btn-correct:hover {
-            background: #059669;
-            transform: translateY(-2px);
-        }
-
-        .btn-wrong {
-            background: #f43f5e;
-            box-shadow: 0 4px 12px rgba(244, 63, 94, 0.2);
-        }
-
-        .btn-wrong:hover {
-            background: #e11d48;
-            transform: translateY(-2px);
-        }
-
-        /* Skip actions */
-        .skip-action {
-            display: flex;
-            justify-content: center;
-            margin-top: auto;
-            padding-top: 1rem;
-        }
-
-        .btn-skip {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--card-border);
-            color: var(--text-secondary);
-            padding: 0.5rem 1.5rem;
-            border-radius: 0.75rem;
-            font-family: var(--font-sans);
-            font-size: 0.85rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-skip:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-primary);
-        }
-
-        /* Toast notifications */
-        .toast {
-            position: fixed;
-            bottom: 2rem;
-            right: -25rem;
-            z-index: 9999;
-            min-width: 280px;
-            max-width: 380px;
-            padding: 1rem 1.25rem;
-            border-radius: 1rem;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: #ffffff;
-            transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
-            opacity: 0;
-        }
-
-        .toast.visible {
-            right: 2rem;
-            opacity: 1;
-        }
-
-        .toast.fade-out {
-            opacity: 0;
-        }
-
-        .toast-success { background: rgba(16, 185, 129, 0.9); border: 1px solid rgba(16, 185, 129, 0.3); }
-        .toast-error { background: rgba(244, 63, 94, 0.9); border: 1px solid rgba(244, 63, 94, 0.3); }
-        .toast-info { background: rgba(59, 130, 246, 0.9); border: 1px solid rgba(59, 130, 246, 0.3); }
-        .toast-icon { font-size: 1.2rem; }
-    </style>
-</head>
-<body>
-    <div class="background-glow"></div>
-
-    <div class="container">
-        <header>
-            <div class="header-left">
-                <a href="/" class="logo">✏️ Điền Nghĩa</a>
-                
-                <div class="controls-group">
-                    <!-- Toggle translation direction -->
-                    <button class="btn-toggle" id="btn-toggle-mode">🇬🇧 EN → 🇻🇳 VI</button>
-                    
-                    <select class="ctrl-select" id="filter-dropdown">
-                        <option value="all">Tất cả trạng thái</option>
-                        <option value="new">Từ mới</option>
-                        <option value="learning">Đang học</option>
-                        <option value="learned">Đã thuộc</option>
-                    </select>
-                </div>
-            </div>
-            
-            <a href="/" class="back-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                Trang chủ
-            </a>
-        </header>
-
-        <!-- Session Statistics Counter -->
-        <div class="session-info">
-            Đã ôn: <span id="session-count">0</span> từ | Điểm: <span id="session-score">0</span> hôm nay
+    <!-- Stage Card -->
+    <main class="prompt-card">
+        <div class="card-top">
+            <span class="status-badge badge" id="card-status-badge">Trống</span>
+            <span class="flag-icon" id="question-flag">🇬🇧</span>
         </div>
-
-        <!-- Stage Card -->
-        <main class="prompt-card">
-            <div class="card-top">
-                <span class="status-badge" id="card-status-badge">Trống</span>
-                <span class="flag-icon" id="question-flag">🇬🇧</span>
-            </div>
-            
-            <div style="margin: auto 0; padding: 1rem 0;">
-                <div class="question-hint-label" id="question-hint-label">Nghĩa tiếng Việt là gì?</div>
-                <div class="prompt-display" id="question-prompt">Word Prompt</div>
-                <div class="phonetic-display" id="question-phonetic">/phonetic/</div>
-            </div>
-            
-            <div class="card-bottom">
-                <span id="card-score">Điểm: 0 ⭐</span>
-                <span>Tự đánh giá đáp án</span>
-            </div>
-        </main>
-
-        <!-- Input and Actions Panel -->
-        <div class="input-area">
-            <input type="text" autocomplete="off" class="answer-input" id="answer-input" placeholder="Nhập nghĩa tiếng Việt...">
-            <button class="btn-check" id="btn-action">Kiểm tra →</button>
+        
+        <div style="margin: auto 0; padding: 1rem 0;">
+            <div class="question-hint-label" id="question-hint-label">Nghĩa tiếng Việt là gì?</div>
+            <div class="prompt-display" id="question-prompt">Word Prompt</div>
+            <div class="phonetic-display" id="question-phonetic">/phonetic/</div>
         </div>
-
-        <!-- Answer box (yellow) -->
-        <div class="answer-box" id="answer-box">
-            <div class="ans-label">📖 Đáp án chính xác:</div>
-            <div class="ans-short" id="short-answer">Short translation</div>
-            <div class="ans-full" id="full-answer">Full detail definition description translation context goes here.</div>
-            
-            <div class="eval-actions">
-                <button class="btn-eval btn-correct" onclick="evaluate(true)">✅ Tôi đúng rồi (+5 điểm)</button>
-                <button class="btn-eval btn-wrong" onclick="evaluate(false)">❌ Tôi sai rồi (-3 điểm)</button>
-            </div>
+        
+        <div class="card-bottom">
+            <span id="card-score">Điểm: 0 ⭐</span>
+            <span>Tự đánh giá đáp án</span>
         </div>
+    </main>
 
-        <!-- Skip Button -->
-        <div class="skip-action">
-            <button class="btn-skip" id="btn-skip">⏭ Bỏ qua từ này</button>
+    <!-- Input and Actions Panel -->
+    <div class="input-area">
+        <input type="text" autocomplete="off" class="answer-input" id="answer-input" placeholder="Nhập nghĩa tiếng Việt...">
+        <button class="btn btn-primary btn-check" id="btn-action" style="padding: 0.9rem 2.5rem; font-size: 1.05rem; border-radius: var(--radius);">Kiểm tra →</button>
+    </div>
+
+    <!-- Answer box (yellow) -->
+    <div class="answer-box" id="answer-box">
+        <div class="ans-label">📖 Đáp án chính xác:</div>
+        <div class="ans-short" id="short-answer">Short translation</div>
+        <div class="ans-full" id="full-answer">Full detail definition description translation context goes here.</div>
+        
+        <div class="eval-actions">
+            <button class="btn-eval btn-correct" onclick="window.evaluate(true)">✅ Tôi đúng rồi (+5 điểm)</button>
+            <button class="btn-eval btn-wrong" onclick="window.evaluate(false)">❌ Tôi sai rồi (-3 điểm)</button>
         </div>
     </div>
 
-    <!-- Load fill game script -->
-    <script src="/static/js/fill.js"></script>
-    <script>
-        // Override local click to prevent propagation
-        function evaluate(isCorrect) {
-            if (typeof window.evaluate === 'function') {
-                window.evaluate(isCorrect);
-            }
-        }
-    </script>
-</body>
-</html>
+    <!-- Skip Button -->
+    <div class="skip-action">
+        <button class="btn btn-ghost" id="btn-skip">⏭ Bỏ qua từ này</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/fill.js"></script>
+{% endblock %}

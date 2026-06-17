@@ -1,28 +1,3 @@
-// Reusable Toast Notification System
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-    
-    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.classList.add('visible');
-    }, 10);
-    
-    setTimeout(() => {
-        toast.classList.remove('visible');
-        toast.classList.add('fade-out');
-        setTimeout(() => {
-            toast.remove();
-        }, 300);
-    }, 2500);
-}
-
 // Fisher-Yates Shuffle Algorithm
 function shuffle(array) {
     let currentIndex = array.length, randomIndex;
@@ -112,6 +87,10 @@ async function loadWords() {
         gridLocked = false;
         sessionSubmitted = false;
         
+        // Hide empty state, show game container
+        document.getElementById('matching-empty-state').style.display = 'none';
+        document.getElementById('matching-stage-container').style.display = 'block';
+        
         if (btnSubmitEl) btnSubmitEl.disabled = true;
         updateProgressUI();
         renderColumns();
@@ -123,10 +102,8 @@ async function loadWords() {
 }
 
 function displayEmptyState(available) {
-    if (enColumnEl) enColumnEl.innerHTML = `<div class="empty-msg">Cần tối thiểu 4 từ vựng. Bạn hiện có ${available} từ phù hợp.</div>`;
-    if (viColumnEl) viColumnEl.innerHTML = `<div class="empty-msg">Vui lòng nhập thêm từ vựng từ file CSV.</div>`;
-    if (progressTextEl) progressTextEl.textContent = "0/0 cặp đã nối";
-    if (btnSubmitEl) btnSubmitEl.disabled = true;
+    document.getElementById('matching-stage-container').style.display = 'none';
+    document.getElementById('matching-empty-state').style.display = 'flex';
 }
 
 function renderColumns() {

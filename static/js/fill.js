@@ -1,28 +1,3 @@
-// Reusable Toast Notification System
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-    
-    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.classList.add('visible');
-    }, 10);
-    
-    setTimeout(() => {
-        toast.classList.remove('visible');
-        toast.classList.add('fade-out');
-        setTimeout(() => {
-            toast.remove();
-        }, 300);
-    }, 2500);
-}
-
 // Điền Nghĩa Game State
 let state = {
     currentWord: null,
@@ -146,6 +121,10 @@ async function loadNext() {
             return;
         }
 
+        // Hide empty state, show game container
+        document.getElementById('fill-empty-state').style.display = 'none';
+        document.getElementById('fill-stage-container').style.display = 'block';
+
         state.currentWord = data;
         displayWord(data);
     } catch (err) {
@@ -155,16 +134,8 @@ async function loadNext() {
 }
 
 function displayEmptyState() {
-    if (flagEl) flagEl.textContent = '❌';
-    if (promptEl) promptEl.textContent = "Hết từ vựng";
-    if (hintLabelEl) hintLabelEl.textContent = "Không có từ vựng khớp với bộ lọc.";
-    if (phoneticEl) phoneticEl.style.display = 'none';
-    if (statusBadgeEl) {
-        statusBadgeEl.textContent = "Trống";
-        statusBadgeEl.className = "status-badge badge-empty";
-    }
-    if (wordScoreEl) wordScoreEl.textContent = "Điểm: 0 ⭐";
-    if (btnActionEl) btnActionEl.style.display = 'none';
+    document.getElementById('fill-stage-container').style.display = 'none';
+    document.getElementById('fill-empty-state').style.display = 'flex';
 }
 
 function displayWord(word) {

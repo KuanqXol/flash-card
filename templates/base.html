@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FlashVocab{% endblock %}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Cohesive clean stylesheet -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Navigation (Desktop) -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <a href="/">📚 FlashVocab</a>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-link" id="nav-dashboard">
+                    <span class="nav-icon">🏠</span> Dashboard
+                </a>
+                <a href="/flashcard" class="nav-link" id="nav-flashcard">
+                    <span class="nav-icon">🃏</span> Flash Card
+                </a>
+                <a href="/matching" class="nav-link" id="nav-matching">
+                    <span class="nav-icon">🔗</span> Nối Từ
+                </a>
+                <a href="/fill" class="nav-link" id="nav-fill">
+                    <span class="nav-icon">✏️</span> Điền Nghĩa
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Bottom Navigation (Mobile) -->
+        <nav class="bottom-nav">
+            <a href="/" class="bottom-nav-link" id="bnav-dashboard">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="/flashcard" class="bottom-nav-link" id="bnav-flashcard">
+                <span class="nav-icon">🃏</span>
+                <span class="nav-text">Flash Card</span>
+            </a>
+            <a href="/matching" class="bottom-nav-link" id="bnav-matching">
+                <span class="nav-icon">🔗</span>
+                <span class="nav-text">Nối Từ</span>
+            </a>
+            <a href="/fill" class="bottom-nav-link" id="bnav-fill">
+                <span class="nav-icon">✏️</span>
+                <span class="nav-text">Điền Nghĩa</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" style="position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;"></div>
+    
+    <script>
+    // Global Toast Notification System
+    function showToast(message, type = 'success', duration = 2500) {
+      const colors = { success: '#10B981', error: '#EF4444', info: '#4F46E5', warning: '#F59E0B' };
+      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+      
+      let container = document.getElementById('toast-container');
+      if (!container) {
+          container = document.createElement('div');
+          container.id = 'toast-container';
+          container.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;`;
+          document.body.appendChild(container);
+      }
+      
+      const toast = document.createElement('div');
+      toast.innerHTML = `<span>${icons[type]}</span> ${message}`;
+      toast.style.cssText = `background:${colors[type]};color:white;padding:12px 20px;border-radius:8px;font-size:0.9rem;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:8px;transform:translateX(120%);transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);max-width:300px;`;
+      container.appendChild(toast);
+      
+      setTimeout(() => toast.style.transform = 'translateX(0)', 10);
+      setTimeout(() => {
+        toast.style.transform = 'translateX(120%)';
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    // Set Active Navigation State based on Pathname
+    function updateActiveNav() {
+        const path = window.location.pathname;
+        let activeId = 'dashboard';
+        if (path.startsWith('/flashcard')) activeId = 'flashcard';
+        else if (path.startsWith('/matching')) activeId = 'matching';
+        else if (path.startsWith('/fill')) activeId = 'fill';
+
+        // Sidebar Links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
+        const activeSidebarLink = document.getElementById(`nav-${activeId}`);
+        if (activeSidebarLink) activeSidebarLink.classList.add('active');
+
+        // Bottom Nav Links
+        document.querySelectorAll('.bottom-nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
+        const activeBottomLink = document.getElementById(`bnav-${activeId}`);
+        if (activeBottomLink) activeBottomLink.classList.add('active');
+    }
+    updateActiveNav();
+
+    // Global Keyboard Shortcuts
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const map = { 'd': '/', 'f': '/flashcard', 'm': '/matching', 't': '/fill' };
+      if (map[e.key.toLowerCase()]) window.location.href = map[e.key.toLowerCase()];
+    });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,31 +1,3 @@
-// Toast Notification System
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
-    // Icon selection based on type
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-    
-    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
-    document.body.appendChild(toast);
-    
-    // Smooth transition trigger
-    setTimeout(() => {
-        toast.classList.add('visible');
-    }, 10);
-    
-    // Auto removal
-    setTimeout(() => {
-        toast.classList.remove('visible');
-        toast.classList.add('fade-out');
-        setTimeout(() => {
-            toast.remove();
-        }, 300);
-    }, 2500);
-}
-
 // Flashcard Game State
 const state = {
     currentWord: null,
@@ -43,7 +15,6 @@ const statusBadgeEl = document.getElementById('card-status-badge');
 const translationEl = document.getElementById('card-translation');
 const cardScoreEl = document.getElementById('card-score');
 const cardReviewsEl = document.getElementById('card-reviews');
-const showMeaningHintEl = document.getElementById('show-meaning-hint');
 const ratingBarEl = document.getElementById('rating-bar');
 const btnFlipEl = document.getElementById('btn-flip');
 
@@ -70,6 +41,7 @@ function init() {
 
 // Keyboard shortcuts
 function handleKeyDown(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     if (e.code === 'Space') {
         e.preventDefault();
         flipCard();
@@ -79,7 +51,6 @@ function handleKeyDown(e) {
         }
     } else if (e.key === 'Enter') {
         e.preventDefault();
-        // Skip current word without score changes
         showToast("⏭ Bỏ qua từ này", "info");
         loadNextWord();
     }
@@ -110,6 +81,11 @@ async function loadNextWord() {
         }
 
         state.currentWord = data;
+        
+        // Hide empty state and show stage
+        document.getElementById('flashcard-empty-state').style.display = 'none';
+        document.getElementById('flashcard-stage-container').style.display = 'block';
+        
         displayWord(data);
     } catch (err) {
         console.error("Error loading next word:", err);
@@ -118,17 +94,8 @@ async function loadNextWord() {
 }
 
 function displayEmptyState() {
-    if (wordEl) wordEl.textContent = "Hết từ vựng";
-    if (phoneticEl) phoneticEl.style.display = 'none';
-    if (statusBadgeEl) {
-        statusBadgeEl.textContent = "Trống";
-        statusBadgeEl.className = "status-badge badge-empty";
-    }
-    if (translationEl) translationEl.textContent = "Không có từ vựng nào khớp với bộ lọc đã chọn.";
-    if (cardScoreEl) cardScoreEl.textContent = "Điểm: 0 ⭐";
-    if (cardReviewsEl) cardReviewsEl.textContent = "Đã ôn: 0 lần";
-    if (btnFlipEl) btnFlipEl.style.display = 'none';
-    if (ratingBarEl) ratingBarEl.classList.remove('visible');
+    document.getElementById('flashcard-stage-container').style.display = 'none';
+    document.getElementById('flashcard-empty-state').style.display = 'flex';
 }
 
 function displayWord(word) {
@@ -147,7 +114,7 @@ function displayWord(word) {
     // Status Badge styling
     if (statusBadgeEl) {
         statusBadgeEl.textContent = getStatusText(word.status);
-        statusBadgeEl.className = `status-badge badge-${word.status}`;
+        statusBadgeEl.className = `badge badge-${word.status}`;
     }
 
     // Back card content
@@ -295,6 +262,7 @@ function highlightChosenStar(rating) {
     });
 }
 
+// Reset Star ratings
 function resetStars() {
     const stars = document.querySelectorAll('.star-rating svg');
     stars.forEach(star => {
