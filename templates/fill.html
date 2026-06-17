@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AetherCard - Spelling Practice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-start: #080710;
+            --bg-end: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --color-accent: #6366f1;
+            --color-accent-hover: #4f46e5;
+            --color-correct: #10b981;
+            --color-incorrect: #f43f5e;
+            --font-display: 'Outfit', sans-serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: var(--text-primary);
+        }
+
+        .title {
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        /* Progress indicator */
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 9999px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #818cf8, #fb7185);
+            transition: width 0.3s ease;
+        }
+
+        /* Question stage */
+        .question-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 1.75rem;
+            padding: 3rem 2rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hint-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .meaning-display {
+            font-family: var(--font-display);
+            font-size: 2.25rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        .phonetic-display {
+            font-size: 1.25rem;
+            color: #818cf8;
+            font-weight: 500;
+        }
+
+        /* Input field */
+        .input-wrapper {
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+        .answer-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.25);
+            border: 2px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            color: white;
+            text-align: center;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .answer-input:focus {
+            border-color: var(--color-accent);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+        }
+
+        .answer-input.correct {
+            border-color: var(--color-correct);
+            background: rgba(16, 185, 129, 0.05);
+            color: var(--color-correct);
+        }
+
+        .answer-input.incorrect {
+            border-color: var(--color-incorrect);
+            background: rgba(244, 63, 94, 0.05);
+            color: var(--color-incorrect);
+            animation: shake 0.4s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+
+        /* Submit elements */
+        .feedback-msg {
+            font-weight: 600;
+            font-size: 1.1rem;
+            min-height: 25px;
+            margin-top: 0.5rem;
+        }
+        
+        .feedback-msg.correct { color: var(--color-correct); }
+        .feedback-msg.incorrect { color: var(--color-incorrect); }
+
+        .btn-submit {
+            background: var(--color-accent);
+            color: white;
+            border: none;
+            padding: 1rem 3rem;
+            border-radius: 9999px;
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn-submit:hover {
+            background: var(--color-accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        /* End Screen */
+        .end-card {
+            display: none;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 2rem;
+            padding: 3rem 2rem;
+            backdrop-filter: blur(16px);
+            text-align: center;
+            max-width: 500px;
+            margin: 2rem auto;
+        }
+
+        .end-title {
+            font-family: var(--font-display);
+            font-size: 2.25rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #34d399, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .end-score {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .btn-action {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 0.85rem 2rem;
+            border-radius: 9999px;
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-action:hover {
+            background: var(--color-accent);
+            border-color: var(--color-accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Dashboard
+            </a>
+            <div class="title">Spelling Game</div>
+            <div style="width: 80px;"></div> <!-- balance -->
+        </header>
+
+        <div id="game-panel">
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+
+            <div class="question-card">
+                <div class="hint-label">Translate into English</div>
+                <div class="meaning-display" id="question-meaning">Vietnamese Meaning</div>
+                <div class="phonetic-display" id="question-phonetic">/phonetic/</div>
+                
+                <div class="input-wrapper">
+                    <input type="text" autocomplete="off" class="answer-input" id="answer-input" placeholder="Type answer here..." autofocus>
+                </div>
+
+                <div class="feedback-msg" id="feedback-msg"></div>
+                
+                <div>
+                    <button class="btn-submit" id="btn-action" onclick="checkAnswer()">Submit</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="end-card" id="end-panel">
+            <div class="end-title">Practice Finished!</div>
+            <div class="end-score" id="end-score-details">You got 0/5 correct.</div>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="btn-action" onclick="startGame()">Practice Again</button>
+                <a href="/" class="btn-action" style="background: var(--color-accent); border-color: var(--color-accent);">Home</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionWords = [];
+        let currentIndex = 0;
+        let score = 0;
+        let showingAnswer = false; // state when answer is showing and button is "Next"
+
+        async function startGame() {
+            try {
+                const response = await fetch('/api/words/random?n=5');
+                sessionWords = await response.json();
+                
+                if (sessionWords.length === 0) {
+                    const panel = document.querySelector('.question-card');
+                    panel.innerHTML = '<div style="color: var(--text-secondary); padding: 2rem;">No words available in the database. Run CSV import first!</div>';
+                    return;
+                }
+
+                currentIndex = 0;
+                score = 0;
+                showingAnswer = false;
+                
+                document.getElementById('game-panel').style.display = 'block';
+                document.getElementById('end-panel').style.display = 'none';
+                
+                showQuestion(currentIndex);
+
+            } catch (err) {
+                console.error("Error loading spelling session:", err);
+            }
+        }
+
+        function showQuestion(index) {
+            if (index >= sessionWords.length) {
+                endSession();
+                return;
+            }
+
+            showingAnswer = false;
+            
+            const word = sessionWords[index];
+            document.getElementById('question-meaning').textContent = word.short_translation || 'No translation available';
+            document.getElementById('question-phonetic').textContent = word.phonetic || '//';
+            
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.className = 'answer-input';
+            input.disabled = false;
+            input.focus();
+
+            const feedback = document.getElementById('feedback-msg');
+            feedback.textContent = '';
+            feedback.className = 'feedback-msg';
+
+            const btn = document.getElementById('btn-action');
+            btn.textContent = 'Submit';
+            
+            // Update Progress Bar
+            const percent = (index / sessionWords.length) * 100;
+            document.getElementById('progress-bar').style.width = percent + '%';
+        }
+
+        async function checkAnswer() {
+            if (showingAnswer) {
+                // Advance to next question
+                currentIndex++;
+                showQuestion(currentIndex);
+                return;
+            }
+
+            const input = document.getElementById('answer-input');
+            const feedback = document.getElementById('feedback-msg');
+            const btn = document.getElementById('btn-action');
+            
+            const userAnswer = input.value.trim().toLowerCase();
+            const word = sessionWords[currentIndex];
+            const correctAnswer = word.word.trim().toLowerCase();
+            
+            let isCorrect = (userAnswer === correctAnswer);
+            
+            input.disabled = true;
+            showingAnswer = true;
+            btn.textContent = 'Next';
+
+            let delta = 0;
+
+            if (isCorrect) {
+                input.classList.add('correct');
+                feedback.textContent = '✓ Correct spelling!';
+                feedback.classList.add('correct');
+                score++;
+                delta = 3; // +3 score for correct spelling
+            } else {
+                input.classList.add('incorrect');
+                feedback.textContent = `✗ Incorrect. Correct: "${word.word}"`;
+                feedback.classList.add('incorrect');
+                delta = -2; // -2 score for incorrect spelling
+            }
+
+            // Sync with backend SQLite review
+            try {
+                await fetch('/api/review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        word_id: word.id,
+                        delta: delta,
+                        mode: 'fill',
+                        is_correct: isCorrect
+                    })
+                });
+            } catch (err) {
+                console.error("Failed to sync score delta:", err);
+            }
+        }
+
+        function endSession() {
+            document.getElementById('game-panel').style.display = 'none';
+            document.getElementById('end-panel').style.display = 'block';
+            document.getElementById('progress-bar').style.width = '100%';
+            
+            const details = document.getElementById('end-score-details');
+            details.textContent = `You scored ${score} out of ${sessionWords.length} correct words!`;
+        }
+
+        // Enter key listener
+        document.getElementById('answer-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', startGame);
+    </script>
+</body>
+</html>
