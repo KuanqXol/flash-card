@@ -9,9 +9,12 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
+def init_db(conn=None):
     """Initializes the SQLite database schemas for words and review_history tables."""
-    conn = get_db()
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
     cursor = conn.cursor()
     
     # Create words table
@@ -47,7 +50,8 @@ def init_db():
     ''')
     
     conn.commit()
-    conn.close()
+    if should_close:
+        conn.close()
 
 def get_word_by_id(word_id):
     """Retrieves a single word by its ID. Returns dict or None."""

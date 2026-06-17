@@ -4,11 +4,16 @@ from database import (
     get_stats, 
     get_words_by_status, 
     get_random_words, 
-    update_word_after_review, 
-    check_and_auto_upgrade,
     get_word_by_id,
-    update_word_status,
     get_db
+)
+from scoring import (
+    apply_flashcard_rating,
+    apply_matching_result,
+    apply_fill_result,
+    mark_as_learned,
+    mark_as_learning,
+    _apply_score_change
 )
 
 app = Flask(__name__)
@@ -57,24 +62,23 @@ def api_review_word():
     if word_id is None or delta is None or not mode:
         return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
         
+    conn = get_db()
     try:
-        success = update_word_after_review(
-            word_id=int(word_id), 
-            delta=int(delta), 
-            mode=mode, 
-            rating=rating, 
+        new_score, status_changed, new_status = _apply_score_change(
+            db=conn,
+            word_id=int(word_id),
+            delta=int(delta),
+            mode=mode,
+            rating=rating,
             is_correct=is_correct
         )
-        
-        if success:
-            # Check for automatic status upgrades if rated 5
-            upgraded = check_and_auto_upgrade(int(word_id))
-            return jsonify({'status': 'success', 'upgraded': upgraded})
-        else:
-            return jsonify({'status': 'error', 'message': 'Word not found'}), 404
-            
+        return jsonify({'status': 'success', 'upgraded': status_changed})
+    except ValueError:
+        return jsonify({'status': 'error', 'message': 'Word not found'}), 404
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        conn.close()
 
 # API GET /api/flashcard/next -> retrieves next word for flashcard study
 @app.route('/api/flashcard/next')
@@ -122,31 +126,22 @@ def api_flashcard_rate():
     if rating < 1 or rating > 5:
         return jsonify({'success': False, 'message': 'Rating must be between 1 and 5'}), 400
         
-    word_before = get_word_by_id(word_id)
-    if not word_before:
-        return jsonify({'success': False, 'message': 'Word not found'}), 404
-        
-    old_status = word_before['status']
-    
-    # Update score and reviews. delta = rating
-    update_word_after_review(word_id, rating, 'flashcard', rating=rating)
-    
-    # Check for automatic status upgrades if rating is 5
-    check_and_auto_upgrade(word_id)
-    
-    # Fetch post-update stats
-    word_after = get_word_by_id(word_id)
-    new_status = word_after['status']
-    new_score = word_after['total_score']
-    status_changed = (old_status != new_status)
-    
-    return jsonify({
-        'success': True,
-        'new_score': new_score,
-        'new_status': new_status,
-        'status_changed': status_changed,
-        'message': 'Rating updated successfully'
-    })
+    conn = get_db()
+    try:
+        res = apply_flashcard_rating(conn, word_id, rating)
+        return jsonify({
+            'success': True,
+            'new_score': res['new_score'],
+            'new_status': res['new_status'],
+            'status_changed': res['status_changed'],
+            'message': 'Rating updated successfully'
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
 
 # API POST /api/word/mark-learned -> marks word as learned
 @app.route('/api/word/mark-learned', methods=['POST'])
@@ -155,11 +150,14 @@ def api_mark_learned():
     word_id = data.get('word_id')
     if word_id is None:
         return jsonify({'success': False, 'message': 'Missing word_id'}), 400
+    conn = get_db()
     try:
-        update_word_status(int(word_id), 'learned')
-        return jsonify({'success': True})
+        res = mark_as_learned(conn, int(word_id))
+        return jsonify(res)
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
 
 # API POST /api/word/mark-learning -> marks word as learning
 @app.route('/api/word/mark-learning', methods=['POST'])
@@ -168,11 +166,14 @@ def api_mark_learning():
     word_id = data.get('word_id')
     if word_id is None:
         return jsonify({'success': False, 'message': 'Missing word_id'}), 400
+    conn = get_db()
     try:
-        update_word_status(int(word_id), 'learning')
-        return jsonify({'success': True})
+        res = mark_as_learning(conn, int(word_id))
+        return jsonify(res)
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
 
 # API GET /api/matching/words -> retrieves n random words for matching game
 @app.route('/api/matching/words')
@@ -214,33 +215,27 @@ def api_matching_result():
     updated = []
     total_delta = 0
     
-    for item in results:
-        word_id = item.get('word_id')
-        is_correct = item.get('is_correct')
-        
-        if word_id is None or is_correct is None:
-            continue
+    conn = get_db()
+    try:
+        for item in results:
+            word_id = item.get('word_id')
+            is_correct = item.get('is_correct')
             
-        delta = 3 if is_correct else -2
-        total_delta += delta
-        
-        try:
-            update_word_after_review(
-                word_id=int(word_id),
-                delta=delta,
-                mode='matching',
-                is_correct=bool(is_correct)
-            )
-            
-            word = get_word_by_id(word_id)
-            if word:
+            if word_id is None or is_correct is None:
+                continue
+                
+            try:
+                res = apply_matching_result(conn, int(word_id), bool(is_correct))
+                total_delta += res['delta']
                 updated.append({
                     'word_id': int(word_id),
-                    'delta': delta,
-                    'new_score': word['total_score']
+                    'delta': res['delta'],
+                    'new_score': res['new_score']
                 })
-        except Exception as e:
-            print(f"Error updating word {word_id} in matching result: {e}")
+            except Exception as e:
+                print(f"Error updating word {word_id} in matching result: {e}")
+    finally:
+        conn.close()
             
     return jsonify({
         'updated': updated,
@@ -282,29 +277,20 @@ def api_fill_evaluate():
     if word_id is None or is_correct is None:
         return jsonify({'success': False, 'message': 'Missing word_id or is_correct'}), 400
         
-    delta = 5 if is_correct else -3
-    
+    conn = get_db()
     try:
-        success = update_word_after_review(
-            word_id=int(word_id),
-            delta=delta,
-            mode='fill',
-            is_correct=bool(is_correct)
-        )
-        
-        if success:
-            word = get_word_by_id(word_id)
-            new_score = word['total_score'] if word else 0
-            return jsonify({
-                'success': True,
-                'new_score': new_score,
-                'delta': delta
-            })
-        else:
-            return jsonify({'success': False, 'message': 'Word not found'}), 404
-            
+        res = apply_fill_result(conn, int(word_id), bool(is_correct))
+        return jsonify({
+            'success': True,
+            'new_score': res['new_score'],
+            'delta': res['delta']
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 404
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
 
 # API GET /api/stats -> retrieves comprehensive progress statistics
 @app.route('/api/stats')
