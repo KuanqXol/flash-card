@@ -70,14 +70,26 @@ def get_words_by_status(status):
     conn.close()
     return [dict(row) for row in rows]
 
-def get_random_words(n, status=None):
-    """Retrieves n random words, optionally filtered by status. Returns list[dict]."""
+def get_random_words(n, status=None, exclude_id=None):
+    """Retrieves n random words, optionally filtered by status and excluding a specific word ID. Returns list[dict]."""
     conn = get_db()
     cursor = conn.cursor()
+    
+    # Normalize 'all' status to None
+    if status == 'all':
+        status = None
+        
     if status:
-        cursor.execute('SELECT * FROM words WHERE status = ? ORDER BY RANDOM() LIMIT ?', (status, n))
+        if exclude_id is not None:
+            cursor.execute('SELECT * FROM words WHERE status = ? AND id != ? ORDER BY RANDOM() LIMIT ?', (status, exclude_id, n))
+        else:
+            cursor.execute('SELECT * FROM words WHERE status = ? ORDER BY RANDOM() LIMIT ?', (status, n))
     else:
-        cursor.execute('SELECT * FROM words ORDER BY RANDOM() LIMIT ?', (n,))
+        if exclude_id is not None:
+            cursor.execute('SELECT * FROM words WHERE id != ? ORDER BY RANDOM() LIMIT ?', (exclude_id, n))
+        else:
+            cursor.execute('SELECT * FROM words ORDER BY RANDOM() LIMIT ?', (n,))
+            
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]

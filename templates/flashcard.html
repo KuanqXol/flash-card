@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AetherCard - Flashcards Review</title>
+    <title>AetherCard - Flashcard Practice</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -11,12 +11,17 @@
         :root {
             --bg-start: #080710;
             --bg-end: #0f172a;
-            --card-bg: rgba(30, 41, 59, 0.65);
             --card-border: rgba(255, 255, 255, 0.08);
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --color-accent: #6366f1;
             --color-accent-hover: #4f46e5;
+            
+            --front-grad-start: #eef2ff;
+            --front-grad-end: #e0e7ff;
+            --back-grad-start: #f5f3ff;
+            --back-grad-end: #ede9fe;
+            
             --font-display: 'Outfit', sans-serif;
             --font-sans: 'Inter', sans-serif;
         }
@@ -35,71 +40,141 @@
             display: flex;
             flex-direction: column;
             overflow-x: hidden;
+            position: relative;
+        }
+
+        .background-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0) 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
         }
 
         .container {
             width: 100%;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 2rem 1.5rem;
+            padding: 1.5rem 1.5rem;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
+            z-index: 10;
+            position: relative;
         }
 
+        /* Header layout */
         header {
-            margin-bottom: 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 2rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 1rem 1.5rem;
+            border-radius: 1.25rem;
+            backdrop-filter: blur(10px);
         }
 
-        .back-link {
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .logo {
+            font-family: var(--font-display);
+            font-size: 1.6rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #818cf8, #fb7185);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        /* Filter dropdown */
+        .filter-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .filter-select {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            padding: 0.45rem 1.5rem 0.45rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-select:focus {
+            border-color: var(--color-accent);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+        }
+
+        .back-btn {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-
-        .back-link:hover {
-            color: var(--text-primary);
-        }
-
-        .title {
-            font-family: var(--font-display);
-            font-size: 1.75rem;
-            font-weight: 700;
-        }
-
-        /* Progress indicator */
-        .progress-container {
-            width: 100%;
-            height: 6px;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 9999px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            padding: 0.5rem 1.25rem;
+            border-radius: 0.75rem;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateX(-2px);
+        }
+
+        /* Corner Session Statistics */
+        .session-info {
+            align-self: flex-end;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(244, 63, 94, 0.05) 100%);
+            border: 1px solid rgba(129, 140, 248, 0.2);
+            padding: 0.6rem 1.2rem;
+            border-radius: 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: var(--font-display);
             margin-bottom: 2rem;
-            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(8px);
         }
 
-        .progress-bar {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #818cf8, #fb7185);
-            transition: width 0.3s ease;
+        .session-info span {
+            color: #818cf8;
         }
 
-        /* Flashcard Component */
+        /* 3D Flashcard Stage */
         .flashcard-stage {
-            perspective: 1000px;
-            flex-grow: 1;
+            perspective: 1200px;
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-bottom: 2rem;
-            min-height: 350px;
+            margin-bottom: 2.5rem;
+            min-height: 380px;
         }
 
         .flashcard {
@@ -121,152 +196,120 @@
             width: 100%;
             height: 100%;
             backface-visibility: hidden;
-            border-radius: 1.75rem;
-            border: 1px solid var(--card-border);
+            border-radius: 2rem;
             padding: 2.5rem;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
             text-align: center;
         }
 
+        /* Front Face (Light Indigo) */
         .card-front {
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
+            background: linear-gradient(135deg, var(--front-grad-start), var(--front-grad-end));
+            border: 1px solid rgba(255, 255, 255, 0.6);
         }
 
-        .card-back {
-            background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.7));
-            transform: rotateY(180deg);
-        }
-
-        .word-display {
+        .card-front .word-display {
             font-family: var(--font-display);
-            font-size: 3.5rem;
+            font-size: 3.2rem;
             font-weight: 800;
+            color: #1e1b4b;
             letter-spacing: -0.02em;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(to right, #ffffff, #e2e8f0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            margin-top: 1rem;
         }
 
-        .phonetic-display {
-            font-size: 1.35rem;
-            color: #818cf8;
+        .card-front .phonetic-display {
+            font-size: 1.2rem;
+            color: #4f46e5;
             font-weight: 500;
-            margin-bottom: 1.5rem;
+            margin-top: 0.5rem;
         }
 
+        .hint-click {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 500;
+            opacity: 0.7;
+        }
+
+        /* Back Face (Light Violet) */
+        .card-back {
+            background: linear-gradient(135deg, var(--back-grad-start), var(--back-grad-end));
+            transform: rotateY(180deg);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .card-back .translation-display {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #3b0764;
+            line-height: 1.6;
+            margin: auto 0;
+            max-height: 180px;
+            overflow-y: auto;
+            padding: 0 1rem;
+        }
+
+        .card-back .card-meta {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            width: 100%;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+            padding-top: 1rem;
+        }
+
+        .meta-item {
+            font-size: 0.85rem;
+            color: #5b21b6;
+            font-weight: 600;
+        }
+
+        /* Status badges */
         .status-badge {
             font-size: 0.75rem;
-            padding: 0.25rem 0.75rem;
+            padding: 0.3rem 0.9rem;
             border-radius: 9999px;
             text-transform: uppercase;
-            font-weight: 600;
-            border: 1px solid currentColor;
-            letter-spacing: 0.05em;
-        }
-
-        .badge-new { color: #38bdf8; background: rgba(56, 189, 248, 0.08); }
-        .badge-learning { color: #fb7185; background: rgba(251, 113, 133, 0.08); }
-        .badge-learned { color: #34d399; background: rgba(52, 211, 153, 0.08); }
-
-        .short-trans-display {
-            font-family: var(--font-display);
-            font-size: 2.25rem;
             font-weight: 700;
-            color: #34d399;
-            margin-bottom: 1rem;
+            letter-spacing: 0.05em;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        .full-trans-display {
-            font-size: 1.05rem;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            max-height: 120px;
-            overflow-y: auto;
-        }
+        .badge-new { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        .badge-learning { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .badge-learned { background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; }
+        .badge-empty { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
-        /* Help tip */
-        .hint-text {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            margin-top: 1rem;
-            opacity: 0.6;
-        }
-
-        /* Controls / Rating Interface */
-        .controls-stage {
+        /* Controls Panel */
+        .control-panel {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 1.5rem;
+            width: 100%;
+            max-width: 550px;
+            margin: 0 auto;
         }
 
-        .rating-bar {
+        .primary-actions {
             display: flex;
-            gap: 0.75rem;
+            gap: 1rem;
+            width: 100%;
             justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(10px);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        .rating-bar.visible {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateY(0);
-        }
-
-        .rate-btn {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--card-border);
-            color: var(--text-primary);
-            border-radius: 1rem;
-            padding: 1rem;
-            min-width: 70px;
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 0.25rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
         }
 
-        .rate-btn:hover {
-            transform: translateY(-4px);
-            background: rgba(99, 102, 241, 0.1);
-            border-color: rgba(99, 102, 241, 0.3);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
-        }
-
-        .rate-score {
-            font-weight: 700;
-            font-size: 1.15rem;
-        }
-
-        .rate-label {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        .rate-1:hover { color: #f43f5e; }
-        .rate-2:hover { color: #fb7185; }
-        .rate-3:hover { color: #fbbf24; }
-        .rate-4:hover { color: #60a5fa; }
-        .rate-5:hover { color: #34d399; }
-
+        /* Buttons */
         .btn-flip {
             background: var(--color-accent);
             color: white;
             border: none;
-            padding: 1rem 2.5rem;
-            border-radius: 9999px;
+            padding: 0.9rem 2.5rem;
+            border-radius: 1rem;
             font-family: var(--font-display);
             font-size: 1.1rem;
             font-weight: 600;
@@ -281,297 +324,231 @@
             box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
         }
 
-        /* Success/Upgrade message popups */
-        .toast-notification {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: rgba(16, 185, 129, 0.9);
+        .btn-learned {
+            background: #10b981;
             color: white;
-            padding: 1rem 1.5rem;
+            border: none;
+            padding: 0.9rem 2rem;
             border-radius: 1rem;
+            font-family: var(--font-display);
+            font-size: 1.05rem;
             font-weight: 600;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
-            transform: translateY(100px);
-            opacity: 0;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 100;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .toast-notification.active {
+        .btn-learned:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+        }
+
+        .btn-skip {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 0.5rem 1.25rem;
+            border-radius: 0.75rem;
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-skip:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        /* 5-Star Rating Bar */
+        .rating-bar {
+            display: none;
+            gap: 0.75rem;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .rating-bar.visible {
+            display: flex;
+            opacity: 1;
             transform: translateY(0);
+        }
+
+        .star-rating {
+            display: flex;
+            gap: 0.35rem;
+        }
+
+        .star-rating svg {
+            width: 2.25rem;
+            height: 2.25rem;
+            fill: #4b5563; /* unselected */
+            stroke: #374151;
+            stroke-width: 1.5;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .star-rating svg.hover {
+            fill: #fbbf24;
+            stroke: #d97706;
+            transform: scale(1.15);
+        }
+
+        .star-rating svg.selected {
+            fill: #fb923c;
+            stroke: #ea580c;
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        /* Toast Notifications Styling */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: -25rem; /* Offscreen starting point */
+            z-index: 9999;
+            min-width: 280px;
+            max-width: 380px;
+            padding: 1rem 1.25rem;
+            border-radius: 1rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #ffffff;
+            transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+            opacity: 0;
+        }
+
+        .toast.visible {
+            right: 2rem;
             opacity: 1;
         }
 
-        /* End Screen */
-        .end-screen {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 3rem;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 2rem;
-            backdrop-filter: blur(12px);
-            margin: 2rem auto;
-            max-width: 550px;
+        .toast.fade-out {
+            opacity: 0;
         }
 
-        .end-title {
-            font-family: var(--font-display);
-            font-size: 2.25rem;
-            font-weight: 800;
-            margin-bottom: 1rem;
-            background: linear-gradient(to right, #34d399, #38bdf8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .toast-success {
+            background: rgba(16, 185, 129, 0.9);
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
-        .end-text {
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-            line-height: 1.6;
+        .toast-error {
+            background: rgba(244, 63, 94, 0.9);
+            border: 1px solid rgba(244, 63, 94, 0.3);
         }
 
-        .btn-action {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--card-border);
-            color: var(--text-primary);
-            padding: 0.85rem 2rem;
-            border-radius: 9999px;
-            font-family: var(--font-display);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
+        .toast-info {
+            background: rgba(59, 130, 246, 0.9);
+            border: 1px solid rgba(59, 130, 246, 0.3);
         }
 
-        .btn-action:hover {
-            background: var(--color-accent);
-            border-color: var(--color-accent);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        .toast-icon {
+            font-size: 1.2rem;
         }
     </style>
 </head>
 <body>
+    <div class="background-glow"></div>
+
     <div class="container">
         <header>
-            <a href="/" class="back-link">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                Dashboard
+            <div class="header-left">
+                <a href="/" class="logo">AetherCard</a>
+                
+                <div class="filter-wrapper">
+                    <span class="filter-label">Bộ lọc:</span>
+                    <select class="filter-select" id="filter-dropdown">
+                        <option value="all">Tất cả từ vựng</option>
+                        <option value="new">Từ mới</option>
+                        <option value="learning">Đang học</option>
+                        <option value="learned">Đã thuộc</option>
+                    </select>
+                </div>
+            </div>
+            
+            <a href="/" class="back-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Trang chủ
             </a>
-            <div class="title">Flashcards</div>
-            <div style="width: 80px;"></div> <!-- placeholder balance -->
         </header>
 
-        <div id="study-panel">
-            <div class="progress-container">
-                <div class="progress-bar" id="progress-bar"></div>
-            </div>
+        <!-- Session Counter -->
+        <div class="session-info">
+            Đã ôn: <span id="session-count">0</span> từ | +<span id="session-score">0</span> điểm hôm nay
+        </div>
 
-            <div class="flashcard-stage">
-                <div class="flashcard" id="flashcard" onclick="flipCard()">
-                    <!-- Front -->
-                    <div class="card-face card-front">
-                        <span class="status-badge" id="card-status-badge">status</span>
-                        <div style="margin: auto 0;">
-                            <div class="word-display" id="card-word">Loading...</div>
-                            <div class="phonetic-display" id="card-phonetic">[/loading/]</div>
-                        </div>
-                        <div class="hint-text">Click card or press SPACE to flip</div>
+        <!-- Card Stage -->
+        <div class="flashcard-stage">
+            <div class="flashcard" id="flashcard" onclick="flipCard()">
+                <!-- Front Side -->
+                <div class="card-face card-front">
+                    <span class="status-badge" id="card-status-badge">Trống</span>
+                    <div>
+                        <div class="word-display" id="card-word">Loading...</div>
+                        <div class="phonetic-display" id="card-phonetic">[/loading/]</div>
                     </div>
-                    <!-- Back -->
-                    <div class="card-face card-back">
-                        <div style="margin: auto 0; width: 100%;">
-                            <div class="short-trans-display" id="card-short-trans">Translation</div>
-                            <div class="full-trans-display" id="card-full-trans">Full Vietnamese definitions go here.</div>
-                        </div>
-                        <div class="hint-text">Click card or press SPACE to flip back</div>
+                    <span class="hint-click">Click thẻ hoặc nhấn Space để xem nghĩa</span>
+                </div>
+                
+                <!-- Back Side -->
+                <div class="card-face card-back">
+                    <div class="translation-display" id="card-translation">Nghĩa tiếng Việt</div>
+                    
+                    <div class="card-meta">
+                        <span class="meta-item" id="card-score">Điểm: 0 ⭐</span>
+                        <span class="meta-item" id="card-reviews">Đã ôn: 0 lần</span>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="controls-stage">
-                <button class="btn-flip" id="btn-flip" onclick="flipCard()">Show Translation</button>
+        <!-- Controls Stage -->
+        <div class="control-panel">
+            <div class="primary-actions">
+                <button class="btn-flip" id="btn-flip" onclick="flipCard()">👁 Xem nghĩa</button>
                 
+                <!-- 5 Star rating bar -->
                 <div class="rating-bar" id="rating-bar">
-                    <button class="rate-btn rate-1" onclick="rateCard(1)">
-                        <span class="rate-score">1</span>
-                        <span class="rate-label">Forgot</span>
-                    </button>
-                    <button class="rate-btn rate-2" onclick="rateCard(2)">
-                        <span class="rate-score">2</span>
-                        <span class="rate-label">Hard</span>
-                    </button>
-                    <button class="rate-btn rate-3" onclick="rateCard(3)">
-                        <span class="rate-score">3</span>
-                        <span class="rate-label">Good</span>
-                    </button>
-                    <button class="rate-btn rate-4" onclick="rateCard(4)">
-                        <span class="rate-score">4</span>
-                        <span class="rate-label">Easy</span>
-                    </button>
-                    <button class="rate-btn rate-5" onclick="rateCard(5)">
-                        <span class="rate-score">5</span>
-                        <span class="rate-label">Perfect</span>
-                    </button>
+                    <div class="star-rating">
+                        <!-- Star SVGs -->
+                        <svg data-val="1" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        <svg data-val="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        <svg data-val="3" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        <svg data-val="4" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        <svg data-val="5" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="end-screen" id="end-screen">
-            <div class="end-title">Excellent Job!</div>
-            <p class="end-text">You have completed this review session. All ratings and progress have been updated in your profile database.</p>
-            <div style="display: flex; gap: 1rem; justify-content: center;">
-                <button class="btn-action" onclick="loadSession()">Review More</button>
-                <a href="/" class="btn-action" style="background: var(--color-accent); border-color: var(--color-accent);">Back to Home</a>
+                <button class="btn-learned" onclick="markLearned(event)">✅ Đã thuộc</button>
             </div>
+            
+            <button class="btn-skip" onclick="loadNextWord()">⏭ Bỏ qua</button>
         </div>
     </div>
 
-    <div class="toast-notification" id="toast-upgrade">
-        🚀 Word upgraded to <strong>Learning</strong> status!
-    </div>
-
+    <!-- Import our custom javascript actions -->
+    <script src="/static/js/flashcard.js"></script>
     <script>
-        let words = [];
-        let currentIndex = 0;
-        let isFlipped = false;
-
-        async function loadSession() {
-            try {
-                const response = await fetch('/api/words/random?n=10');
-                words = await response.json();
-                
-                if (words.length === 0) {
-                    document.getElementById('card-word').textContent = "Empty DB";
-                    document.getElementById('card-phonetic').textContent = "Import CSV first";
-                    return;
-                }
-                
-                currentIndex = 0;
-                isFlipped = false;
-                document.getElementById('study-panel').style.display = 'block';
-                document.getElementById('end-screen').style.display = 'none';
-                showWord(currentIndex);
-            } catch (err) {
-                console.error("Failed to load cards:", err);
+        // Override event handlers or prevent card lật when clicking buttons
+        function markLearned(event) {
+            event.stopPropagation();
+            if (typeof window.markLearned === 'function') {
+                window.markLearned();
             }
         }
-
-        function showWord(index) {
-            if (index >= words.length) {
-                showEndScreen();
-                return;
-            }
-
-            isFlipped = false;
-            const card = document.getElementById('flashcard');
-            card.classList.remove('flipped');
-
-            const word = words[index];
-            document.getElementById('card-word').textContent = word.word;
-            document.getElementById('card-phonetic').textContent = word.phonetic || '//';
-            
-            const badge = document.getElementById('card-status-badge');
-            badge.textContent = word.status;
-            badge.className = 'status-badge badge-' + word.status;
-
-            document.getElementById('card-short-trans').textContent = word.short_translation || 'No definition';
-            document.getElementById('card-full-trans').textContent = word.translation || '';
-
-            document.getElementById('btn-flip').style.display = 'block';
-            document.getElementById('rating-bar').classList.remove('visible');
-
-            // Update Progress Bar
-            const percent = ((index) / words.length) * 100;
-            document.getElementById('progress-bar').style.width = percent + '%';
-        }
-
-        function flipCard() {
-            isFlipped = !isFlipped;
-            const card = document.getElementById('flashcard');
-            
-            if (isFlipped) {
-                card.classList.add('flipped');
-                document.getElementById('btn-flip').style.display = 'none';
-                document.getElementById('rating-bar').classList.add('visible');
-            } else {
-                card.classList.remove('flipped');
-                document.getElementById('btn-flip').style.display = 'block';
-                document.getElementById('rating-bar').classList.remove('visible');
-            }
-        }
-
-        async function rateCard(rating) {
-            if (currentIndex >= words.length) return;
-            
-            const word = words[currentIndex];
-            
-            // Map rating to delta score
-            // 1:-2, 2:-1, 3:+1, 4:+2, 5:+3
-            const deltas = { 1: -2, 2: -1, 3: 1, 4: 2, 5: 3 };
-            const delta = deltas[rating] || 0;
-
-            try {
-                const response = await fetch('/api/review', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        word_id: word.id,
-                        delta: delta,
-                        mode: 'flashcard',
-                        rating: rating
-                    })
-                });
-                
-                const result = await response.json();
-                if (result.status === 'success' && result.upgraded) {
-                    showUpgradeToast();
-                }
-
-                // Move to next card
-                currentIndex++;
-                showWord(currentIndex);
-            } catch (err) {
-                console.error("Error rating word:", err);
-            }
-        }
-
-        function showUpgradeToast() {
-            const toast = document.getElementById('toast-upgrade');
-            toast.classList.add('active');
-            setTimeout(() => {
-                toast.classList.remove('active');
-            }, 3000);
-        }
-
-        function showEndScreen() {
-            document.getElementById('study-panel').style.display = 'none';
-            document.getElementById('end-screen').style.display = 'flex';
-            document.getElementById('progress-bar').style.width = '100%';
-        }
-
-        // Keyboard navigation
-        document.addEventListener('keydown', (e) => {
-            if (document.getElementById('study-panel').style.display === 'none') return;
-
-            if (e.code === 'Space') {
-                e.preventDefault();
-                flipCard();
-            } else if (isFlipped && e.key >= '1' && e.key <= '5') {
-                rateCard(parseInt(e.key));
-            }
-        });
-
-        // Initialize session on load
-        window.addEventListener('DOMContentLoaded', loadSession);
     </script>
 </body>
 </html>

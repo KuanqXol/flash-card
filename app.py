@@ -5,7 +5,9 @@ from database import (
     get_words_by_status, 
     get_random_words, 
     update_word_after_review, 
-    check_and_auto_upgrade
+    check_and_auto_upgrade,
+    get_word_by_id,
+    update_word_status
 )
 
 app = Flask(__name__)
@@ -72,6 +74,104 @@ def api_review_word():
             
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# API GET /api/flashcard/next -> retrieves next word for flashcard study
+@app.route('/api/flashcard/next')
+def api_flashcard_next():
+    status = request.args.get('status', 'all')
+    exclude_id = request.args.get('exclude_id', None, type=int)
+    
+    words = get_random_words(1, status, exclude_id)
+    if not words:
+        # If no words matching the filter were found, try without excluding the ID
+        if exclude_id is not None:
+            words = get_random_words(1, status, None)
+            
+        if not words:
+            return jsonify({'error': 'no_words'})
+            
+    word = words[0]
+    return jsonify({
+        'id': word['id'],
+        'word': word['word'],
+        'phonetic': word['phonetic'],
+        'translation': word['translation'],
+        'short_translation': word['short_translation'],
+        'status': word['status'],
+        'total_score': word['total_score'],
+        'review_count': word['review_count']
+    })
+
+# API POST /api/flashcard/rate -> rates a flashcard word, adjusts score and handles potential upgrades
+@app.route('/api/flashcard/rate', methods=['POST'])
+def api_flashcard_rate():
+    data = request.get_json() or {}
+    word_id = data.get('word_id')
+    rating = data.get('rating')
+    
+    if word_id is None or rating is None:
+        return jsonify({'success': False, 'message': 'Missing word_id or rating'}), 400
+        
+    try:
+        word_id = int(word_id)
+        rating = int(rating)
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid type for word_id or rating'}), 400
+        
+    if rating < 1 or rating > 5:
+        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5'}), 400
+        
+    word_before = get_word_by_id(word_id)
+    if not word_before:
+        return jsonify({'success': False, 'message': 'Word not found'}), 404
+        
+    old_status = word_before['status']
+    
+    # Update score and reviews. delta = rating
+    update_word_after_review(word_id, rating, 'flashcard', rating=rating)
+    
+    # Check for automatic status upgrades if rating is 5
+    check_and_auto_upgrade(word_id)
+    
+    # Fetch post-update stats
+    word_after = get_word_by_id(word_id)
+    new_status = word_after['status']
+    new_score = word_after['total_score']
+    status_changed = (old_status != new_status)
+    
+    return jsonify({
+        'success': True,
+        'new_score': new_score,
+        'new_status': new_status,
+        'status_changed': status_changed,
+        'message': 'Rating updated successfully'
+    })
+
+# API POST /api/word/mark-learned -> marks word as learned
+@app.route('/api/word/mark-learned', methods=['POST'])
+def api_mark_learned():
+    data = request.get_json() or {}
+    word_id = data.get('word_id')
+    if word_id is None:
+        return jsonify({'success': False, 'message': 'Missing word_id'}), 400
+    try:
+        update_word_status(int(word_id), 'learned')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# API POST /api/word/mark-learning -> marks word as learning
+@app.route('/api/word/mark-learning', methods=['POST'])
+def api_mark_learning():
+    data = request.get_json() or {}
+    word_id = data.get('word_id')
+    if word_id is None:
+        return jsonify({'success': False, 'message': 'Missing word_id'}), 400
+    try:
+        update_word_status(int(word_id), 'learning')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     # Initialize SQLite database and tables
