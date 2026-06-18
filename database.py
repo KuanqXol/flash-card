@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from datetime import datetime
 
 DB_NAME = 'flashcards.db'
 
@@ -10,14 +11,14 @@ def get_db():
     return conn
 
 def init_db(conn=None):
-    """Initializes the SQLite database schemas for words and review_history tables."""
+    """Initializes the SQLite database schemas for words, review_history, word_pos, and settings tables."""
     should_close = False
     if conn is None:
         conn = get_db()
         should_close = True
     cursor = conn.cursor()
     
-    # Create words table
+    # Create words table (v2 schema)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS words (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +32,15 @@ def init_db(conn=None):
         review_count INTEGER DEFAULT 0,
         has_been_rated_five INTEGER DEFAULT 0,  -- 1 nếu từng rate 5 sao
         last_reviewed TEXT,
-        created_at TEXT DEFAULT (datetime('now','localtime'))
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        correct_count INTEGER DEFAULT 0,
+        wrong_count INTEGER DEFAULT 0,
+        self_correct_count INTEGER DEFAULT 0,
+        self_wrong_count INTEGER DEFAULT 0,
+        last_failed_at TEXT,
+        correct_streak INTEGER DEFAULT 0,
+        consecutive_wrong INTEGER DEFAULT 0,
+        needs_review INTEGER DEFAULT 0
     );
     ''')
     
@@ -49,6 +58,38 @@ def init_db(conn=None):
     );
     ''')
     
+    # Create word_pos table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS word_pos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word_id INTEGER NOT NULL,
+        pos TEXT,            -- 'n', 'v', 'adj', 'adv', 'prep', 'conj', 'pron', NULL (cho phrase)
+        meaning TEXT NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        FOREIGN KEY (word_id) REFERENCES words(id) ON DELETE CASCADE
+    );
+    ''')
+    
+    # Create settings table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+    );
+    ''')
+    
+    # Insert default settings
+    defaults = [
+        ('daily_goal', '20'),
+        ('session_size', '10'),
+        ('matching_pairs', '6'),
+        ('new_word_ratio', '0.2'),
+        ('theme', 'light'),
+    ]
+    for key, value in defaults:
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
+        
     conn.commit()
     if should_close:
         conn.close()
@@ -98,54 +139,122 @@ def get_random_words(n, status=None, exclude_id=None):
     conn.close()
     return [dict(row) for row in rows]
 
-def update_word_after_review(word_id, delta, mode, rating=None, is_correct=None):
-    """Updates total_score, review_count, last_reviewed, has_been_rated_five and logs to review_history."""
-    conn = get_db()
-    try:
-        cursor = conn.cursor()
+def update_word_after_review(db_or_id, word_id=None, delta=None, mode=None, rating=None, is_correct=None):
+    """
+    Cập nhật word sau 1 lần review.
+    Supports two signatures:
+      - update_word_after_review(word_id, delta, mode, rating=None, is_correct=None)
+      - update_word_after_review(db, word_id, delta, mode, rating=None, is_correct=None)
+    """
+    if isinstance(db_or_id, (int, str)):
+        # Signature: update_word_after_review(word_id, delta, mode, rating, is_correct)
+        word_id_val = int(db_or_id)
+        delta_val = word_id
+        mode_val = delta
+        db = get_db()
+        db.row_factory = sqlite3.Row
+        should_close = True
+    else:
+        # Signature: update_word_after_review(db, word_id, delta, mode, rating, is_correct)
+        db = db_or_id
+        word_id_val = word_id
+        delta_val = delta
+        mode_val = mode
+        should_close = False
         
-        # 1. Fetch current word to modify its score and rate
-        cursor.execute('SELECT total_score, has_been_rated_five FROM words WHERE id = ?', (word_id,))
-        row = cursor.fetchone()
-        if not row:
-            return False
-
-        current_score = row['total_score']
-        current_has_five = row['has_been_rated_five']
-
-        new_score = max(0, current_score + delta)
-        new_has_five = current_has_five
-        if rating == 5:
-            new_has_five = 1
-
-        # 2. Update words table
-        cursor.execute('''
-            UPDATE words 
-            SET total_score = ?, 
-                review_count = review_count + 1, 
-                has_been_rated_five = ?, 
-                last_reviewed = datetime('now', 'localtime') 
+    try:
+        now = datetime.now().isoformat()
+        
+        # Lấy word hiện tại
+        word = db.execute("SELECT * FROM words WHERE id=?", (word_id_val,)).fetchone()
+        if not word:
+            return False if should_close else (None, False)
+            
+        # Tính new_score (không âm)
+        new_score = max(0, word['total_score'] + delta_val)
+        
+        # Xác định đúng/sai (flashcard: đúng nếu rating >= 4)
+        effective_correct = is_correct
+        if mode_val == 'flashcard' and rating is not None:
+            effective_correct = rating >= 4
+        
+        # Cập nhật correct/wrong counts
+        if effective_correct is True:
+            correct_delta = 1
+            wrong_delta = 0
+            new_streak = (word['correct_streak'] or 0) + 1
+            new_consec_wrong = 0
+            fail_at = word['last_failed_at']  # giữ nguyên
+        elif effective_correct is False:
+            correct_delta = 0
+            wrong_delta = 1
+            new_streak = 0
+            new_consec_wrong = (word['consecutive_wrong'] or 0) + 1
+            fail_at = now
+        else:
+            correct_delta = 0
+            wrong_delta = 0
+            new_streak = word['correct_streak'] or 0
+            new_consec_wrong = word['consecutive_wrong'] or 0
+            fail_at = word['last_failed_at']
+        
+        # Self-evaluation (fill mode)
+        self_correct_delta = 1 if (mode_val == 'fill' and is_correct is True) else 0
+        self_wrong_delta   = 1 if (mode_val == 'fill' and is_correct is False) else 0
+        
+        # Soft-flag needs_review nếu consecutive_wrong >= 3
+        needs_review = 1 if new_consec_wrong >= 3 else (word['needs_review'] or 0)
+        # Reset needs_review nếu correct_streak >= 2
+        if new_streak >= 2:
+            needs_review = 0
+        
+        # Flashcard rate 5 → set has_been_rated_five
+        rated_five = word['has_been_rated_five'] or 0
+        if mode_val == 'flashcard' and rating == 5:
+            rated_five = 1
+        
+        db.execute("""
+            UPDATE words SET
+                total_score        = ?,
+                review_count       = review_count + 1,
+                correct_count      = correct_count + ?,
+                wrong_count        = wrong_count + ?,
+                self_correct_count = self_correct_count + ?,
+                self_wrong_count   = self_wrong_count + ?,
+                correct_streak     = ?,
+                consecutive_wrong  = ?,
+                last_failed_at     = ?,
+                needs_review       = ?,
+                has_been_rated_five= ?,
+                last_reviewed      = ?
             WHERE id = ?
-        ''', (new_score, new_has_five, word_id))
-
-        # Handle is_correct input normalization
-        is_correct_val = None
-        if is_correct is not None:
-            is_correct_val = 1 if is_correct else 0
-
-        # 3. Insert review history record
-        cursor.execute('''
-            INSERT INTO review_history (word_id, mode, score_delta, is_correct, rating)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (word_id, mode, delta, is_correct_val, rating))
-
-        conn.commit()
-        return True
+        """, (new_score, correct_delta, wrong_delta, self_correct_delta, self_wrong_delta,
+              new_streak, new_consec_wrong, fail_at, needs_review, rated_five, now, word_id_val))
+        
+        # Ghi review_history
+        db.execute("""
+            INSERT INTO review_history (word_id, mode, score_delta, is_correct, rating, reviewed_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (word_id_val, mode_val, delta_val, 1 if is_correct else (0 if is_correct is False else None), rating, now))
+        
+        db.commit()
+        
+        # Auto-upgrade new → learning nếu đủ điều kiện
+        status_changed = False
+        if not should_close:
+            status_changed = check_and_auto_upgrade(db, word_id_val)
+        
+        updated_word = db.execute("SELECT * FROM words WHERE id=?", (word_id_val,)).fetchone()
+        
+        if should_close:
+            return True
+        return dict(updated_word), status_changed
     except Exception as e:
-        conn.rollback()
+        db.rollback()
         raise e
     finally:
-        conn.close()
+        if should_close:
+            db.close()
 
 def update_word_status(word_id, new_status):
     """Updates the status of a word."""
@@ -155,24 +264,34 @@ def update_word_status(word_id, new_status):
     conn.commit()
     conn.close()
 
-def check_and_auto_upgrade(word_id):
-    """Upgrades word status to 'learning' if it has been rated five and status is 'new'."""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT status, has_been_rated_five FROM words WHERE id = ?', (word_id,))
-    row = cursor.fetchone()
-    if not row:
-        conn.close()
+def check_and_auto_upgrade(db_or_id, word_id=None):
+    """
+    Upgrades word status to 'learning' if it has been rated five and status is 'new'.
+    Supports both signatures: (word_id) and (db, word_id).
+    """
+    if word_id is None:
+        word_id = db_or_id
+        db = get_db()
+        should_close = True
+    else:
+        db = db_or_id
+        should_close = False
+        
+    try:
+        cursor = db.cursor()
+        cursor.execute('SELECT status, has_been_rated_five FROM words WHERE id = ?', (word_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+
+        if row['has_been_rated_five'] == 1 and row['status'] == 'new':
+            cursor.execute("UPDATE words SET status = 'learning' WHERE id = ?", (word_id,))
+            db.commit()
+            return True
         return False
-
-    if row['has_been_rated_five'] == 1 and row['status'] == 'new':
-        cursor.execute("UPDATE words SET status = 'learning' WHERE id = ?", (word_id,))
-        conn.commit()
-        conn.close()
-        return True
-
-    conn.close()
-    return False
+    finally:
+        if should_close:
+            db.close()
 
 def get_stats():
     """Returns a dict of database aggregate statistics."""

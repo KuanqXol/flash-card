@@ -95,57 +95,11 @@ def mark_as_learning(db: sqlite3.Connection, word_id: int) -> dict:
 def _apply_score_change(db: sqlite3.Connection, word_id: int, delta: int, mode: str, rating: int = None, is_correct: bool = None) -> tuple:
     """
     Internal helper: apply score delta, update counts, log history.
+    Delegates database updates to database.update_word_after_review.
     Returns: (new_score, status_changed, new_status)
     """
-    db.row_factory = sqlite3.Row
-    cursor = db.cursor()
-    
-    # 1. Lấy word hiện tại
-    cursor.execute("SELECT total_score, status, has_been_rated_five FROM words WHERE id = ?", (word_id,))
-    row = cursor.fetchone()
-    if not row:
-        raise ValueError(f"Word with id {word_id} not found")
-        
-    old_score = row['total_score']
-    old_status = row['status']
-    old_has_five = row['has_been_rated_five']
-    
-    # 2. Tính new_score = MAX(0, old_score + delta)
-    new_score = max(0, old_score + delta)
-    
-    # 3. Xác định has_been_rated_five (nếu rating == 5)
-    new_has_five = 1 if (rating == 5 or old_has_five == 1) else 0
-    
-    # 4. UPDATE words SET total_score=?, review_count=review_count+1, last_reviewed=?, has_been_rated_five=?
-    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    cursor.execute("""
-        UPDATE words 
-        SET total_score = ?, 
-            review_count = review_count + 1, 
-            last_reviewed = ?, 
-            has_been_rated_five = ?
-        WHERE id = ?
-    """, (new_score, now_str, new_has_five, word_id))
-    
-    # 5. Gọi check_and_auto_upgrade(word_id) - logic implemented directly here
-    status_changed = False
-    new_status = old_status
-    if new_has_five == 1 and old_status == 'new':
-        cursor.execute("UPDATE words SET status = 'learning' WHERE id = ?", (word_id,))
-        new_status = 'learning'
-        status_changed = True
-        
-    # 6. INSERT vào review_history
-    is_correct_val = None
-    if is_correct is not None:
-        is_correct_val = 1 if is_correct else 0
-        
-    cursor.execute("""
-        INSERT INTO review_history (word_id, mode, score_delta, is_correct, rating, reviewed_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (word_id, mode, delta, is_correct_val, rating, now_str))
-    
-    db.commit()
-    
-    # 7. Return kết quả
-    return new_score, status_changed, new_status
+    from database import update_word_after_review
+    updated_word, status_changed = update_word_after_review(
+        db, word_id, delta, mode, rating=rating, is_correct=is_correct
+    )
+    return updated_word['total_score'], status_changed, updated_word['status']
