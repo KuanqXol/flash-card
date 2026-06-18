@@ -332,3 +332,13 @@ def get_stats():
         'reviewed_today': reviewed_today,
         'total_score_sum': total_score_sum
     }
+
+def get_setting(db, key, default):
+    """Retrieves a setting value from the settings table. Takes db connection, key, and fallback default."""
+    cursor = db.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    if row:
+        return row['value']
+    return default
+

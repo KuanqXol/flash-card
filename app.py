@@ -10,7 +10,8 @@ from database import (
     get_words_by_status, 
     get_random_words, 
     get_word_by_id,
-    get_db
+    get_db,
+    get_setting
 )
 from scoring import (
     apply_flashcard_rating,
@@ -18,7 +19,8 @@ from scoring import (
     apply_fill_result,
     mark_as_learned,
     mark_as_learning,
-    _apply_score_change
+    _apply_score_change,
+    get_review_queue
 )
 
 app = Flask(__name__)
@@ -89,26 +91,30 @@ def api_review_word():
 @app.route('/api/flashcard/next')
 def api_flashcard_next():
     status = request.args.get('status', 'all')
-    exclude_id = request.args.get('exclude_id', None, type=int)
+    exclude_ids = request.args.getlist('exclude', type=int)
+    exclude_id = request.args.get('exclude_id', type=int)
+    if exclude_id is not None and exclude_id not in exclude_ids:
+        exclude_ids.append(exclude_id)
     
-    words = get_random_words(1, status, exclude_id)
-    if not words:
-        # If no words matching the filter were found, try without excluding the ID
-        if exclude_id is not None:
-            words = get_random_words(1, status, None)
-            
-        if not words:
-            return jsonify({'error': 'no_words'})
-            
-    word = words[0]
     conn = get_db()
-    pos_rows = conn.execute(
-        "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
-        (word['id'],)
-    ).fetchall()
-    conn.close()
-    pos_entries = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
-    
+    try:
+        queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=exclude_ids)
+        if not queue:
+            # Fallback: if we excluded words but found nothing, try without excludes to prevent complete deadlock
+            if exclude_ids:
+                queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=[])
+            
+            if not queue:
+                return jsonify({'error': 'no_words'}), 404
+        word = queue[0]
+        pos_rows = conn.execute(
+            "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
+            (word['id'],)
+        ).fetchall()
+        pos_entries = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+    finally:
+        conn.close()
+        
     return jsonify({
         'id': word['id'],
         'word': word['word'],
@@ -120,6 +126,7 @@ def api_flashcard_next():
         'review_count': word['review_count'],
         'pos_entries': pos_entries
     })
+
 
 # API POST /api/flashcard/rate -> rates a flashcard word, adjusts score and handles potential upgrades
 @app.route('/api/flashcard/rate', methods=['POST'])
@@ -200,10 +207,19 @@ def api_matching_words():
         
     status = request.args.get('status', 'all')
     
-    words = get_random_words(n, status)
-    if len(words) < n:
-        matching_count = len(get_words_by_status(status))
-        return jsonify({'error': 'not_enough_words', 'available': matching_count})
+    conn = get_db()
+    try:
+        words = get_review_queue(conn, n=n, status_filter=status)
+        if len(words) < n:
+            cursor = conn.cursor()
+            if status == 'all':
+                cursor.execute("SELECT COUNT(*) FROM words")
+            else:
+                cursor.execute("SELECT COUNT(*) FROM words WHERE status = ?", (status,))
+            matching_count = cursor.fetchone()[0]
+            return jsonify({'error': 'not_enough_words', 'available': matching_count})
+    finally:
+        conn.close()
         
     formatted_words = []
     for word in words:
@@ -219,6 +235,7 @@ def api_matching_words():
         })
         
     return jsonify({'words': formatted_words})
+
 
 # API POST /api/matching/result -> submits review results for matching game
 @app.route('/api/matching/result', methods=['POST'])
@@ -260,17 +277,23 @@ def api_matching_result():
 @app.route('/api/fill/next')
 def api_fill_next():
     status = request.args.get('status', 'all')
-    exclude_id = request.args.get('exclude_id', None, type=int)
-    
-    words = get_random_words(1, status, exclude_id)
-    if not words:
-        if exclude_id is not None:
-            words = get_random_words(1, status, None)
-            
-        if not words:
-            return jsonify({'error': 'no_words'})
-            
-    word = words[0]
+    exclude_ids = request.args.getlist('exclude', type=int)
+    exclude_id = request.args.get('exclude_id', type=int)
+    if exclude_id is not None and exclude_id not in exclude_ids:
+        exclude_ids.append(exclude_id)
+        
+    conn = get_db()
+    try:
+        queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=exclude_ids)
+        if not queue:
+            if exclude_ids:
+                queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=[])
+            if not queue:
+                return jsonify({'error': 'no_words'}), 404
+        word = queue[0]
+    finally:
+        conn.close()
+        
     return jsonify({
         'id': word['id'],
         'word': word['word'],
@@ -280,6 +303,7 @@ def api_fill_next():
         'status': word['status'],
         'total_score': word['total_score']
     })
+
 
 # API POST /api/fill/evaluate -> evaluates user spelling/meaning guess and updates score
 @app.route('/api/fill/evaluate', methods=['POST'])
@@ -305,6 +329,33 @@ def api_fill_evaluate():
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
+
+@app.route('/api/session/start', methods=['GET'])
+def session_start():
+    """Khởi tạo session và trả về queue từ đã sắp xếp."""
+    status = request.args.get('status', 'all')
+    db = get_db()
+    try:
+        n = int(request.args.get('n', get_setting(db, 'session_size', '10')))
+        queue = get_review_queue(db, n=n, status_filter=status)
+        
+        # Attach pos_entries to each word in the queue
+        for word in queue:
+            pos_rows = db.execute(
+                "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
+                (word['id'],)
+            ).fetchall()
+            word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+            
+        return jsonify({
+            'queue': queue,
+            'total': len(queue),
+            'new_count': sum(1 for w in queue if w['status'] == 'new'),
+            'review_count': sum(1 for w in queue if w['status'] != 'new'),
+        })
+    finally:
+        db.close()
+
 
 # API GET /api/stats -> retrieves comprehensive progress statistics
 @app.route('/api/stats')

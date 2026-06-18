@@ -54,7 +54,60 @@ def test_all():
     word = db.execute("SELECT status FROM words WHERE id=?", (word_id,)).fetchone()
     assert word['status'] == 'learned'
     
+    # Test 6: Priority Queue test
+    test_priority_queue()
+
     print("✅ Tất cả tests pass!")
+
+def test_priority_queue():
+    import sqlite3
+    from database import init_db
+    from scoring import calculate_priority, get_review_queue
+    from datetime import datetime, timedelta
+    
+    db = sqlite3.connect(':memory:')
+    db.row_factory = sqlite3.Row
+    init_db(db)
+    
+    # Insert some words with different properties
+    # Word 1: New word
+    db.execute("""
+        INSERT INTO words (id, word, translation, status, correct_count, wrong_count, last_reviewed, last_failed_at, correct_streak) 
+        VALUES (1, 'new_word', 'từ mới', 'new', 0, 0, NULL, NULL, 0)
+    """)
+    # Word 2: Learning word, high wrong count, failed recently (hours < 24)
+    yesterday = (datetime.now() - timedelta(hours=2)).isoformat()
+    db.execute("""
+        INSERT INTO words (id, word, translation, status, correct_count, wrong_count, last_reviewed, last_failed_at, correct_streak) 
+        VALUES (2, 'failed_word', 'từ sai', 'learning', 1, 5, ?, ?, 0)
+    """, (yesterday, yesterday))
+    # Word 3: Learned word, high correct streak
+    db.execute("""
+        INSERT INTO words (id, word, translation, status, correct_count, wrong_count, last_reviewed, last_failed_at, correct_streak) 
+        VALUES (3, 'mastered_word', 'từ thuộc', 'learned', 10, 0, ?, NULL, 5)
+    """, (yesterday,))
+    db.commit()
+    
+    # Verify calculate_priority
+    p_new = calculate_priority(dict(db.execute("SELECT * FROM words WHERE id=1").fetchone()))
+    p_fail = calculate_priority(dict(db.execute("SELECT * FROM words WHERE id=2").fetchone()))
+    p_master = calculate_priority(dict(db.execute("SELECT * FROM words WHERE id=3").fetchone()))
+    
+    print(f"Priority - New: {p_new}, Failed: {p_fail}, Mastered: {p_master}")
+    
+    # Failed word should have much higher priority than mastered word
+    assert p_fail > p_master, "Failed learning word should have higher priority than mastered word"
+    
+    # Test get_review_queue
+    queue = get_review_queue(db, n=3, status_filter='all')
+    assert len(queue) == 3, f"Expected 3 words, got {len(queue)}"
+    
+    # Test exclude_ids
+    queue_ex = get_review_queue(db, n=3, status_filter='all', exclude_ids=[2])
+    assert 2 not in [w['id'] for w in queue_ex], "Excluded ID should not be in queue"
+    
+    print("✓ Priority queue tests passed!")
 
 if __name__ == '__main__':
     test_all()
+

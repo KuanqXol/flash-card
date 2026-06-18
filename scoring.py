@@ -103,3 +103,122 @@ def _apply_score_change(db: sqlite3.Connection, word_id: int, delta: int, mode: 
         db, word_id, delta, mode, rating=rating, is_correct=is_correct
     )
     return updated_word['total_score'], status_changed, updated_word['status']
+
+
+def calculate_priority(word: dict) -> float:
+    """
+    Tính priority score: score cao hơn = cần ôn hơn.
+    
+    Công thức:
+    priority = accuracy_pressure + staleness + status_bonus + recent_fail_boost - mastery_reduction
+    """
+    total_reviews = (word.get('correct_count') or 0) + (word.get('wrong_count') or 0)
+    
+    # 1. Accuracy pressure (0-50): sai nhiều = urgent hơn
+    if total_reviews > 0:
+        wrong_ratio = (word.get('wrong_count') or 0) / total_reviews
+    else:
+        wrong_ratio = 0.5  # Từ mới chưa review: giả định 50%
+    accuracy_pressure = wrong_ratio * 50
+    
+    # 2. Staleness (0-60): lâu không ôn = urgent hơn, cap ở 30 ngày
+    if word.get('last_reviewed'):
+        try:
+            delta = datetime.now() - datetime.fromisoformat(word['last_reviewed'])
+            days = min(delta.total_seconds() / 86400, 30)
+        except:
+            days = 30
+    else:
+        days = 30  # Chưa bao giờ ôn = max staleness
+    staleness = days * 2  # max = 60
+    
+    # 3. Status bonus: learning được ưu tiên cao nhất
+    status_bonus = {'new': 8, 'learning': 20, 'learned': -15}.get(word.get('status', 'new'), 0)
+    
+    # 4. Recently failed boost: vừa sai gần đây được ưu tiên cao (decay 24h)
+    recent_fail_boost = 0
+    if word.get('last_failed_at'):
+        try:
+            hours = (datetime.now() - datetime.fromisoformat(word['last_failed_at'])).total_seconds() / 3600
+            if hours < 24:
+                recent_fail_boost = 35 * max(0, 1 - hours / 24)  # 35 → 0 theo thời gian
+        except:
+            pass
+    
+    # 5. Mastery reduction: đúng liên tiếp nhiều lần thì giảm priority
+    streak = word.get('correct_streak', 0)
+    mastery_reduction = min(streak * 3, 30)  # cap ở -30
+    
+    return accuracy_pressure + staleness + status_bonus + recent_fail_boost - mastery_reduction
+
+
+def get_review_queue(db, n: int = 10, status_filter: str = 'all', 
+                     exclude_ids: list = None, include_new_ratio: float = 0.2) -> list:
+    """
+    Lấy n từ theo priority để học trong phiên này.
+    
+    Args:
+        n: số từ cần lấy
+        status_filter: 'all' | 'new' | 'learning' | 'learned'
+        exclude_ids: list word_id đã xem trong session (tránh lặp)
+        include_new_ratio: tỉ lệ từ mới trong queue (0.0-1.0, default 20%)
+    
+    Returns:
+        list[dict] đã sort theo priority DESC
+    """
+    exclude_ids = exclude_ids or []
+    
+    # Lấy tất cả từ phù hợp
+    if status_filter == 'all':
+        query = "SELECT * FROM words"
+        words = [dict(r) for r in db.execute(query).fetchall()]
+    else:
+        query = "SELECT * FROM words WHERE status = ?"
+        words = [dict(r) for r in db.execute(query, (status_filter,)).fetchall()]
+    
+    # Loại exclude_ids
+    words = [w for w in words if w['id'] not in exclude_ids]
+    
+    if not words:
+        return []
+    
+    # Tính priority cho mỗi từ
+    for w in words:
+        w['_priority'] = calculate_priority(w)
+    
+    # Tách new và non-new
+    new_words     = [w for w in words if w['status'] == 'new']
+    review_words  = [w for w in words if w['status'] != 'new']
+    
+    # Sort theo priority DESC
+    new_words.sort(key=lambda x: x['_priority'], reverse=True)
+    review_words.sort(key=lambda x: x['_priority'], reverse=True)
+    
+    # Mix theo ratio
+    if status_filter == 'all':
+        n_new    = min(int(n * include_new_ratio), len(new_words))
+        n_review = min(n - n_new, len(review_words))
+        # Nếu không đủ review words, bù bằng new words
+        if n_review < n - n_new:
+            n_new = min(n - n_review, len(new_words))
+        queue = new_words[:n_new] + review_words[:n_review]
+        # Sort queue according to priority to keep highest priority first
+        queue.sort(key=lambda x: x['_priority'], reverse=True)
+    else:
+        words.sort(key=lambda x: x['_priority'], reverse=True)
+        queue = words[:n]
+    
+    # Shuffle nhẹ trong nhóm priority cao (tránh predictable)
+    import random
+    if len(queue) > 3:
+        top = queue[:max(1, len(queue)//2)]
+        rest = queue[max(1, len(queue)//2):]
+        random.shuffle(top)
+        queue = top + rest
+    
+    # Xóa _priority khỏi kết quả
+    for w in queue:
+        w.pop('_priority', None)
+    
+    return queue
+

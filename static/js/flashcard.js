@@ -7,6 +7,13 @@ const state = {
     sessionScore: 0
 };
 
+// Session State
+const sessionState = {
+    seenIds: [],       // word_ids đã xem trong phiên này
+    queue: [],         // queue từ /api/session/start
+    currentIndex: 0,
+};
+
 // DOM Cache
 const cardEl = document.getElementById('flashcard');
 const wordEl = document.getElementById('card-word');
@@ -28,7 +35,7 @@ function init() {
     if (filterDropdownEl) {
         filterDropdownEl.addEventListener('change', (e) => {
             state.currentFilter = e.target.value;
-            loadNextWord();
+            startSession();
         });
     }
 
@@ -36,7 +43,7 @@ function init() {
     document.addEventListener('keydown', handleKeyDown);
 
     // Initial load
-    loadNextWord();
+    startSession();
 }
 
 // Keyboard shortcuts
@@ -51,51 +58,101 @@ function handleKeyDown(e) {
         }
     } else if (e.key === 'Enter') {
         e.preventDefault();
-        showToast("⏭ Bỏ qua từ này", "info");
-        loadNextWord();
+        skipWord();
     }
 }
 
-// Fetch next word
-async function loadNextWord() {
+// Khi load phiên mới:
+async function startSession() {
     try {
-        state.isFlipped = false;
-        if (cardEl) {
-            cardEl.classList.remove('flipped');
-        }
+        const res = await fetch(`/api/session/start?status=${state.currentFilter}`);
+        const data = await res.json();
         
-        // Hide rating and show flip controls
-        if (ratingBarEl) ratingBarEl.classList.remove('visible');
-        if (btnFlipEl) btnFlipEl.style.display = 'block';
-
-        const excludeId = state.currentWord ? state.currentWord.id : '';
-        const url = `/api/flashcard/next?status=${state.currentFilter}&exclude_id=${excludeId}`;
+        sessionState.queue = data.queue || [];
+        sessionState.currentIndex = 0;
+        sessionState.seenIds = [];
         
-        const response = await fetch(url);
-        const data = await response.json();
+        state.sessionCount = 0;
+        state.sessionScore = 0;
+        updateSessionUI();
 
-        if (data.error === 'no_words') {
+        // Hide completion state and empty state
+        const sessionCompleteEl = document.getElementById('flashcard-session-complete');
+        if (sessionCompleteEl) sessionCompleteEl.style.display = 'none';
+        
+        const emptyStateEl = document.getElementById('flashcard-empty-state');
+        if (emptyStateEl) emptyStateEl.style.display = 'none';
+
+        if (sessionState.queue.length === 0) {
             state.currentWord = null;
             displayEmptyState();
             return;
         }
 
-        state.currentWord = data;
+        const stageContainer = document.getElementById('flashcard-stage-container');
+        if (stageContainer) stageContainer.style.display = 'block';
         
-        // Hide empty state and show stage
-        document.getElementById('flashcard-empty-state').style.display = 'none';
-        document.getElementById('flashcard-stage-container').style.display = 'block';
-        
-        displayWord(data);
+        showNextFromQueue();
     } catch (err) {
-        console.error("Error loading next word:", err);
-        showToast("Lỗi tải từ vựng!", "error");
+        console.error("Error starting session:", err);
+        showToast("Lỗi khởi tạo phiên học!", "error");
+    }
+}
+
+// Khi lấy từ tiếp theo:
+function showNextFromQueue() {
+    if (sessionState.currentIndex >= sessionState.queue.length) {
+        showSessionComplete();
+        return;
+    }
+    const word = sessionState.queue[sessionState.currentIndex++];
+    sessionState.seenIds.push(word.id);
+    renderCard(word);
+}
+
+function renderCard(word) {
+    state.currentWord = word;
+    state.isFlipped = false;
+    if (cardEl) {
+        cardEl.classList.remove('flipped');
+    }
+    
+    // Hide rating and show flip controls
+    if (ratingBarEl) ratingBarEl.classList.remove('visible');
+    if (btnFlipEl) btnFlipEl.style.display = 'block';
+
+    displayWord(word);
+}
+
+function skipWord() {
+    showToast("⏭ Bỏ qua từ này", "info");
+    showNextFromQueue();
+}
+
+function showSessionComplete() {
+    state.currentWord = null;
+    const stageContainer = document.getElementById('flashcard-stage-container');
+    if (stageContainer) stageContainer.style.display = 'none';
+    
+    const emptyStateEl = document.getElementById('flashcard-empty-state');
+    if (emptyStateEl) emptyStateEl.style.display = 'none';
+    
+    const sessionCompleteEl = document.getElementById('flashcard-session-complete');
+    if (sessionCompleteEl) {
+        sessionCompleteEl.style.display = 'flex';
+        const countEl = document.getElementById('session-complete-count');
+        const scoreEl = document.getElementById('session-complete-score');
+        if (countEl) countEl.textContent = state.sessionCount;
+        if (scoreEl) scoreEl.textContent = state.sessionScore;
     }
 }
 
 function displayEmptyState() {
-    document.getElementById('flashcard-stage-container').style.display = 'none';
-    document.getElementById('flashcard-empty-state').style.display = 'flex';
+    const stageContainer = document.getElementById('flashcard-stage-container');
+    if (stageContainer) stageContainer.style.display = 'none';
+    
+    const emptyStateEl = document.getElementById('flashcard-empty-state');
+    if (emptyStateEl) emptyStateEl.style.display = 'flex';
 }
 
 function displayWord(word) {
@@ -186,7 +243,7 @@ async function rateWord(rating) {
             highlightChosenStar(rating);
             
             setTimeout(() => {
-                loadNextWord();
+                showNextFromQueue();
             }, 800);
         } else {
             showToast(data.message || "Lỗi đánh giá!", "error");
@@ -212,7 +269,7 @@ async function markLearned() {
         
         if (data.success) {
             showToast("✅ Đã thuộc!", "success");
-            loadNextWord();
+            showNextFromQueue();
         } else {
             showToast("Không thể cập nhật trạng thái!", "error");
         }
@@ -237,7 +294,7 @@ async function markLearning() {
         
         if (data.success) {
             showToast("Chuyển sang Đang học!", "info");
-            loadNextWord();
+            showNextFromQueue();
         } else {
             showToast("Không thể cập nhật trạng thái!", "error");
         }
