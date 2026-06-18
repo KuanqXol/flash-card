@@ -66,15 +66,38 @@ function handleKeyDown(e) {
 // Khi load phiên mới:
 async function startSession() {
     try {
-        let queryParams = `?status=${state.currentFilter}`;
-        if (state.useUrlParams && window.location.search) {
-            queryParams = window.location.search;
-            state.useUrlParams = false; // only use once
-        }
-        const res = await fetch(`/api/session/start${queryParams}`);
-        const data = await res.json();
+        const urlParams = new URLSearchParams(window.location.search);
+        let queue = [];
         
-        sessionState.queue = data.queue || [];
+        if (state.currentFilter === 'recent_fails' || (state.useUrlParams && urlParams.get('mode') === 'recent_fails')) {
+            state.useUrlParams = false; // only use once
+            state.currentFilter = 'recent_fails';
+            
+            const res = await fetch('/api/words/recently-failed?hours=24');
+            queue = await res.json();
+            
+            if (filterDropdownEl) {
+                let opt = filterDropdownEl.querySelector('option[value="recent_fails"]');
+                if (!opt) {
+                    opt = document.createElement('option');
+                    opt.value = 'recent_fails';
+                    opt.textContent = '🔁 Từ vừa sai (24h)';
+                    filterDropdownEl.appendChild(opt);
+                }
+                filterDropdownEl.value = 'recent_fails';
+            }
+        } else {
+            let queryParams = `?status=${state.currentFilter}`;
+            if (state.useUrlParams && window.location.search) {
+                queryParams = window.location.search;
+                state.useUrlParams = false; // only use once
+            }
+            const res = await fetch(`/api/session/start${queryParams}`);
+            const data = await res.json();
+            queue = data.queue || [];
+        }
+        
+        sessionState.queue = queue;
         sessionState.currentIndex = 0;
         sessionState.seenIds = [];
         

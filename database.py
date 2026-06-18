@@ -339,12 +339,15 @@ def get_stats():
         'needs_review': needs_review_cnt
     }
 
-def get_setting(db, key, default):
-    """Retrieves a setting value from the settings table. Takes db connection, key, and fallback default."""
-    cursor = db.cursor()
-    cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
-    row = cursor.fetchone()
-    if row:
-        return row['value']
-    return default
+def get_setting(db, key: str, default: str = '') -> str:
+    row = db.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return row['value'] if row else default
+
+def set_setting(db, key: str, value: str):
+    db.execute(
+        "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now','localtime')) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+        (key, value)
+    )
+    db.commit()
 

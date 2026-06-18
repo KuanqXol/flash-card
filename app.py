@@ -11,7 +11,9 @@ from database import (
     get_random_words, 
     get_word_by_id,
     get_db,
-    get_setting
+    get_setting,
+    set_setting,
+    update_word_after_review
 )
 from scoring import (
     apply_flashcard_rating,
@@ -310,7 +312,6 @@ def api_fill_next():
     })
 
 
-# API POST /api/fill/evaluate -> evaluates user spelling/meaning guess and updates score
 @app.route('/api/fill/evaluate', methods=['POST'])
 def api_fill_evaluate():
     data = request.get_json() or {}
@@ -320,16 +321,25 @@ def api_fill_evaluate():
     if word_id is None or is_correct is None:
         return jsonify({'success': False, 'message': 'Missing word_id or is_correct'}), 400
         
+    delta = 5 if is_correct else -3
+    
     conn = get_db()
     try:
-        res = apply_fill_result(conn, int(word_id), bool(is_correct))
+        # update_word_after_review has handled self_correct_count, last_failed_at, consecutive_wrong
+        word, status_changed = update_word_after_review(
+            conn, int(word_id), delta, 'fill', is_correct=bool(is_correct)
+        )
+        
         return jsonify({
             'success': True,
-            'new_score': res['new_score'],
-            'delta': res['delta']
+            'new_score': word['total_score'],
+            'mastery_score': calculate_mastery_score(word),
+            'delta': delta,
+            'consecutive_wrong': word['consecutive_wrong'],
+            'needs_review': word['needs_review'],
+            'status_changed': status_changed,
+            'new_status': word['status'],
         })
-    except ValueError as e:
-        return jsonify({'success': False, 'message': str(e)}), 404
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
@@ -537,6 +547,59 @@ def api_daily_progress():
             'today': progress,
             'weekly': weekly
         })
+    finally:
+        conn.close()
+
+
+@app.route('/api/words/recently-failed')
+def api_recently_failed():
+    hours = request.args.get('hours', 24, type=int)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT *, 
+                   ROUND((julianday('now','localtime') - julianday(last_failed_at)) * 24, 1) as hours_ago
+            FROM words
+            WHERE last_failed_at IS NOT NULL AND datetime(last_failed_at) >= datetime('now', ?, 'localtime')
+            ORDER BY last_failed_at DESC
+        """, (f'-{hours} hours',)).fetchall()
+        
+        res = []
+        for r in rows:
+            w_dict = dict(r)
+            pos_rows = conn.execute(
+                "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
+                (w_dict['id'],)
+            ).fetchall()
+            w_dict['pos_entries'] = [{'pos': pr['pos'], 'meaning': pr['meaning']} for pr in pos_rows]
+            w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+            res.append(w_dict)
+            
+        return jsonify(res)
+    finally:
+        conn.close()
+
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        return jsonify({r['key']: r['value'] for r in rows})
+    finally:
+        conn.close()
+
+
+@app.route('/api/settings', methods=['POST'])
+def update_settings():
+    data = request.get_json() or {}
+    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme'}
+    conn = get_db()
+    try:
+        for key, value in data.items():
+            if key in allowed:
+                set_setting(conn, key, str(value))
+        return jsonify({'success': True})
     finally:
         conn.close()
 

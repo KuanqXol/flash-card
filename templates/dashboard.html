@@ -660,7 +660,7 @@
     <div class="analytics-card analytics-card-recent" id="card-recent-container" style="grid-column: span 2;">
         <div class="analytics-card-header">
             <span>🔥 Vừa mới sai (24h qua)</span>
-            <a href="/flashcard?recent_fails=1" class="btn-analytics" id="btn-practice-fails" style="display: none; background: #EF4444; border-radius: 0.5rem; font-size: 0.75rem;">Ôn từ vừa sai</a>
+            <a href="/flashcard?mode=recent_fails" class="btn-analytics" id="btn-practice-fails" style="display: none; background: #EF4444; border-radius: 0.5rem; font-size: 0.75rem; text-decoration: none; color: white;">🔁 Ôn từ vừa sai</a>
         </div>
         <div class="recent-fails-list" id="recent-fails-container">
             <!-- Loading placeholder -->
@@ -718,6 +718,7 @@
     <!-- Data Management Toolbar -->
     <div class="toolbar">
         <button id="btn-import" class="btn btn-ghost" onclick="openImportModal()">📥 Import CSV</button>
+        <button id="btn-settings" class="btn btn-ghost" onclick="openSettingsModal()">⚙️ Cài đặt</button>
         <button id="btn-export" class="btn btn-ghost" onclick="exportProgress()">📤 Export tiến độ</button>
         <div class="bulk-actions" id="bulk-actions-panel" style="display:none">
             <span id="selected-count">0 từ đã chọn</span>
@@ -795,6 +796,38 @@
                 <h4 id="result-summary">Hoàn thành!</h4>
                 <p id="result-details" style="color: var(--text-secondary); margin-top: 0.5rem;"></p>
                 <button class="btn-close-result" onclick="closeImportModal(true)">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal-overlay" style="display:none">
+    <div class="modal" style="max-width: 450px;">
+        <div class="modal-header">
+            <h3>⚙️ Cài đặt học tập</h3>
+            <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem;">
+            <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">🎯 Mục tiêu hàng ngày (từ/ngày):</label>
+                    <input type="number" id="setting-daily-goal" min="1" max="100" style="background: var(--bg); border: 1px solid var(--border); padding: 0.6rem; border-radius: 0.5rem; font-size: 0.95rem; color: var(--text-primary); outline: none;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">🃏 Số từ mỗi phiên học (session size):</label>
+                    <input type="number" id="setting-session-size" min="1" max="50" style="background: var(--bg); border: 1px solid var(--border); padding: 0.6rem; border-radius: 0.5rem; font-size: 0.95rem; color: var(--text-primary); outline: none;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">🔗 Số cặp từ trong game Nối Từ:</label>
+                    <select id="setting-matching-pairs" style="background: var(--bg); border: 1px solid var(--border); padding: 0.6rem; border-radius: 0.5rem; font-size: 0.95rem; color: var(--text-primary); outline: none; cursor: pointer;">
+                        <option value="4">4 cặp</option>
+                        <option value="6">6 cặp</option>
+                        <option value="8">8 cặp</option>
+                        <option value="10">10 cặp</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="saveSettings()" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; font-weight: 700; border: none; cursor: pointer; margin-top: 0.5rem;">Lưu cài đặt</button>
             </div>
         </div>
     </div>
@@ -1447,7 +1480,10 @@
             return;
         }
         
-        if (practiceBtn) practiceBtn.style.display = 'inline-flex';
+        if (practiceBtn) {
+            practiceBtn.style.display = 'inline-flex';
+            practiceBtn.innerHTML = `🔁 Ôn ngay ${words.length} từ vừa sai`;
+        }
         
         words.forEach(w => {
             const badge = document.createElement('div');
@@ -1495,6 +1531,62 @@
             const circumference = 213.6;
             const offset = circumference - (circumference * percent / 100);
             ring.style.strokeDashoffset = offset;
+        }
+    }
+
+    // Settings Actions
+    async function openSettingsModal() {
+        try {
+            const response = await fetch('/api/settings');
+            const settings = await response.json();
+            
+            document.getElementById('setting-daily-goal').value = settings.daily_goal || 20;
+            document.getElementById('setting-session-size').value = settings.session_size || 10;
+            document.getElementById('setting-matching-pairs').value = settings.matching_pairs || 6;
+            
+            document.getElementById('settings-modal').style.display = 'flex';
+        } catch (err) {
+            console.error("Error loading settings:", err);
+            showToast("Lỗi tải cài đặt!", "error");
+        }
+    }
+
+    function closeSettingsModal() {
+        document.getElementById('settings-modal').style.display = 'none';
+    }
+
+    async function saveSettings() {
+        const dailyGoal = parseInt(document.getElementById('setting-daily-goal').value);
+        const sessionSize = parseInt(document.getElementById('setting-session-size').value);
+        const matchingPairs = parseInt(document.getElementById('setting-matching-pairs').value);
+        
+        if (isNaN(dailyGoal) || dailyGoal < 1 || isNaN(sessionSize) || sessionSize < 1) {
+            showToast("Vui lòng nhập giá trị hợp lệ!", "error");
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    daily_goal: dailyGoal,
+                    session_size: sessionSize,
+                    matching_pairs: matchingPairs
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                showToast("⚙️ Lưu cài đặt thành công!", "success");
+                closeSettingsModal();
+                fetchStats();
+                fetchAnalytics();
+            } else {
+                showToast("Lỗi lưu cài đặt!", "error");
+            }
+        } catch (err) {
+            console.error("Error saving settings:", err);
+            showToast("Lỗi kết nối máy chủ!", "error");
         }
     }
 
