@@ -1,4 +1,4 @@
-# 📚 FlashVocab — Vibe Coding Checklist
+# 📚 FlashVocab
 
 > App học từ vựng tiếng Anh cá nhân, chạy local trên Windows.
 > Dùng file này như "spec" để feed vào Cursor / Claude / Copilot từng bước.

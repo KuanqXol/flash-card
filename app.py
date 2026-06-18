@@ -101,6 +101,14 @@ def api_flashcard_next():
             return jsonify({'error': 'no_words'})
             
     word = words[0]
+    conn = get_db()
+    pos_rows = conn.execute(
+        "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
+        (word['id'],)
+    ).fetchall()
+    conn.close()
+    pos_entries = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+    
     return jsonify({
         'id': word['id'],
         'word': word['word'],
@@ -109,7 +117,8 @@ def api_flashcard_next():
         'short_translation': word['short_translation'],
         'status': word['status'],
         'total_score': word['total_score'],
-        'review_count': word['review_count']
+        'review_count': word['review_count'],
+        'pos_entries': pos_entries
     })
 
 # API POST /api/flashcard/rate -> rates a flashcard word, adjusts score and handles potential upgrades

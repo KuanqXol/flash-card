@@ -1,7 +1,12 @@
 import sys
 import os
 import pandas as pd
+import re
 from database import get_db, init_db
+
+POS_TAGS = ('n', 'v', 'adj', 'adv', 'prep', 'conj', 'pron', 'web')
+_SPLIT_RE = re.compile(r';\s*(?=' + '|'.join(POS_TAGS) + r'\.\s)')
+_MATCH_RE = re.compile(r'^(' + '|'.join(POS_TAGS) + r')\.\s*(.+)')
 
 # Ensure UTF-8 output on Windows console
 if hasattr(sys.stdout, 'reconfigure'):
@@ -10,36 +15,67 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-def parse_short_translation(full_translation: str) -> str:
+def parse_pos_entries(translation: str) -> list[dict]:
     """
-    Parses full translation by taking the first segment before a semicolon (or the whole string if none),
-    stripping word-type prefixes, and truncating to max 60 chars (appending '...').
+    Input : "n. người đại diện; adj. đại diện tượng trưng; v. đại diện thay mặt; web. tiêu biểu..."
+    Output: [
+        {"pos": "n",   "meaning": "người đại diện"},
+        {"pos": "adj", "meaning": "đại diện tượng trưng"},
+        {"pos": "v",   "meaning": "đại diện thay mặt"},
+        # "web" bị loại bỏ
+    ]
+    Edge cases:
+    - Phrase (không có POS): pos=None, lấy toàn bộ text
+    - Chỉ 1 POS không có ";": vẫn parse đúng
+    - Translation rỗng hoặc None: trả về []
+    - Chỉ có "web.": trả về [] (vì web bị filter)
     """
-    if not isinstance(full_translation, str) or not full_translation:
-        return ""
+    if not translation or not translation.strip() or not isinstance(translation, str):
+        return []
     
-    # Split by semicolon and get the first part if present
-    if ';' in full_translation:
-        first_part = full_translation.split(';')[0].strip()
+    parts = _SPLIT_RE.split(translation.strip())
+    entries = []
+    has_pos_prefix = False
+    
+    for i, part in enumerate(parts):
+        part = part.strip()
+        if not part:
+            continue
+        m = _MATCH_RE.match(part)
+        if m:
+            has_pos_prefix = True
+            pos, meaning = m.group(1), m.group(2).strip()
+            if pos != 'web':  # Bỏ entries web
+                entries.append({'pos': pos, 'meaning': meaning})
+        elif not has_pos_prefix and i == 0:
+            # Phrase không có POS prefix (vd: "the nasal spray")
+            entries.append({'pos': None, 'meaning': part})
+    
+    return entries
+
+
+def get_short_translation(pos_entries: list[dict], full_translation: str) -> str:
+    """
+    Lấy nghĩa ngắn gọn nhất từ pos_entries.
+    - Dùng meaning của entry đầu tiên
+    - Cắt tối đa 60 ký tự
+    """
+    if pos_entries:
+        meaning = pos_entries[0]['meaning']
+    elif full_translation and isinstance(full_translation, str):
+        # Fallback: bỏ POS prefix và lấy phần trước ";"
+        cleaned = re.sub(r'^(' + '|'.join(POS_TAGS) + r')\.\s*', '', full_translation.strip())
+        meaning = cleaned.split(';')[0].strip()
     else:
-        first_part = full_translation.strip()
+        meaning = ''
     
-    # Prefix list to strip from the beginning of the string (case-insensitive)
-    prefixes = ["n. ", "v. ", "adj. ", "adv. ", "prep. ", "conj. ", "web. ", "pron. "]
-    
-    changed = True
-    while changed:
-        changed = False
-        for prefix in prefixes:
-            if first_part.lower().startswith(prefix.lower()):
-                first_part = first_part[len(prefix):].strip()
-                changed = True
-                break
-                
-    if len(first_part) > 60:
-        first_part = first_part[:60] + "..."
-        
-    return first_part
+    return meaning[:60] + ('...' if len(meaning) > 60 else '')
+
+
+def parse_short_translation(full_translation: str) -> str:
+    """Legacy stub to maintain test suite compatibility."""
+    entries = parse_pos_entries(full_translation)
+    return get_short_translation(entries, full_translation)
 
 def import_from_csv(csv_path: str) -> dict:
     """
@@ -80,7 +116,9 @@ def import_from_csv(csv_path: str) -> dict:
         translation = str(row.get('Translation', '')).strip() if pd.notna(row.get('Translation')) else ""
         date_added = str(row.get('Date', '')).strip() if pd.notna(row.get('Date')) else None
         
-        short_translation = parse_short_translation(translation)
+        # Parse POS entries
+        entries = parse_pos_entries(translation)
+        short_translation = get_short_translation(entries, translation)
         
         # Perform case-insensitive search for existing word
         cursor.execute('SELECT id FROM words WHERE LOWER(word) = LOWER(?)', (word,))
@@ -94,6 +132,7 @@ def import_from_csv(csv_path: str) -> dict:
                 WHERE id = ?
             ''', (phonetic, translation, short_translation, existing['id']))
             update_count += 1
+            word_id = existing['id']
         else:
             # Insert new word record
             cursor.execute('''
@@ -101,6 +140,15 @@ def import_from_csv(csv_path: str) -> dict:
                 VALUES (?, ?, ?, ?, ?, 'new', 0, 0, 0, NULL)
             ''', (word, phonetic, translation, short_translation, date_added))
             new_count += 1
+            word_id = cursor.lastrowid
+            
+        # Xóa POS entries cũ của từ này rồi insert lại
+        cursor.execute("DELETE FROM word_pos WHERE word_id = ?", (word_id,))
+        for i, entry in enumerate(entries):
+            cursor.execute(
+                "INSERT INTO word_pos (word_id, pos, meaning, sort_order) VALUES (?, ?, ?, ?)",
+                (word_id, entry['pos'], entry['meaning'], i)
+            )
             
     conn.commit()
     conn.close()

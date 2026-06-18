@@ -394,3 +394,14 @@ body {
 .empty-state a:hover {
     background-color: var(--primary-light);
 }
+
+/* POS entries styling on flashcard back face */
+.pos-entry { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.pos-badge {
+  font-size: 0.7rem; font-weight: 700; color: var(--primary);
+  background: var(--primary-light); padding: 2px 6px;
+  border-radius: 4px; min-width: 32px; text-align: center; flex-shrink: 0;
+  font-style: italic; margin-top: 2px;
+}
+.meaning-text { font-size: 1rem; color: var(--text-primary); line-height: 1.5; }
+

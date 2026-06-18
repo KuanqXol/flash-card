@@ -118,7 +118,9 @@ function displayWord(word) {
     }
 
     // Back card content
-    if (translationEl) translationEl.textContent = word.translation || 'Không có nghĩa';
+    if (translationEl) {
+        translationEl.innerHTML = renderPosEntries(word.pos_entries, word.translation || 'Không có nghĩa');
+    }
     if (cardScoreEl) cardScoreEl.textContent = `Điểm: ${word.total_score || 0} ⭐`;
     if (cardReviewsEl) cardReviewsEl.textContent = `Đã ôn: ${word.review_count || 0} lần`;
 }
@@ -297,3 +299,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     init();
 });
+
+function renderPosEntries(posEntries, fullTranslation) {
+  if (!posEntries || posEntries.length === 0) {
+    return `<p class="meaning-full" style="font-size: 1.2rem; color: #5b21b6; font-weight: 600; line-height: 1.6; text-align: center; width: 100%;">${fullTranslation}</p>`;
+  }
+  const posLabels = { n: 'n.', v: 'v.', adj: 'adj.', adv: 'adv.', 
+                      prep: 'prep.', conj: 'conj.', pron: 'pron.' };
+  return posEntries.map(e => `
+    <div class="pos-entry">
+      ${e.pos ? `<span class="pos-badge">${posLabels[e.pos] || e.pos}</span>` : ''}
+      <span class="meaning-text">${e.meaning}</span>
+    </div>
+  `).join('');
+}
