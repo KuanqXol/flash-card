@@ -106,6 +106,17 @@ def test_priority_queue():
     queue_ex = get_review_queue(db, n=3, status_filter='all', exclude_ids=[2])
     assert 2 not in [w['id'] for w in queue_ex], "Excluded ID should not be in queue"
     
+    # Test calculate_mastery_score
+    from scoring import calculate_mastery_score
+    w1 = dict(db.execute("SELECT * FROM words WHERE id=1").fetchone())
+    m1 = calculate_mastery_score(w1)
+    assert m1 == 0.0, f"Expected 0.0, got {m1}"
+    
+    w3 = dict(db.execute("SELECT * FROM words WHERE id=3").fetchone())
+    m3 = calculate_mastery_score(w3)
+    assert m3 == 60.0, f"Expected 60.0, got {m3}"
+    
+    print("✓ Mastery score calculation tests passed!")
     print("✓ Priority queue tests passed!")
 
 if __name__ == '__main__':

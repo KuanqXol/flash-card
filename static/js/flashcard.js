@@ -174,6 +174,16 @@ function displayWord(word) {
         statusBadgeEl.className = `badge badge-${word.status}`;
     }
 
+    // Warning Badge styling
+    const warningBadgeEl = document.getElementById('card-warning-badge');
+    if (warningBadgeEl) {
+        if (word.needs_review === 1) {
+            warningBadgeEl.style.display = 'inline-block';
+        } else {
+            warningBadgeEl.style.display = 'none';
+        }
+    }
+
     // Back card content
     if (translationEl) {
         translationEl.innerHTML = renderPosEntries(word.pos_entries, word.translation || 'Không có nghĩa');

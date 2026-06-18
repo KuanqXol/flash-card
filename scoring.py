@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+import math
 
 SCORE_RULES = {
     'flashcard': lambda rating: rating,  # 1-5
@@ -221,4 +222,32 @@ def get_review_queue(db, n: int = 10, status_filter: str = 'all',
         w.pop('_priority', None)
     
     return queue
+
+
+def calculate_mastery_score(word: dict) -> float:
+    """
+    Tính mastery score: phản ánh mức độ thực sự nhớ từ.
+    Khác total_score (gamification), mastery_score dùng để đánh giá
+    chất lượng học (fill đúng có giá trị hơn flashcard 5 sao x10).
+    
+    Trả về số 0-100.
+    """
+    total_reviews = (word.get('correct_count') or 0) + (word.get('wrong_count') or 0)
+    if total_reviews == 0:
+        return 0.0
+    
+    # Accuracy cơ bản
+    accuracy = (word.get('correct_count') or 0) / total_reviews  # 0-1
+    
+    # Fill mode weight: fill đúng = strong recall, weight cao hơn
+    # (self_correct_count từ fill mode)
+    fill_bonus = min((word.get('self_correct_count') or 0) * 3, 20)
+    fill_penalty = min((word.get('self_wrong_count') or 0) * 2, 15)
+    
+    # Review count factor: cần đủ data để tin tưởng
+    confidence = min(math.log(1 + total_reviews) / math.log(11), 1.0)  # 0→1 khi review 0→10
+    
+    raw = (accuracy * 60 + fill_bonus - fill_penalty)
+    return max(0.0, round(raw * confidence, 1))  # scale theo confidence
+
 

@@ -244,7 +244,10 @@
         <div class="flashcard" id="flashcard" onclick="flipCard()">
             <!-- Front Side -->
             <div class="card-face card-front">
-                <span class="status-badge badge" id="card-status-badge">Trống</span>
+                <div style="position: absolute; top: 1.5rem; left: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                    <span class="status-badge badge" id="card-status-badge" style="position: static;">Trống</span>
+                    <span class="badge-warning" id="card-warning-badge" style="display: none; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 700; font-size: 0.75rem;" title="Từ này cần ôn lại">⚠️ Cần ôn</span>
+                </div>
                 <div>
                     <div class="word-display" id="card-word">Loading...</div>
                     <div class="phonetic-display" id="card-phonetic">[/loading/]</div>

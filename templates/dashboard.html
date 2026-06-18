@@ -447,6 +447,7 @@
             <button class="tab-btn" data-status="new" onclick="setFilter('new', this)">Từ mới (<span id="count-new">0</span>)</button>
             <button class="tab-btn" data-status="learning" onclick="setFilter('learning', this)">Đang học (<span id="count-learning">0</span>)</button>
             <button class="tab-btn" data-status="learned" onclick="setFilter('learned', this)">Đã thuộc (<span id="count-learned">0</span>)</button>
+            <button class="tab-btn" data-status="needs_review" onclick="setFilter('needs_review', this)">⚠️ Cần ôn lại (<span id="count-warning">0</span>)</button>
         </div>
         
         <!-- Sort Dropdown -->
@@ -596,6 +597,8 @@
             document.getElementById('count-new').textContent = stats.new;
             document.getElementById('count-learning').textContent = stats.learning;
             document.getElementById('count-learned').textContent = stats.learned;
+            const countWarningEl = document.getElementById('count-warning');
+            if (countWarningEl) countWarningEl.textContent = stats.needs_review || 0;
             
             // Progress Bar
             const total = stats.total;
@@ -676,6 +679,8 @@
             const phoneticText = w.phonetic && w.phonetic !== '--' ? `<span class="phonetic-display">${w.phonetic}</span>` : '';
             const shortTransText = w.short_translation || 'N/A';
             
+            const warningBadge = w.needs_review === 1 ? `<span class="badge-warning" style="margin-left: 0.35rem;" title="Từ này cần ôn lại">⚠️ Cần ôn</span>` : '';
+            
             // Main row
             const mainRow = document.createElement('tr');
             mainRow.className = 'word-row';
@@ -684,7 +689,7 @@
             
             mainRow.innerHTML = `
                 <td style="text-align: center;" onclick="event.stopPropagation()"><input type="checkbox" class="word-checkbox" data-id="${w.id}" onchange="onCheckboxChange()"></td>
-                <td><span class="badge badge-${w.status}" id="badge-${w.id}">${getStatusLabel(w.status)}</span></td>
+                <td><span class="badge badge-${w.status}" id="badge-${w.id}">${getStatusLabel(w.status)}</span>${warningBadge}</td>
                 <td><span class="word-display">${w.word}</span>${phoneticText}</td>
                 <td><div class="trans-display">${shortTransText}</div></td>
                 <td style="text-align: center;"><span class="score-display">⭐ <span id="score-${w.id}">${w.total_score}</span></span></td>
@@ -696,12 +701,15 @@
             detailRow.className = 'detail-row';
             detailRow.id = `detail-row-${w.id}`;
             
+            const dismissWarningBtn = w.needs_review === 1 ? `<button class="btn-inline btn-review-inline" style="background: var(--danger-light); color: var(--danger); border-color: rgba(239, 68, 68, 0.2); margin-left: 1rem; padding: 0.25rem 0.75rem;" onclick="dismissWarning(event, ${w.id})">💡 Bỏ qua cảnh báo</button>` : '';
+            
             detailRow.innerHTML = `
                 <td colspan="6">
                     <div class="detail-content">
                         <p style="margin-bottom: 0.5rem;"><strong>Nghĩa đầy đủ:</strong> ${w.translation || 'Chưa cập nhật'}</p>
                         <p style="font-size: 0.8rem; color: var(--text-secondary);">
                             Số lần ôn: ${w.review_count} lần | Ôn lần cuối: ${w.last_reviewed || 'Chưa ôn tập'}
+                            ${dismissWarningBtn}
                         </p>
                     </div>
                 </td>
@@ -835,6 +843,27 @@
             }
         } catch (err) {
             console.error("Error marking learning inline:", err);
+            showToast("Lỗi máy chủ!", "error");
+        }
+    }
+
+    async function dismissWarning(event, wordId) {
+        event.stopPropagation();
+        try {
+            const response = await fetch(`/api/word/${wordId}/dismiss-warning`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            if (data.success) {
+                showToast("Đã xóa cảnh báo ôn tập!", "success");
+                fetchStats();
+                fetchWordList();
+            } else {
+                showToast("Lỗi xóa cảnh báo!", "error");
+            }
+        } catch (err) {
+            console.error("Error dismissing warning:", err);
             showToast("Lỗi máy chủ!", "error");
         }
     }

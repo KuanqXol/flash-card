@@ -20,7 +20,8 @@ from scoring import (
     mark_as_learned,
     mark_as_learning,
     _apply_score_change,
-    get_review_queue
+    get_review_queue,
+    calculate_mastery_score
 )
 
 app = Flask(__name__)
@@ -124,7 +125,8 @@ def api_flashcard_next():
         'status': word['status'],
         'total_score': word['total_score'],
         'review_count': word['review_count'],
-        'pos_entries': pos_entries
+        'pos_entries': pos_entries,
+        'mastery_score': calculate_mastery_score(word)
     })
 
 
@@ -243,23 +245,25 @@ def api_matching_result():
     data = request.get_json() or {}
     results = data.get('results', [])
     
+    # DEDUP: nếu 1 word_id xuất hiện nhiều lần, chỉ lấy kết quả CUỐI CÙNG
+    final_results = {}
+    for r in results:
+        word_id = r.get('word_id')
+        is_correct = r.get('is_correct')
+        if word_id is not None and is_correct is not None:
+            final_results[int(word_id)] = bool(is_correct)
+    
     updated = []
     total_delta = 0
     
     conn = get_db()
     try:
-        for item in results:
-            word_id = item.get('word_id')
-            is_correct = item.get('is_correct')
-            
-            if word_id is None or is_correct is None:
-                continue
-                
+        for word_id, is_correct in final_results.items():
             try:
-                res = apply_matching_result(conn, int(word_id), bool(is_correct))
+                res = apply_matching_result(conn, word_id, is_correct)
                 total_delta += res['delta']
                 updated.append({
-                    'word_id': int(word_id),
+                    'word_id': word_id,
                     'delta': res['delta'],
                     'new_score': res['new_score']
                 })
@@ -301,7 +305,8 @@ def api_fill_next():
         'translation': word['translation'],
         'short_translation': word['short_translation'],
         'status': word['status'],
-        'total_score': word['total_score']
+        'total_score': word['total_score'],
+        'mastery_score': calculate_mastery_score(word)
     })
 
 
@@ -346,6 +351,7 @@ def session_start():
                 (word['id'],)
             ).fetchall()
             word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+            word['mastery_score'] = calculate_mastery_score(word)
             
         return jsonify({
             'queue': queue,
@@ -355,6 +361,7 @@ def session_start():
         })
     finally:
         db.close()
+
 
 
 # API GET /api/stats -> retrieves comprehensive progress statistics
@@ -392,7 +399,9 @@ def api_words_list():
     
     query_cond = ""
     params = []
-    if status != 'all':
+    if status == 'needs_review':
+        query_cond = "WHERE needs_review = 1"
+    elif status != 'all':
         query_cond = "WHERE status = ?"
         params.append(status)
         
@@ -413,7 +422,7 @@ def api_words_list():
     offset = (page - 1) * per_page
     
     fetch_query = f"""
-        SELECT id, word, phonetic, short_translation, status, total_score, review_count, last_reviewed, translation
+        SELECT *
         FROM words
         {query_cond}
         ORDER BY {order_clause}
@@ -429,17 +438,9 @@ def api_words_list():
     
     words_list = []
     for row in rows:
-        words_list.append({
-            'id': row['id'],
-            'word': row['word'],
-            'phonetic': row['phonetic'],
-            'short_translation': row['short_translation'],
-            'translation': row['translation'],
-            'status': row['status'],
-            'total_score': row['total_score'],
-            'review_count': row['review_count'],
-            'last_reviewed': row['last_reviewed']
-        })
+        w_dict = dict(row)
+        w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+        words_list.append(w_dict)
         
     import math
     pages = math.ceil(total / per_page) if total > 0 else 1
@@ -451,6 +452,7 @@ def api_words_list():
         'pages': pages
     })
 
+
 # API GET /api/words/top -> retrieves top n words with highest score
 @app.route('/api/words/top')
 def api_words_top():
@@ -461,7 +463,7 @@ def api_words_top():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, word, total_score, status, review_count 
+        SELECT * 
         FROM words 
         ORDER BY total_score DESC, id DESC 
         LIMIT ?
@@ -471,13 +473,9 @@ def api_words_top():
     
     top_words = []
     for r in rows:
-        top_words.append({
-            'id': r['id'],
-            'word': r['word'],
-            'total_score': r['total_score'],
-            'status': r['status'],
-            'review_count': r['review_count']
-        })
+        w_dict = dict(r)
+        w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+        top_words.append(w_dict)
         
     return jsonify(top_words)
 
@@ -596,6 +594,24 @@ def api_reset_word(word_id):
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         conn.close()
+
+# API POST /api/word/<id>/dismiss-warning -> sets needs_review = 0 for a word
+@app.route('/api/word/<int:word_id>/dismiss-warning', methods=['POST'])
+def api_dismiss_warning(word_id):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE words SET needs_review = 0 WHERE id = ?", (word_id,))
+        if cursor.rowcount == 0:
+            return jsonify({'success': False, 'error': 'Word not found'}), 404
+            
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
 
 # API POST /api/words/bulk-action -> applies status overrides or resets on list of words
 @app.route('/api/words/bulk-action', methods=['POST'])

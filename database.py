@@ -322,6 +322,11 @@ def get_stats():
     row_score = cursor.fetchone()
     total_score_sum = row_score[0] if (row_score and row_score[0] is not None) else 0
     
+    # Needs review count
+    cursor.execute("SELECT COUNT(*) FROM words WHERE needs_review = 1")
+    row_review = cursor.fetchone()
+    needs_review_cnt = row_review[0] if row_review else 0
+    
     conn.close()
     
     return {
@@ -330,7 +335,8 @@ def get_stats():
         'learned': counts['learned'],
         'total': total,
         'reviewed_today': reviewed_today,
-        'total_score_sum': total_score_sum
+        'total_score_sum': total_score_sum,
+        'needs_review': needs_review_cnt
     }
 
 def get_setting(db, key, default):

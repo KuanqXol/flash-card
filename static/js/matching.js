@@ -21,7 +21,8 @@ let state = {
     selectedVi: null,    // id
     matched: new Set(),  // set of correct word_ids
     failedWords: new Set(), // set of word_ids mismatched during this session
-    results: []          // [{word_id, is_correct}] for submission
+    results: [],         // [{word_id, is_correct}] for UI details display
+    finalResults: {}     // {word_id: is_correct} (dict, overwrite if exist)
 };
 
 let gridLocked = false;
@@ -84,6 +85,7 @@ async function loadWords() {
         state.matched.clear();
         state.failedWords.clear();
         state.results = [];
+        state.finalResults = {};
         gridLocked = false;
         sessionSubmitted = false;
         
@@ -175,7 +177,7 @@ function tryMatch() {
         
         // Push result: check if ever failed
         const isCorrectFirstTry = !state.failedWords.has(wordId);
-        state.results.push({ word_id: wordId, is_correct: isCorrectFirstTry });
+        recordMatch(wordId, isCorrectFirstTry);
         
         enCard.classList.remove('selected');
         viCard.classList.remove('selected');
@@ -202,6 +204,8 @@ function tryMatch() {
         // Mark both IDs as mismatched in current session
         state.failedWords.add(enId);
         state.failedWords.add(viId);
+        recordMatch(enId, false);
+        recordMatch(viId, false);
         
         enCard.classList.remove('selected');
         viCard.classList.remove('selected');
@@ -220,6 +224,10 @@ function tryMatch() {
     }
 }
 
+function recordMatch(wordId, isCorrect) {
+    state.finalResults[wordId] = isCorrect;  // overwrite → chỉ giữ kết quả cuối
+}
+
 function resetSelections() {
     state.selectedEn = null;
     state.selectedVi = null;
@@ -236,22 +244,27 @@ async function submitResults() {
     if (sessionSubmitted) return;
     sessionSubmitted = true;
     
-    // Ensure all remaining unmatched words are pushed as incorrect in results if user clicked manually
+    // Ensure all remaining unmatched words are pushed as incorrect in results
     state.words.forEach(w => {
-        const alreadyPushed = state.results.some(r => r.word_id === w.id);
-        if (!alreadyPushed) {
-            state.results.push({ word_id: w.id, is_correct: false });
+        if (state.finalResults[w.id] === undefined) {
+            state.finalResults[w.id] = false;
         }
     });
+
+    const finalResults = Object.entries(state.finalResults).map(([id, correct]) => ({
+        word_id: parseInt(id),
+        is_correct: correct
+    }));
 
     try {
         const response = await fetch('/api/matching/result', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ results: state.results })
+            body: JSON.stringify({ results: finalResults })
         });
         
         const data = await response.json();
+        state.results = finalResults;
         showResultModal(data);
         
     } catch (err) {
