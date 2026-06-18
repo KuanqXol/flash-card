@@ -365,6 +365,189 @@
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
+
+    /* Analytics Grids and Cards */
+    .analytics-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2.5rem;
+    }
+
+    @media (min-width: 768px) {
+        .analytics-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .analytics-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        .analytics-wide-card {
+            grid-column: span 2;
+        }
+    }
+
+    .analytics-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .analytics-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .analytics-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.15rem;
+    }
+
+    .analytics-card-danger {
+        background-color: #FEF2F2;
+        border: 1px solid #FCA5A5;
+        color: #991B1B;
+    }
+
+    .analytics-card-weak {
+        background-color: #FFFBEB;
+        border: 1px solid #FCD34D;
+        color: #92400E;
+    }
+
+    .analytics-card-forgotten {
+        background-color: #EFF6FF;
+        border: 1px solid #93C5FD;
+        color: #1E40AF;
+    }
+
+    .analytics-card-recent {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        color: #334155;
+    }
+
+    .analytics-card-goal {
+        background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
+        border: 1px solid #C7D2FE;
+        color: #3730A3;
+    }
+
+    .analytics-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: auto;
+    }
+
+    .analytics-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0.85rem;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 0.75rem;
+        font-size: 0.9rem;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+
+    .analytics-item .word-name {
+        font-weight: 700;
+    }
+
+    .analytics-item .stats-info {
+        font-size: 0.8rem;
+        opacity: 0.85;
+    }
+
+    .progress-mini {
+        width: 60px;
+        height: 6px;
+        background: rgba(0, 0, 0, 0.08);
+        border-radius: 3px;
+        overflow: hidden;
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 0.5rem;
+    }
+
+    .progress-mini-bar {
+        height: 100%;
+        background: #F59E0B;
+        border-radius: 3px;
+    }
+
+    .btn-analytics {
+        background: var(--primary);
+        color: white !important;
+        border: none;
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        transition: background 0.2s ease, transform 0.1s ease;
+    }
+
+    .btn-analytics:hover {
+        background: var(--primary-dark);
+        transform: scale(1.02);
+    }
+
+    .goal-container {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .recent-fails-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .recent-fail-badge {
+        background: rgba(239, 68, 68, 0.08);
+        color: #EF4444;
+        border: 1px solid rgba(239, 68, 68, 0.15);
+        padding: 0.4rem 0.75rem;
+        border-radius: 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+
+    .recent-fail-badge:hover {
+        transform: scale(1.05);
+        background: rgba(239, 68, 68, 0.12);
+    }
+
+    .recent-fail-time {
+        font-size: 0.7rem;
+        opacity: 0.75;
+        font-weight: 400;
+    }
 </style>
 {% endblock %}
 
@@ -436,6 +619,78 @@
             <span class="action-desc">Kiểm tra chính tả phản xạ</span>
         </div>
     </a>
+</section>
+
+<!-- Analytics and Learning Insights -->
+<section class="analytics-grid">
+    <!-- Card 1: Từ nguy hiểm -->
+    <div class="analytics-card analytics-card-danger" id="card-danger-container">
+        <div class="analytics-card-header">
+            <span>⚠️ Từ nguy hiểm</span>
+            <span style="font-size: 0.8rem; font-weight: normal; opacity: 0.8;">Học mãi chưa thuộc</span>
+        </div>
+        <div class="analytics-list" id="danger-words-list">
+            <!-- Loading placeholder -->
+        </div>
+    </div>
+
+    <!-- Card 2: Từ yếu nhất -->
+    <div class="analytics-card analytics-card-weak" id="card-weak-container">
+        <div class="analytics-card-header">
+            <span>📉 Từ yếu nhất</span>
+            <span style="font-size: 0.8rem; font-weight: normal; opacity: 0.8;">Accuracy thấp nhất</span>
+        </div>
+        <div class="analytics-list" id="weak-words-list">
+            <!-- Loading placeholder -->
+        </div>
+    </div>
+
+    <!-- Card 3: Bỏ quên lâu nhất -->
+    <div class="analytics-card analytics-card-forgotten" id="card-forgotten-container">
+        <div class="analytics-card-header">
+            <span>💤 Bỏ quên lâu nhất</span>
+            <span style="font-size: 0.8rem; font-weight: normal; opacity: 0.8;">Chưa ôn nhiều ngày</span>
+        </div>
+        <div class="analytics-list" id="forgotten-words-list">
+            <!-- Loading placeholder -->
+        </div>
+    </div>
+
+    <!-- Card 4: Vừa mới sai -->
+    <div class="analytics-card analytics-card-recent" id="card-recent-container" style="grid-column: span 2;">
+        <div class="analytics-card-header">
+            <span>🔥 Vừa mới sai (24h qua)</span>
+            <a href="/flashcard?recent_fails=1" class="btn-analytics" id="btn-practice-fails" style="display: none; background: #EF4444; border-radius: 0.5rem; font-size: 0.75rem;">Ôn từ vừa sai</a>
+        </div>
+        <div class="recent-fails-list" id="recent-fails-container">
+            <!-- Loading placeholder -->
+        </div>
+    </div>
+
+    <!-- Card 5: Daily Goal -->
+    <div class="analytics-card analytics-card-goal">
+        <div class="analytics-card-header">
+            <span>📅 Daily Goal</span>
+        </div>
+        <div class="goal-container">
+            <div style="position: relative; width: 80px; height: 80px;">
+                <svg width="80" height="80" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" stroke="rgba(79, 70, 229, 0.1)" stroke-width="8" fill="transparent"/>
+                  <circle cx="40" cy="40" r="34" stroke="#4F46E5" stroke-width="8" fill="transparent"
+                          stroke-dasharray="213.6" stroke-dashoffset="213.6" id="goal-ring"
+                          stroke-linecap="round" transform="rotate(-90 40 40)" style="transition: stroke-dashoffset 0.8s ease-in-out;"/>
+                </svg>
+                <div style="position: absolute; top: 0; left: 0; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: #4F46E5;" id="goal-percent-text">
+                  0%
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <div style="font-size: 1rem; font-weight: 700; color: #3730A3;" id="goal-status-text">Hôm nay: 0 / 20 từ</div>
+                <div style="font-size: 0.8rem; opacity: 0.9; color: #4F46E5;" id="goal-subtext">Đã đúng 0 từ, sai 0 từ.</div>
+                <a href="/flashcard" class="btn-analytics" style="margin-top: 0.5rem; align-self: flex-start; background: #4F46E5; border-radius: 0.5rem; font-size: 0.75rem;">Tiếp tục ôn</a>
+            </div>
+        </div>
+    </div>
 </section>
 
 <!-- Word List Table Section -->
@@ -801,6 +1056,7 @@
                 
                 // Update stats in cards
                 fetchStats();
+                fetchAnalytics();
             } else {
                 showToast("Lỗi cập nhật trạng thái!", "error");
             }
@@ -838,6 +1094,7 @@
                 
                 // Update stats in cards
                 fetchStats();
+                fetchAnalytics();
             } else {
                 showToast("Lỗi cập nhật trạng thái!", "error");
             }
@@ -858,6 +1115,7 @@
             if (data.success) {
                 showToast("Đã xóa cảnh báo ôn tập!", "success");
                 fetchStats();
+                fetchAnalytics();
                 fetchWordList();
             } else {
                 showToast("Lỗi xóa cảnh báo!", "error");
@@ -932,6 +1190,7 @@
                 
                 // Refresh data
                 fetchStats();
+                fetchAnalytics();
                 fetchWordList();
             } else {
                 showToast(data.message || "Lỗi áp dụng hành động!", "error");
@@ -1055,10 +1314,195 @@
         }
     }
 
+    // Analytics Renderers
+    async function fetchAnalytics() {
+        try {
+            // 1. Danger words
+            const dangerRes = await fetch('/api/analytics/danger?n=5');
+            const dangerWords = await dangerRes.json();
+            renderDangerWords(dangerWords);
+
+            // 2. Weak words
+            const weakRes = await fetch('/api/analytics/weak-words?n=5');
+            const weakWords = await weakRes.json();
+            renderWeakWords(weakWords);
+
+            // 3. Forgotten words
+            const forgottenRes = await fetch('/api/analytics/forgotten?n=5');
+            const forgottenWords = await forgottenRes.json();
+            renderForgottenWords(forgottenWords);
+
+            // 4. Recent fails
+            const recentRes = await fetch('/api/analytics/recent-fails?hours=24');
+            const recentWords = await recentRes.json();
+            renderRecentFails(recentWords);
+
+            // 5. Daily progress
+            const progressRes = await fetch('/api/analytics/daily-progress');
+            const progressData = await progressRes.json();
+            renderDailyProgress(progressData);
+        } catch (err) {
+            console.error("Error fetching analytics:", err);
+        }
+    }
+
+    function renderDangerWords(words) {
+        const container = document.getElementById('danger-words-list');
+        if (!container) return;
+        container.innerHTML = '';
+        if (words.length === 0) {
+            container.innerHTML = '<div style="font-size:0.9rem; opacity:0.8; text-align:center; padding:1.5rem;">Không có từ nguy hiểm nào 🎉</div>';
+            return;
+        }
+        words.forEach(w => {
+            const accuracyPct = Math.round(w.accuracy * 100);
+            const item = document.createElement('div');
+            item.className = 'analytics-item';
+            item.innerHTML = `
+                <div style="min-width: 0; flex: 1; margin-right: 0.5rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                    <span class="word-name">${w.word}</span>
+                    <span style="font-size: 0.8rem; opacity: 0.8; margin-left: 0.25rem;">(${w.short_translation || 'N/A'})</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+                    <span class="stats-info">${w.wrong_count} sai / ${w.correct_count} đúng (${accuracyPct}%)</span>
+                    <a href="/flashcard?word_id=${w.id}" class="btn-analytics" style="background:#EF4444; padding:0.25rem 0.5rem; font-size:0.75rem; border-radius:0.4rem;">Ôn ngay</a>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function renderWeakWords(words) {
+        const container = document.getElementById('weak-words-list');
+        if (!container) return;
+        container.innerHTML = '';
+        if (words.length === 0) {
+            container.innerHTML = '<div style="font-size:0.9rem; opacity:0.8; text-align:center; padding:1.5rem;">Không có từ yếu nào 👍</div>';
+            return;
+        }
+        words.forEach(w => {
+            const accuracyPct = Math.round(w.accuracy * 100);
+            const item = document.createElement('div');
+            item.className = 'analytics-item';
+            item.innerHTML = `
+                <div style="min-width: 0; flex: 1; margin-right: 0.5rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                    <span class="word-name">${w.word}</span>
+                    <span style="font-size: 0.8rem; opacity: 0.8; margin-left: 0.25rem;">(${w.short_translation || 'N/A'})</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                        <span class="stats-info">${accuracyPct}% đúng</span>
+                        <div class="progress-mini">
+                            <div class="progress-mini-bar" style="width: ${accuracyPct}%;"></div>
+                        </div>
+                    </div>
+                    <a href="/flashcard?word_id=${w.id}" class="btn-analytics" style="background:#F59E0B; padding:0.25rem 0.5rem; font-size:0.75rem; border-radius:0.4rem;">Ôn ngay</a>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function renderForgottenWords(words) {
+        const container = document.getElementById('forgotten-words-list');
+        if (!container) return;
+        container.innerHTML = '';
+        if (words.length === 0) {
+            container.innerHTML = '<div style="font-size:0.9rem; opacity:0.8; text-align:center; padding:1.5rem;">Đã ôn tập đầy đủ 🌟</div>';
+            return;
+        }
+        words.forEach(w => {
+            const daysText = w.days_ago >= 999 ? 'Chưa ôn bao giờ' : `${w.days_ago} ngày chưa ôn`;
+            const item = document.createElement('div');
+            item.className = 'analytics-item';
+            
+            let statusText = '';
+            if (w.status === 'new') statusText = 'Mới';
+            else if (w.status === 'learning') statusText = 'Đang học';
+            else statusText = w.status;
+            
+            item.innerHTML = `
+                <div style="min-width: 0; flex: 1; margin-right: 0.5rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                    <span class="word-name">${w.word}</span>
+                    <span style="font-size: 0.8rem; opacity: 0.8; margin-left: 0.25rem;">(${statusText})</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+                    <span class="stats-info" style="color: #1E40AF; font-weight: 600;">${daysText}</span>
+                    <a href="/flashcard?word_id=${w.id}" class="btn-analytics" style="background:#2563EB; padding:0.25rem 0.5rem; font-size:0.75rem; border-radius:0.4rem;">Ôn ngay</a>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function renderRecentFails(words) {
+        const container = document.getElementById('recent-fails-container');
+        const practiceBtn = document.getElementById('btn-practice-fails');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (words.length === 0) {
+            container.innerHTML = '<div style="font-size:0.9rem; opacity:0.8; width:100%; padding:0.5rem 0; text-align:center;">Không có từ nào sai trong 24h qua 👏</div>';
+            if (practiceBtn) practiceBtn.style.display = 'none';
+            return;
+        }
+        
+        if (practiceBtn) practiceBtn.style.display = 'inline-flex';
+        
+        words.forEach(w => {
+            const badge = document.createElement('div');
+            badge.className = 'recent-fail-badge';
+            
+            let timeText = '';
+            const mins = Math.round(w.hours_ago * 60);
+            if (mins < 1) {
+                timeText = 'vừa xong';
+            } else if (mins < 60) {
+                timeText = `${mins} phút trước`;
+            } else {
+                timeText = `${Math.round(w.hours_ago)} giờ trước`;
+            }
+            
+            badge.innerHTML = `
+                <span>${w.word}</span>
+                <span class="recent-fail-time">${timeText}</span>
+            `;
+            badge.style.cursor = 'pointer';
+            badge.onclick = () => { window.location = `/flashcard?word_id=${w.id}`; };
+            container.appendChild(badge);
+        });
+    }
+
+    function renderDailyProgress(data) {
+        const today = data.today;
+        
+        const goalStatusText = document.getElementById('goal-status-text');
+        if (goalStatusText) {
+            goalStatusText.textContent = `Hôm nay: ${today.reviewed_today} / ${today.goal} từ`;
+        }
+        
+        const goalSubtext = document.getElementById('goal-subtext');
+        if (goalSubtext) {
+            goalSubtext.textContent = `Đúng ${today.correct_today} từ, sai ${today.wrong_today} từ (Tỷ lệ: ${today.accuracy_today}%).`;
+        }
+        
+        const ring = document.getElementById('goal-ring');
+        const text = document.getElementById('goal-percent-text');
+        if (ring && text) {
+            const percent = today.goal_percent;
+            text.textContent = `${percent}%`;
+            
+            const circumference = 213.6;
+            const offset = circumference - (circumference * percent / 100);
+            ring.style.strokeDashoffset = offset;
+        }
+    }
+
     // On Load Page Initialization
     window.addEventListener('DOMContentLoaded', () => {
         fetchStats();
         fetchWordList();
+        fetchAnalytics();
     });
 </script>
 {% endblock %}

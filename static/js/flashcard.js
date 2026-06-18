@@ -4,7 +4,8 @@ const state = {
     isFlipped: false,
     currentFilter: 'all',
     sessionCount: 0,
-    sessionScore: 0
+    sessionScore: 0,
+    useUrlParams: true
 };
 
 // Session State
@@ -65,7 +66,12 @@ function handleKeyDown(e) {
 // Khi load phiên mới:
 async function startSession() {
     try {
-        const res = await fetch(`/api/session/start?status=${state.currentFilter}`);
+        let queryParams = `?status=${state.currentFilter}`;
+        if (state.useUrlParams && window.location.search) {
+            queryParams = window.location.search;
+            state.useUrlParams = false; // only use once
+        }
+        const res = await fetch(`/api/session/start${queryParams}`);
         const data = await res.json();
         
         sessionState.queue = data.queue || [];

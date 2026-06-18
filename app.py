@@ -2,7 +2,7 @@ import os
 import tempfile
 import csv
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, make_response
 from database import (
     init_db, 
@@ -339,12 +339,29 @@ def api_fill_evaluate():
 def session_start():
     """Khởi tạo session và trả về queue từ đã sắp xếp."""
     status = request.args.get('status', 'all')
+    word_id = request.args.get('word_id', type=int)
+    recent_fails = request.args.get('recent_fails', type=int)
+    
     db = get_db()
     try:
-        n = int(request.args.get('n', get_setting(db, 'session_size', '10')))
-        queue = get_review_queue(db, n=n, status_filter=status)
+        if word_id:
+            # Fetch that single word
+            row = db.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
+            queue = [dict(row)] if row else []
+        elif recent_fails:
+            # Fetch fails in last 24h
+            limit_time = (datetime.now() - timedelta(hours=24)).isoformat()
+            rows = db.execute("""
+                SELECT * FROM words 
+                WHERE last_failed_at IS NOT NULL AND last_failed_at >= ?
+                ORDER BY last_failed_at DESC
+            """, (limit_time,)).fetchall()
+            queue = [dict(r) for r in rows]
+        else:
+            n = int(request.args.get('n', get_setting(db, 'session_size', '10')))
+            queue = get_review_queue(db, n=n, status_filter=status)
         
-        # Attach pos_entries to each word in the queue
+        # Attach pos_entries and mastery_score to each word in the queue
         for word in queue:
             pos_rows = db.execute(
                 "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
@@ -361,6 +378,167 @@ def session_start():
         })
     finally:
         db.close()
+
+
+def get_daily_progress(db):
+    today = datetime.now().strftime('%Y-%m-%d')
+    rows = db.execute("""
+        SELECT COUNT(*) as count, SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) as correct
+        FROM review_history
+        WHERE reviewed_at LIKE ?
+    """, (f'{today}%',)).fetchone()
+    
+    reviewed = rows['count'] or 0
+    correct  = rows['correct'] or 0
+    wrong    = reviewed - correct
+    goal     = int(get_setting(db, 'daily_goal', '20'))
+    
+    return {
+        'reviewed_today': reviewed,
+        'correct_today': correct,
+        'wrong_today': wrong,
+        'accuracy_today': round(correct / reviewed * 100, 1) if reviewed > 0 else 0,
+        'goal': goal,
+        'goal_percent': min(100, round(reviewed / goal * 100)) if goal > 0 else 0,
+    }
+
+
+@app.route('/api/analytics/weak-words')
+def api_weak_words():
+    n = request.args.get('n', 10, type=int)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT *, (correct_count * 1.0 / (correct_count + wrong_count)) as accuracy 
+            FROM words 
+            WHERE review_count >= 3 
+            ORDER BY accuracy ASC 
+            LIMIT ?
+        """, (n,)).fetchall()
+        res = []
+        for r in rows:
+            w_dict = dict(r)
+            w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+            res.append(w_dict)
+        return jsonify(res)
+    finally:
+        conn.close()
+
+
+@app.route('/api/analytics/forgotten')
+def api_forgotten_words():
+    n = request.args.get('n', 10, type=int)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT * 
+            FROM words 
+            WHERE status != 'learned' 
+            ORDER BY last_reviewed ASC NULLS FIRST 
+            LIMIT ?
+        """, (n,)).fetchall()
+        res = []
+        for r in rows:
+            w_dict = dict(r)
+            if w_dict.get('last_reviewed'):
+                try:
+                    delta = datetime.now() - datetime.fromisoformat(w_dict['last_reviewed'])
+                    days_ago = int(delta.total_seconds() / 86400)
+                except:
+                    days_ago = 999
+            else:
+                if w_dict.get('date_added'):
+                    try:
+                        delta = datetime.now() - datetime.fromisoformat(w_dict['date_added'])
+                        days_ago = int(delta.total_seconds() / 86400)
+                    except:
+                        days_ago = 999
+                else:
+                    days_ago = 999
+            w_dict['days_ago'] = days_ago
+            w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+            res.append(w_dict)
+        return jsonify(res)
+    finally:
+        conn.close()
+
+
+@app.route('/api/analytics/danger')
+def api_danger_words():
+    n = request.args.get('n', 10, type=int)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT *, (correct_count * 1.0 / (correct_count + wrong_count)) as accuracy 
+            FROM words 
+            WHERE review_count > 5 AND (correct_count * 1.0 / (correct_count + wrong_count)) < 0.5 
+            ORDER BY accuracy ASC 
+            LIMIT ?
+        """, (n,)).fetchall()
+        res = []
+        for r in rows:
+            w_dict = dict(r)
+            w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+            res.append(w_dict)
+        return jsonify(res)
+    finally:
+        conn.close()
+
+
+@app.route('/api/analytics/recent-fails')
+def api_recent_fails():
+    hours = request.args.get('hours', 24, type=int)
+    limit_time = (datetime.now() - timedelta(hours=hours)).isoformat()
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT * 
+            FROM words 
+            WHERE last_failed_at IS NOT NULL AND last_failed_at >= ? 
+            ORDER BY last_failed_at DESC
+        """, (limit_time,)).fetchall()
+        res = []
+        for r in rows:
+            w_dict = dict(r)
+            w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+            delta = datetime.now() - datetime.fromisoformat(w_dict['last_failed_at'])
+            w_dict['hours_ago'] = round(delta.total_seconds() / 3600, 2)
+            res.append(w_dict)
+        return jsonify(res)
+    finally:
+        conn.close()
+
+
+@app.route('/api/analytics/daily-progress')
+def api_daily_progress():
+    conn = get_db()
+    try:
+        progress = get_daily_progress(conn)
+        weekly = []
+        for i in range(6, -1, -1):
+            day_date = datetime.now() - timedelta(days=i)
+            day_str = day_date.strftime('%Y-%m-%d')
+            row = conn.execute("""
+                SELECT COUNT(*) as count, SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) as correct
+                FROM review_history
+                WHERE reviewed_at LIKE ?
+            """, (f'{day_str}%',)).fetchone()
+            
+            day_reviewed = row['count'] or 0
+            day_correct = row['correct'] or 0
+            day_accuracy = round(day_correct / day_reviewed * 100, 1) if day_reviewed > 0 else 0
+            weekly.append({
+                'date': day_str,
+                'day_label': day_date.strftime('%d/%m'),
+                'review_count': day_reviewed,
+                'accuracy': day_accuracy
+            })
+        return jsonify({
+            'today': progress,
+            'weekly': weekly
+        })
+    finally:
+        conn.close()
 
 
 
