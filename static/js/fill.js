@@ -1,82 +1,123 @@
-// Điền Nghĩa Game State
-let state = {
-    currentWord: null,
-    mode: 'en_to_vi', // 'en_to_vi' or 'vi_to_en'
-    filter: 'all',
-    phase: 'input', // 'input' or 'evaluate'
-    sessionCount: 0,
-    sessionScore: 0
+// Spelling / Fill Mode Game State
+const session = {
+    queue: [],
+    index: 0,
+    filter: 'smart_priority',
+    status: 'all',
+    mode: 'en_to_vi',      // 'en_to_vi' or 'vi_to_en'
+    phase: 'input',        // 'input' or 'evaluate'
+    sessionScore: 0,
+    startedAt: null,
+    currentWord: null
 };
 
 let actionLocked = false;
 
 // DOM Cache
-const flagEl = document.getElementById('question-flag');
-const promptEl = document.getElementById('question-prompt');
-const hintLabelEl = document.getElementById('question-hint-label');
-const phoneticEl = document.getElementById('question-phonetic');
-const statusBadgeEl = document.getElementById('card-status-badge');
-const wordScoreEl = document.getElementById('card-score');
+let flagEl = null;
+let promptEl = null;
+let hintLabelEl = null;
+let phoneticEl = null;
+let statusBadgeEl = null;
+let wordScoreEl = null;
+let answerInputEl = null;
+let btnActionEl = null;
+let answerBoxEl = null;
+let shortAnsEl = null;
+let fullAnsEl = null;
+let btnSkipEl = null;
+let progressTextEl = null;
+let progressFillEl = null;
+let toggleModeBtnEl = null;
 
-const answerInputEl = document.getElementById('answer-input');
-const btnActionEl = document.getElementById('btn-action');
-const answerBoxEl = document.getElementById('answer-box');
-const shortAnsEl = document.getElementById('short-answer');
-const fullAnsEl = document.getElementById('full-answer');
-
-const sessionCountEl = document.getElementById('session-count');
-const sessionScoreEl = document.getElementById('session-score');
-const filterDropdownEl = document.getElementById('filter-dropdown');
-const toggleModeBtnEl = document.getElementById('btn-toggle-mode');
-
-// Init game
-function initGame() {
-    // Dropdown and mode toggle
-    if (filterDropdownEl) {
-        filterDropdownEl.addEventListener('change', (e) => {
-            state.filter = e.target.value;
-            loadNext();
-        });
-    }
-
+function initDOMCache() {
+    flagEl = document.getElementById('question-flag');
+    promptEl = document.getElementById('question-prompt');
+    hintLabelEl = document.getElementById('question-hint-label');
+    phoneticEl = document.getElementById('question-phonetic');
+    statusBadgeEl = document.getElementById('card-status-badge');
+    wordScoreEl = document.getElementById('card-score');
+    answerInputEl = document.getElementById('answer-input');
+    btnActionEl = document.getElementById('btn-action');
+    answerBoxEl = document.getElementById('answer-box');
+    shortAnsEl = document.getElementById('short-answer');
+    fullAnsEl = document.getElementById('full-answer');
+    btnSkipEl = document.getElementById('btn-skip');
+    
+    // Header elements
+    progressTextEl = document.getElementById('progress-text');
+    progressFillEl = document.getElementById('progress-fill');
+    toggleModeBtnEl = document.getElementById('btn-toggle-mode');
+    
     if (toggleModeBtnEl) {
+        // Re-bind to ensure no double listeners on restarts
+        const newToggle = toggleModeBtnEl.cloneNode(true);
+        toggleModeBtnEl.parentNode.replaceChild(newToggle, toggleModeBtnEl);
+        toggleModeBtnEl = newToggle;
         toggleModeBtnEl.addEventListener('click', toggleMode);
+        toggleModeBtnEl.textContent = session.mode === 'en_to_vi' ? '🇬🇧 EN → 🇻🇳 VI' : '🇻🇳 VI → 🇬🇧 EN';
     }
-
-    // Bind check button
+    
     if (btnActionEl) {
         btnActionEl.addEventListener('click', () => {
-            if (state.phase === 'input') {
+            if (session.phase === 'input') {
                 submitAnswer();
             }
         });
     }
+    
+    if (btnSkipEl) {
+        btnSkipEl.addEventListener('click', skipWord);
+    }
+}
 
-    // Keyboard bindings
+// Setup Game
+async function init() {
+    // Store original container HTML to restore on session restarts
+    window.originalCardContainerHTML = document.getElementById('card-container').innerHTML;
+    
+    // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyDown);
-
-    loadNext();
+    
+    // Setup filter headers
+    await initStudyHeaderFilters(async (filter, status) => {
+        session.filter = filter;
+        session.status = status;
+        await startSession();
+    });
 }
 
 function toggleMode() {
-    state.mode = state.mode === 'en_to_vi' ? 'vi_to_en' : 'en_to_vi';
-    
-    // Update button text
+    session.mode = session.mode === 'en_to_vi' ? 'vi_to_en' : 'en_to_vi';
     if (toggleModeBtnEl) {
-        toggleModeBtnEl.textContent = state.mode === 'en_to_vi' ? '🇬🇧 EN → 🇻🇳 VI' : '🇻🇳 VI → 🇬🇧 EN';
+        toggleModeBtnEl.textContent = session.mode === 'en_to_vi' ? '🇬🇧 EN → 🇻🇳 VI' : '🇻🇳 VI → 🇬🇧 EN';
     }
     
-    loadNext();
+    // If there is a current word, refresh its display and clear input/answer box
+    if (session.currentWord) {
+        session.phase = 'input';
+        if (answerBoxEl) answerBoxEl.style.display = 'none';
+        if (answerInputEl) {
+            answerInputEl.value = '';
+            answerInputEl.disabled = false;
+            answerInputEl.placeholder = session.mode === 'en_to_vi' ? 'Nhập nghĩa tiếng Việt...' : 'Type English spelling here...';
+            answerInputEl.focus();
+        }
+        if (btnActionEl) {
+            btnActionEl.style.display = 'inline-block';
+            btnActionEl.textContent = 'Kiểm tra →';
+        }
+        displayWord(session.currentWord);
+    }
 }
 
 function handleKeyDown(e) {
     if (e.key === 'Enter') {
-        if (state.phase === 'input') {
+        if (session.phase === 'input') {
             e.preventDefault();
             submitAnswer();
         }
-        // If phase is evaluate, Enter does nothing to prevent accidental rating clicks
-    } else if (state.phase === 'evaluate' && !actionLocked) {
+    } else if (session.phase === 'evaluate' && !actionLocked) {
         if (e.key.toLowerCase() === 'y' || e.key === 'ArrowUp') {
             e.preventDefault();
             evaluate(true);
@@ -87,59 +128,70 @@ function handleKeyDown(e) {
     }
 }
 
-// Fetch Next Word
-async function loadNext() {
+// Khởi tạo session mới
+async function startSession() {
+    document.getElementById('card-container').innerHTML = window.originalCardContainerHTML;
+    initDOMCache();
+
+    // Hide empty state
+    document.getElementById('fill-empty-state').style.display = 'none';
+
     try {
-        state.phase = 'input';
-        actionLocked = false;
+        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=15`);
+        const data = await res.json();
         
-        // Hide answer box
-        if (answerBoxEl) answerBoxEl.style.display = 'none';
-        
-        // Reset inputs
-        if (answerInputEl) {
-            answerInputEl.value = '';
-            answerInputEl.disabled = false;
-            answerInputEl.placeholder = state.mode === 'en_to_vi' ? 'Nhập nghĩa tiếng Việt...' : 'Type English spelling here...';
-            answerInputEl.focus();
-        }
-        
-        if (btnActionEl) {
-            btnActionEl.style.display = 'inline-block';
-            btnActionEl.textContent = 'Kiểm tra →';
-        }
-
-        const excludeId = state.currentWord ? state.currentWord.id : '';
-        const url = `/api/fill/next?status=${state.filter}&mode=${state.mode}&exclude_id=${excludeId}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.error === 'no_words') {
-            state.currentWord = null;
-            displayEmptyState();
+        if (!data.queue || data.queue.length === 0) {
+            document.getElementById('fill-empty-state').style.display = 'flex';
+            document.getElementById('empty-state-text').textContent = `Không có từ nào phù hợp với bộ lọc "${data.filter_label}"`;
+            document.getElementById('card-container').innerHTML = ''; // Clear container
+            updateProgressUI();
             return;
         }
-
-        // Hide empty state, show game container
-        document.getElementById('fill-empty-state').style.display = 'none';
-        document.getElementById('fill-stage-container').style.display = 'block';
-
-        state.currentWord = data;
-        displayWord(data);
+        
+        session.queue = data.queue;
+        session.index = 0;
+        session.sessionScore = 0;
+        session.startedAt = Date.now();
+        
+        // Show summary info
+        const infoEl = document.getElementById('session-summary-info');
+        if (infoEl) {
+            infoEl.textContent = data.summary || `Phiên học: ${session.queue.length} từ`;
+        }
+        
+        showWordAtIndex();
     } catch (err) {
-        console.error("Error loading next spelling card:", err);
-        showToast("Lỗi tải từ vựng!", "error");
+        console.error("Error starting session:", err);
+        showToast("Lỗi khởi tạo phiên học!", "error");
     }
 }
 
-function displayEmptyState() {
-    document.getElementById('fill-stage-container').style.display = 'none';
-    document.getElementById('fill-empty-state').style.display = 'flex';
+function showWordAtIndex() {
+    session.phase = 'input';
+    actionLocked = false;
+    
+    // Hide answer box
+    if (answerBoxEl) answerBoxEl.style.display = 'none';
+    
+    // Reset inputs
+    if (answerInputEl) {
+        answerInputEl.value = '';
+        answerInputEl.disabled = false;
+        answerInputEl.placeholder = session.mode === 'en_to_vi' ? 'Nhập nghĩa tiếng Việt...' : 'Type English spelling here...';
+        answerInputEl.focus();
+    }
+    
+    if (btnActionEl) {
+        btnActionEl.style.display = 'inline-block';
+        btnActionEl.textContent = 'Kiểm tra →';
+    }
+    
+    session.currentWord = session.queue[session.index];
+    displayWord(session.currentWord);
+    updateProgressUI();
 }
 
 function displayWord(word) {
-    // Badges and stats
     if (statusBadgeEl) {
         statusBadgeEl.textContent = getStatusText(word.status);
         statusBadgeEl.className = `status-badge badge-${word.status}`;
@@ -148,9 +200,7 @@ function displayWord(word) {
         wordScoreEl.textContent = `Điểm: ${word.total_score || 0} ⭐`;
     }
 
-    // Display based on game mode
-    if (state.mode === 'en_to_vi') {
-        // EN -> VI
+    if (session.mode === 'en_to_vi') {
         if (flagEl) flagEl.textContent = '🇬🇧';
         if (promptEl) promptEl.textContent = word.word;
         if (hintLabelEl) hintLabelEl.textContent = 'Nghĩa tiếng Việt là gì?';
@@ -164,16 +214,14 @@ function displayWord(word) {
             }
         }
     } else {
-        // VI -> EN
         if (flagEl) flagEl.textContent = '🇻🇳';
-        // Use short translation as prompt. If empty, use translation[:30]
         let promptText = word.short_translation;
         if (!promptText || promptText.trim() === '') {
             promptText = (word.translation || '').substring(0, 30);
         }
         if (promptEl) promptEl.textContent = promptText;
         if (hintLabelEl) hintLabelEl.textContent = 'Từ tiếng Anh là gì?';
-        if (phoneticEl) phoneticEl.style.display = 'none'; // Hide phonetic to not give away English spelling
+        if (phoneticEl) phoneticEl.style.display = 'none';
     }
 }
 
@@ -186,11 +234,10 @@ function getStatusText(status) {
     }
 }
 
-// Submit answer to show evaluations
 function submitAnswer() {
-    if (!state.currentWord || state.phase !== 'input') return;
+    if (!session.currentWord || session.phase !== 'input') return;
     
-    state.phase = 'evaluate';
+    session.phase = 'evaluate';
     
     if (answerInputEl) {
         answerInputEl.disabled = true;
@@ -200,36 +247,31 @@ function submitAnswer() {
     }
     
     // Setup answer box content
-    if (state.mode === 'en_to_vi') {
-        if (shortAnsEl) shortAnsEl.textContent = state.currentWord.short_translation || 'N/A';
-        if (fullAnsEl) fullAnsEl.textContent = state.currentWord.translation || '';
+    if (session.mode === 'en_to_vi') {
+        if (shortAnsEl) shortAnsEl.textContent = session.currentWord.short_translation || 'N/A';
+        if (fullAnsEl) fullAnsEl.textContent = session.currentWord.translation || '';
     } else {
-        if (shortAnsEl) shortAnsEl.textContent = state.currentWord.word;
-        // Display both phonetic and Vietnamese definitions in details
+        if (shortAnsEl) shortAnsEl.textContent = session.currentWord.word;
         const details = [];
-        if (state.currentWord.phonetic && state.currentWord.phonetic !== '--') {
-            details.push(state.currentWord.phonetic);
+        if (session.currentWord.phonetic && session.currentWord.phonetic !== '--') {
+            details.push(session.currentWord.phonetic);
         }
-        if (state.currentWord.translation) {
-            details.push(state.currentWord.translation);
+        if (session.currentWord.translation) {
+            details.push(session.currentWord.translation);
         }
         if (fullAnsEl) fullAnsEl.textContent = details.join(' | ');
     }
     
-    // Show box
     if (answerBoxEl) {
         answerBoxEl.style.display = 'block';
-        
-        // Scroll into view
         setTimeout(() => {
             answerBoxEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 50);
     }
 }
 
-// Self-Evaluation POST
 async function evaluate(isCorrect) {
-    if (!state.currentWord || state.phase !== 'evaluate' || actionLocked) return;
+    if (!session.currentWord || session.phase !== 'evaluate' || actionLocked) return;
     actionLocked = true;
     
     try {
@@ -237,7 +279,7 @@ async function evaluate(isCorrect) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                word_id: state.currentWord.id,
+                word_id: session.currentWord.id,
                 is_correct: isCorrect
             })
         });
@@ -245,20 +287,14 @@ async function evaluate(isCorrect) {
         const data = await response.json();
         
         if (data.success) {
-            // Toast rating alert
             const pointsLabel = isCorrect ? '+5 điểm ✅' : '-3 điểm ❌';
             const toastType = isCorrect ? 'success' : 'error';
             showToast(pointsLabel, toastType);
             
-            // Session score updates
-            state.sessionScore += data.delta;
-            state.sessionCount++;
+            session.sessionScore += data.delta;
             
-            updateSessionUI();
-            
-            // Load next word after 1000ms
             setTimeout(() => {
-                loadNext();
+                nextWord();
             }, 1000);
             
         } else {
@@ -275,21 +311,67 @@ async function evaluate(isCorrect) {
 
 function skipWord() {
     showToast("⏭ Bỏ qua từ này", "info");
-    loadNext();
+    nextWord();
 }
 
-function updateSessionUI() {
-    if (sessionCountEl) sessionCountEl.textContent = state.sessionCount;
-    if (sessionScoreEl) {
-        const scoreVal = state.sessionScore;
-        sessionScoreEl.textContent = scoreVal >= 0 ? `+${scoreVal}` : scoreVal;
+function nextWord() {
+    session.index++;
+    updateProgressUI();
+    
+    if (session.index >= session.queue.length) {
+        showSessionComplete();
+        return;
+    }
+    
+    showWordAtIndex();
+}
+
+function updateProgressUI() {
+    if (progressTextEl) {
+        progressTextEl.textContent = `${session.index} / ${session.queue.length}`;
+    }
+    if (progressFillEl && session.queue.length > 0) {
+        const percent = Math.min(100, Math.round((session.index / session.queue.length) * 100));
+        progressFillEl.style.width = `${percent}%`;
     }
 }
 
-// Bind direct skip buttons
-document.addEventListener('DOMContentLoaded', () => {
-    const skipBtn = document.getElementById('btn-skip');
-    if (skipBtn) skipBtn.addEventListener('click', skipWord);
+function showSessionComplete() {
+    session.currentWord = null;
+    const duration = Math.max(1, Math.round((Date.now() - session.startedAt) / 1000 / 60));
     
-    initGame();
+    document.getElementById('card-container').innerHTML = `
+        <div class="session-complete">
+          <div class="complete-icon">🎉</div>
+          <h2>Hoàn thành phiên học!</h2>
+          <div class="complete-stats">
+            <div class="stat">
+              <span class="stat-number">${session.queue.length}</span>
+              <span class="stat-label">Từ đã ôn</span>
+            </div>
+            <div class="stat">
+              <span class="stat-number">${session.sessionScore >= 0 ? '+' : ''}${session.sessionScore}</span>
+              <span class="stat-label">Điểm</span>
+            </div>
+            <div class="stat">
+              <span class="stat-number">${duration} phút</span>
+              <span class="stat-label">Thời gian</span>
+            </div>
+          </div>
+          <div class="complete-actions">
+            <button class="btn btn-primary" onclick="startSession()">Bắt đầu lại</button>
+            <a href="/" class="btn btn-ghost">Về Dashboard</a>
+          </div>
+        </div>
+    `;
+    
+    // Confetti animation
+    if (typeof confetti !== 'undefined') {
+        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+    }
+}
+
+// Bind load hooks
+document.addEventListener('DOMContentLoaded', () => {
+    init();
 });

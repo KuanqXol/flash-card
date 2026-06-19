@@ -13,7 +13,9 @@ from database import (
     get_db,
     get_setting,
     set_setting,
-    update_word_after_review
+    update_word_after_review,
+    FILTERS,
+    get_filtered_words
 )
 from scoring import (
     apply_flashcard_rating,
@@ -94,6 +96,10 @@ def api_review_word():
 @app.route('/api/flashcard/next')
 def api_flashcard_next():
     status = request.args.get('status', 'all')
+    filter_type = request.args.get('filter', 'all')
+    if filter_type == 'all' and status == 'all':
+        filter_type = 'smart_priority'
+        
     exclude_ids = request.args.getlist('exclude', type=int)
     exclude_id = request.args.get('exclude_id', type=int)
     if exclude_id is not None and exclude_id not in exclude_ids:
@@ -101,11 +107,11 @@ def api_flashcard_next():
     
     conn = get_db()
     try:
-        queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=exclude_ids)
+        queue = get_filtered_words(conn, filter_key=filter_type, status=status, limit=1, exclude_ids=exclude_ids)
         if not queue:
             # Fallback: if we excluded words but found nothing, try without excludes to prevent complete deadlock
             if exclude_ids:
-                queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=[])
+                queue = get_filtered_words(conn, filter_key=filter_type, status=status, limit=1, exclude_ids=[])
             
             if not queue:
                 return jsonify({'error': 'no_words'}), 404
@@ -210,17 +216,16 @@ def api_matching_words():
         n = 10
         
     status = request.args.get('status', 'all')
-    
+    filter_type = request.args.get('filter', 'all')
+    if filter_type == 'all' and status == 'all':
+        filter_type = 'smart_priority'
+        
     conn = get_db()
     try:
-        words = get_review_queue(conn, n=n, status_filter=status)
+        words = get_filtered_words(conn, filter_key=filter_type, status=status, limit=n)
         if len(words) < n:
-            cursor = conn.cursor()
-            if status == 'all':
-                cursor.execute("SELECT COUNT(*) FROM words")
-            else:
-                cursor.execute("SELECT COUNT(*) FROM words WHERE status = ?", (status,))
-            matching_count = cursor.fetchone()[0]
+            all_matching = get_filtered_words(conn, filter_key=filter_type, status=status)
+            matching_count = len(all_matching)
             return jsonify({'error': 'not_enough_words', 'available': matching_count})
     finally:
         conn.close()
@@ -283,6 +288,10 @@ def api_matching_result():
 @app.route('/api/fill/next')
 def api_fill_next():
     status = request.args.get('status', 'all')
+    filter_type = request.args.get('filter', 'all')
+    if filter_type == 'all' and status == 'all':
+        filter_type = 'smart_priority'
+        
     exclude_ids = request.args.getlist('exclude', type=int)
     exclude_id = request.args.get('exclude_id', type=int)
     if exclude_id is not None and exclude_id not in exclude_ids:
@@ -290,10 +299,10 @@ def api_fill_next():
         
     conn = get_db()
     try:
-        queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=exclude_ids)
+        queue = get_filtered_words(conn, filter_key=filter_type, status=status, limit=1, exclude_ids=exclude_ids)
         if not queue:
             if exclude_ids:
-                queue = get_review_queue(conn, n=1, status_filter=status, exclude_ids=[])
+                queue = get_filtered_words(conn, filter_key=filter_type, status=status, limit=1, exclude_ids=[])
             if not queue:
                 return jsonify({'error': 'no_words'}), 404
         word = queue[0]
@@ -349,6 +358,10 @@ def api_fill_evaluate():
 def session_start():
     """Khởi tạo session và trả về queue từ đã sắp xếp."""
     status = request.args.get('status', 'all')
+    filter_type = request.args.get('filter', 'all')
+    if filter_type == 'all' and status == 'all':
+        filter_type = 'smart_priority'
+        
     word_id = request.args.get('word_id', type=int)
     recent_fails = request.args.get('recent_fails', type=int)
     
@@ -369,7 +382,7 @@ def session_start():
             queue = [dict(r) for r in rows]
         else:
             n = int(request.args.get('n', get_setting(db, 'session_size', '10')))
-            queue = get_review_queue(db, n=n, status_filter=status)
+            queue = get_filtered_words(db, filter_key=filter_type, status=status, limit=n)
         
         # Attach pos_entries and mastery_score to each word in the queue
         for word in queue:
@@ -385,6 +398,64 @@ def session_start():
             'total': len(queue),
             'new_count': sum(1 for w in queue if w['status'] == 'new'),
             'review_count': sum(1 for w in queue if w['status'] != 'new'),
+        })
+    finally:
+        db.close()
+
+
+@app.route('/api/session/queue', methods=['GET'])
+def session_queue():
+    import random
+    filter_key = request.args.get('filter', 'all')
+    status = request.args.get('status', 'all')
+    n = request.args.get('n', 20, type=int)
+    
+    if n < 1:
+        n = 20
+        
+    db = get_db()
+    try:
+        # Gọi get_filtered_words(db, filter_key=filter, status=status, limit=n*3)
+        words = get_filtered_words(db, filter_key=filter_key, status=status, limit=n*3)
+        
+        f = FILTERS.get(filter_key, {})
+        pool_mode = f.get('pool_mode', False)
+        use_smart = f.get('use_smart_queue', False)
+        
+        # Shuffle nếu không phải pool_mode và không phải smart priority
+        if not pool_mode and not use_smart:
+            random.shuffle(words)
+            
+        # Slice lấy n từ đầu tiên
+        queue_words = words[:n]
+        
+        # Thêm pos_entries và mastery_score
+        for word in queue_words:
+            pos_rows = db.execute(
+                "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
+                (word['id'],)
+            ).fetchall()
+            word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+            word['mastery_score'] = calculate_mastery_score(word)
+            
+        filter_label = f.get('label', 'Tất cả từ') if filter_key != 'all' else 'Tất cả từ'
+        pool_size = f.get('pool_size', 20)
+        actual_count = len(queue_words)
+        
+        if pool_mode:
+            summary = f"{actual_count} từ {filter_label.lower()} (pool {pool_size} → shuffle)"
+        elif use_smart:
+            summary = f"{actual_count} từ {filter_label.lower()} (smart priority queue)"
+        else:
+            summary = f"{actual_count} từ {filter_label.lower()} (shuffle)"
+            
+        return jsonify({
+            'queue': queue_words,
+            'total': actual_count,
+            'filter': filter_key,
+            'filter_label': filter_label,
+            'pool_mode': pool_mode,
+            'summary': summary
         })
     finally:
         db.close()
@@ -578,6 +649,307 @@ def api_recently_failed():
         return jsonify(res)
     finally:
         conn.close()
+
+
+@app.route('/api/filters/list')
+def api_filters_list():
+    groups = []
+    group_ids = ['time', 'combo', 'performance', 'smart']
+    group_labels = {
+        'time': 'Thời gian',
+        'combo': 'Kết hợp',
+        'performance': 'Hiệu suất',
+        'smart': 'Thông minh'
+    }
+    for gid in group_ids:
+        filters_in_group = []
+        for fid, fval in FILTERS.items():
+            if fval.get('group') == gid:
+                item = {
+                    'id': fid,
+                    'label': fval['label'],
+                    'pool_mode': fval.get('pool_mode', False)
+                }
+                if 'description' in fval:
+                    item['description'] = fval['description']
+                if 'pool_size' in fval:
+                    item['pool_size'] = fval['pool_size']
+                filters_in_group.append(item)
+        groups.append({
+            'id': gid,
+            'label': group_labels[gid],
+            'filters': filters_in_group
+        })
+    return jsonify({'groups': groups})
+
+
+@app.route('/words')
+def words_page():
+    return render_template('words.html')
+
+
+@app.route('/api/words/search')
+def api_words_search():
+    import time
+    start_time = time.time()
+    
+    q = request.args.get('q', '').strip()
+    filter_type = request.args.get('filter', 'all')
+    status = request.args.get('status', 'all')
+    sort = request.args.get('sort', 'alpha')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 40, type=int)
+    
+    if page < 1:
+        page = 1
+    if per_page < 1:
+        per_page = 40
+        
+    conn = get_db()
+    
+    where_clauses = []
+    params = []
+    
+    if q:
+        where_clauses.append("(word LIKE ? OR translation LIKE ?)")
+        params.append(f"%{q}%")
+        params.append(f"%{q}%")
+        
+    if status != 'all':
+        where_clauses.append("status = ?")
+        params.append(status)
+        
+    if filter_type != 'all' and filter_type in FILTERS:
+        sql_cond = FILTERS[filter_type].get('sql')
+        if sql_cond:
+            where_clauses.append(sql_cond)
+        
+    where_clause_str = ""
+    if where_clauses:
+        where_clause_str = "WHERE " + " AND ".join(where_clauses)
+        
+    sort_clauses = {
+        'alpha': 'word COLLATE NOCASE ASC',
+        'score_desc': 'total_score DESC, id DESC',
+        'score_asc': 'total_score ASC, id ASC',
+        'recent': 'date_added DESC, id DESC',
+        'oldest_review': 'last_reviewed ASC NULLS FIRST, id ASC'
+    }
+    
+    order_clause = sort_clauses.get(sort, 'word COLLATE NOCASE ASC')
+    
+    count_query = f"SELECT COUNT(*) FROM words {where_clause_str}"
+    total = conn.execute(count_query, params).fetchone()[0]
+    
+    offset = (page - 1) * per_page
+    data_query = f"""
+        SELECT * FROM words 
+        {where_clause_str} 
+        ORDER BY {order_clause} 
+        LIMIT ? OFFSET ?
+    """
+    
+    data_params = list(params)
+    data_params.extend([per_page, offset])
+    
+    rows = conn.execute(data_query, data_params).fetchall()
+    
+    words_list = []
+    for r in rows:
+        w_dict = dict(r)
+        w_dict['mastery_score'] = calculate_mastery_score(w_dict)
+        pos_rows = conn.execute(
+            "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
+            (w_dict['id'],)
+        ).fetchall()
+        w_dict['pos_entries'] = [{'pos': pr['pos'], 'meaning': pr['meaning']} for pr in pos_rows]
+        words_list.append(w_dict)
+        
+    conn.close()
+    
+    import math
+    pages = math.ceil(total / per_page) if total > 0 else 1
+    query_time = round((time.time() - start_time) * 1000, 2)
+    
+    return jsonify({
+        'words': words_list,
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'query_time_ms': query_time
+    })
+
+
+@app.route('/api/words/add', methods=['POST'])
+def api_words_add():
+    from import_csv import parse_pos_entries, get_short_translation
+    
+    data = request.get_json() or {}
+    word = data.get('word', '').strip()
+    phonetic = data.get('phonetic', '').strip()
+    translation = data.get('translation', '').strip()
+    
+    if not word or not translation:
+        return jsonify({'success': False, 'error': 'invalid', 'message': 'Word and translation cannot be empty'}), 400
+        
+    conn = get_db()
+    try:
+        # Check duplicate case-insensitively
+        row = conn.execute("SELECT id FROM words WHERE LOWER(word) = LOWER(?)", (word,)).fetchone()
+        if row:
+            return jsonify({'success': False, 'error': 'duplicate', 'message': 'Word already exists'}), 400
+            
+        pos_entries = parse_pos_entries(translation)
+        short_translation = get_short_translation(pos_entries, translation)
+        
+        now = datetime.now().isoformat()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO words (word, phonetic, translation, short_translation, date_added, status, total_score, review_count, has_been_rated_five, last_reviewed, created_at)
+            VALUES (?, ?, ?, ?, ?, 'new', 0, 0, 0, NULL, ?)
+        """, (word, phonetic or None, translation, short_translation, now[:10], now))
+        
+        word_id = cursor.lastrowid
+        
+        for i, entry in enumerate(pos_entries):
+            cursor.execute("""
+                INSERT INTO word_pos (word_id, pos, meaning, sort_order)
+                VALUES (?, ?, ?, ?)
+            """, (word_id, entry['pos'], entry['meaning'], i))
+            
+        conn.commit()
+        
+        inserted_row = conn.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
+        inserted_dict = dict(inserted_row)
+        inserted_dict['mastery_score'] = 0.0
+        inserted_dict['pos_entries'] = pos_entries
+        
+        return jsonify({'success': True, 'word': inserted_dict})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/words/<int:word_id>/edit', methods=['PUT'])
+def api_words_edit(word_id):
+    from import_csv import parse_pos_entries, get_short_translation
+    
+    data = request.get_json() or {}
+    word = data.get('word', '').strip()
+    phonetic = data.get('phonetic', '').strip()
+    translation = data.get('translation', '').strip()
+    
+    if not word or not translation:
+        return jsonify({'success': False, 'error': 'invalid', 'message': 'Word and translation cannot be empty'}), 400
+        
+    conn = get_db()
+    try:
+        # Check if the word exists
+        existing = conn.execute("SELECT id FROM words WHERE id = ?", (word_id,)).fetchone()
+        if not existing:
+            return jsonify({'success': False, 'error': 'not_found', 'message': 'Word not found'}), 404
+            
+        # Check duplicate case-insensitively for other words
+        dup = conn.execute("SELECT id FROM words WHERE LOWER(word) = LOWER(?) AND id != ?", (word, word_id)).fetchone()
+        if dup:
+            return jsonify({'success': False, 'error': 'duplicate', 'message': 'Word spelling already exists under another entry'}), 400
+            
+        pos_entries = parse_pos_entries(translation)
+        short_translation = get_short_translation(pos_entries, translation)
+        
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE words
+            SET word = ?, phonetic = ?, translation = ?, short_translation = ?
+            WHERE id = ?
+        """, (word, phonetic or None, translation, short_translation, word_id))
+        
+        # Reset POS list
+        cursor.execute("DELETE FROM word_pos WHERE word_id = ?", (word_id,))
+        for i, entry in enumerate(pos_entries):
+            cursor.execute("""
+                INSERT INTO word_pos (word_id, pos, meaning, sort_order)
+                VALUES (?, ?, ?, ?)
+            """, (word_id, entry['pos'], entry['meaning'], i))
+            
+        conn.commit()
+        
+        updated_row = conn.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
+        updated_dict = dict(updated_row)
+        updated_dict['mastery_score'] = calculate_mastery_score(updated_dict)
+        updated_dict['pos_entries'] = pos_entries
+        
+        return jsonify({'success': True, 'word': updated_dict})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/words/<int:word_id>', methods=['DELETE'])
+def api_words_delete(word_id):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM review_history WHERE word_id = ?", (word_id,))
+        cursor.execute("DELETE FROM word_pos WHERE word_id = ?", (word_id,))
+        cursor.execute("DELETE FROM words WHERE id = ?", (word_id,))
+        
+        if cursor.rowcount == 0:
+            return jsonify({'success': False, 'error': 'Word not found'}), 404
+            
+        conn.commit()
+        return jsonify({'success': True, 'deleted_id': word_id})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/words/bulk-delete', methods=['POST'])
+def api_words_bulk_delete():
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    if not ids:
+        return jsonify({'success': False, 'message': 'Missing ids'}), 400
+        
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        placeholders = ','.join('?' for _ in ids)
+        
+        cursor.execute(f"DELETE FROM review_history WHERE word_id IN ({placeholders})", ids)
+        cursor.execute(f"DELETE FROM word_pos WHERE word_id IN ({placeholders})", ids)
+        cursor.execute(f"DELETE FROM words WHERE id IN ({placeholders})", ids)
+        
+        affected = cursor.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'deleted_count': affected})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/words/<int:word_id>/history')
+def api_word_history(word_id):
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT mode, score_delta, is_correct, rating, reviewed_at
+            FROM review_history
+            WHERE word_id = ?
+            ORDER BY reviewed_at DESC
+        """, (word_id,)).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        conn.close()
+
 
 
 @app.route('/api/settings', methods=['GET'])
@@ -852,6 +1224,25 @@ def api_dismiss_warning(word_id):
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         conn.close()
+
+
+@app.route('/api/word/<int:word_id>/toggle-warning', methods=['POST'])
+def api_toggle_warning(word_id):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        row = conn.execute("SELECT needs_review FROM words WHERE id = ?", (word_id,)).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': 'Word not found'}), 404
+        new_val = 0 if row['needs_review'] else 1
+        cursor.execute("UPDATE words SET needs_review = ? WHERE id = ?", (new_val, word_id))
+        conn.commit()
+        return jsonify({'success': True, 'needs_review': new_val})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
 
 
 # API POST /api/words/bulk-action -> applies status overrides or resets on list of words

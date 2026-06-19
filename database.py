@@ -351,3 +351,187 @@ def set_setting(db, key: str, value: str):
     )
     db.commit()
 
+
+# ═══ FILTERS CONFIGURATION ═══
+FILTERS = {
+  # ═══ NHÓM THỜI GIAN ═══
+  'added_today': {
+    'label': 'Thêm hôm nay',
+    'group': 'time',
+    'sql': "date(date_added) = date('now','localtime')",
+    'pool_mode': False,
+  },
+  'added_this_week': {
+    'label': 'Thêm tuần này',
+    'group': 'time',
+    'sql': "date(date_added) >= date('now','-7 days','localtime')",
+    'pool_mode': False,
+  },
+  'not_reviewed_today': {
+    'label': 'Chưa ôn hôm nay',
+    'group': 'time',
+    'sql': "(last_reviewed IS NULL OR date(last_reviewed) < date('now','localtime'))",
+    'pool_mode': False,
+  },
+  'reviewed_today': {
+    'label': 'Đã ôn hôm nay',
+    'group': 'time',
+    'sql': "date(last_reviewed) = date('now','localtime')",
+    'pool_mode': False,
+  },
+  'not_reviewed_3days': {
+    'label': 'Chưa ôn 3 ngày',
+    'group': 'time',
+    'sql': "(last_reviewed IS NULL OR last_reviewed < datetime('now','-3 days','localtime'))",
+    'pool_mode': False,
+  },
+  'not_reviewed_7days': {
+    'label': 'Chưa ôn 7 ngày',
+    'group': 'time',
+    'sql': "(last_reviewed IS NULL OR last_reviewed < datetime('now','-7 days','localtime'))",
+    'pool_mode': False,
+  },
+  'failed_today': {
+    'label': 'Vừa mới sai (hôm nay)',
+    'group': 'time',
+    'sql': "date(last_failed_at) = date('now','localtime')",
+    'pool_mode': False,
+  },
+  'failed_24h': {
+    'label': 'Vừa mới sai (24h)',
+    'group': 'time',
+    'sql': "last_failed_at >= datetime('now','-24 hours','localtime')",
+    'pool_mode': False,
+  },
+
+  # ═══ NHÓM KẾT HỢP STATUS + THỜI GIAN ═══
+  'new_today': {
+    'label': 'Từ mới — thêm hôm nay',
+    'group': 'combo',
+    'sql': "status = 'new' AND date(date_added) = date('now','localtime')",
+    'pool_mode': False,
+  },
+  'learning_today': {
+    'label': 'Đang học — ôn hôm nay',
+    'group': 'combo',
+    'sql': "status = 'learning' AND date(last_reviewed) = date('now','localtime')",
+    'pool_mode': False,
+  },
+  'learning_not_today': {
+    'label': 'Đang học — chưa ôn hôm nay',
+    'group': 'combo',
+    'sql': "status = 'learning' AND (last_reviewed IS NULL OR date(last_reviewed) < date('now','localtime'))",
+    'pool_mode': False,
+  },
+  'needs_review': {
+    'label': 'Cần ôn lại (⚠️ flag)',
+    'group': 'combo',
+    'sql': "needs_review = 1",
+    'pool_mode': False,
+  },
+
+  # ═══ NHÓM HIỆU SUẤT — Pool mode: lấy N từ → shuffle ═══
+  'lowest_score': {
+    'label': 'Điểm thấp nhất',
+    'group': 'performance',
+    'sql': "status != 'learned'",
+    'order': 'total_score ASC',
+    'pool_size': 20,
+    'pool_mode': True,   # ← lấy top N rồi shuffle
+  },
+  'lowest_accuracy': {
+    'label': 'Accuracy thấp nhất',
+    'group': 'performance',
+    'sql': "review_count >= 3",  # cần đủ data mới so sánh accuracy
+    'order': "(correct_count * 1.0 / NULLIF(review_count, 0)) ASC",
+    'pool_size': 20,
+    'pool_mode': True,
+  },
+  'most_wrong': {
+    'label': 'Sai nhiều nhất',
+    'group': 'performance',
+    'sql': "wrong_count > 0",
+    'order': 'wrong_count DESC',
+    'pool_size': 20,
+    'pool_mode': True,
+  },
+  'never_reviewed': {
+    'label': 'Chưa ôn lần nào',
+    'group': 'performance',
+    'sql': "review_count = 0",
+    'pool_mode': False,
+  },
+  'danger_words': {
+    'label': 'Từ nguy hiểm',
+    'description': 'Ôn nhiều nhưng vẫn hay sai',
+    'group': 'performance',
+    'sql': "review_count > 5 AND (correct_count * 1.0 / NULLIF(review_count, 0)) < 0.5",
+    'pool_mode': False,
+  },
+
+  # ═══ SMART ═══
+  'smart_priority': {
+    'label': 'Ưu tiên thông minh',
+    'description': 'Dùng priority algorithm từ scoring.py',
+    'group': 'smart',
+    'sql': None,  # dùng get_review_queue() thay vì SQL filter
+    'pool_mode': False,
+    'use_smart_queue': True,
+  },
+}
+
+
+def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
+                       limit: int = None, exclude_ids: list = None) -> list[dict]:
+    """
+    Lấy danh sách từ theo filter. 
+    Pool mode filters: lấy N từ rồi shuffle trước khi trả về.
+    """
+    import random
+    from scoring import get_review_queue
+    
+    exclude_ids = exclude_ids or []
+    
+    # Smart queue không dùng SQL filter
+    if filter_key != 'all' and FILTERS.get(filter_key, {}).get('use_smart_queue'):
+        return get_review_queue(db, n=limit or 20, status_filter=status, exclude_ids=exclude_ids)
+    
+    # Build WHERE clause
+    conditions = []
+    
+    # Status filter
+    if status != 'all':
+        conditions.append(f"status = '{status}'")
+    
+    # Named filter
+    if filter_key != 'all' and filter_key in FILTERS:
+        f = FILTERS[filter_key]
+        if f.get('sql'):
+            conditions.append(f['sql'])
+            
+    # Exclude IDs
+    if exclude_ids:
+        placeholders = ','.join(str(int(x)) for x in exclude_ids)
+        conditions.append(f"id NOT IN ({placeholders})")
+    
+    where_clause = ('WHERE ' + ' AND '.join(conditions)) if conditions else ''
+    
+    # Pool mode: lấy N từ theo ORDER, rồi shuffle
+    if filter_key in FILTERS and FILTERS[filter_key].get('pool_mode'):
+        f = FILTERS[filter_key]
+        pool_size = f.get('pool_size', 20)
+        order = f.get('order', 'total_score ASC')
+        rows = db.execute(
+            f"SELECT * FROM words {where_clause} ORDER BY {order} LIMIT {pool_size}"
+        ).fetchall()
+        result = [dict(r) for r in rows]
+        random.shuffle(result)
+        return result[:limit] if limit else result
+    
+    # Normal mode
+    order = 'RANDOM()'  # mặc định random
+    rows = db.execute(f"SELECT * FROM words {where_clause} ORDER BY {order}" +
+                      (f" LIMIT {limit}" if limit else "")).fetchall()
+    return [dict(r) for r in rows]
+
+

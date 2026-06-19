@@ -552,9 +552,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header" style="margin-bottom: 2rem;">
-    <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; color: var(--text-primary);">Dashboard</h2>
-    <p style="color: var(--text-secondary); font-size: 0.95rem;">Chào mừng bạn quay lại. Hãy chọn một chế độ ôn tập bên dưới.</p>
+<div class="page-header" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; color: var(--text-primary); margin: 0;">Dashboard</h2>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.25rem;">Chào mừng bạn quay lại. Hãy chọn một chế độ ôn tập bên dưới.</p>
+    </div>
+    <button class="btn btn-ghost" onclick="openSettingsModal()">⚙️ Cài đặt</button>
 </div>
 
 <!-- Stat Cards Grid -->
@@ -693,69 +696,26 @@
     </div>
 </section>
 
-<!-- Word List Table Section -->
-<section class="list-section">
-    <div class="list-header">
-        <!-- Status Filter Tabs -->
-        <div class="tabs-group">
-            <button class="tab-btn active" data-status="all" onclick="setFilter('all', this)">Tất cả (<span id="count-all">0</span>)</button>
-            <button class="tab-btn" data-status="new" onclick="setFilter('new', this)">Từ mới (<span id="count-new">0</span>)</button>
-            <button class="tab-btn" data-status="learning" onclick="setFilter('learning', this)">Đang học (<span id="count-learning">0</span>)</button>
-            <button class="tab-btn" data-status="learned" onclick="setFilter('learned', this)">Đã thuộc (<span id="count-learned">0</span>)</button>
-            <button class="tab-btn" data-status="needs_review" onclick="setFilter('needs_review', this)">⚠️ Cần ôn lại (<span id="count-warning">0</span>)</button>
-        </div>
-        
-        <!-- Sort Dropdown -->
-        <select class="sort-select" id="sort-dropdown" onchange="setSort(this.value)">
-            <option value="score_desc" selected>⭐ Điểm giảm dần</option>
-            <option value="score_asc">⭐ Điểm tăng dần</option>
-            <option value="alpha">🔤 Tên từ vựng (A-Z)</option>
-            <option value="date_added">📅 Ngày thêm mới</option>
-            <option value="last_reviewed">🔄 Ôn tập gần nhất</option>
-        </select>
+<!-- Compact Recent Words Section -->
+<section class="recent-words-section" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 1.5rem; padding: 1.75rem; margin-bottom: 2rem; box-shadow: var(--shadow);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h3 style="font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; color: var(--text-primary); margin: 0;">Mới thêm gần đây</h3>
+        <a href="/words" style="color: var(--primary); font-weight: 600; font-size: 0.9rem; text-decoration: none;">Xem tất cả →</a>
     </div>
-
-    <!-- Data Management Toolbar -->
-    <div class="toolbar">
-        <button id="btn-import" class="btn btn-ghost" onclick="openImportModal()">📥 Import CSV</button>
-        <button id="btn-settings" class="btn btn-ghost" onclick="openSettingsModal()">⚙️ Cài đặt</button>
-        <button id="btn-export" class="btn btn-ghost" onclick="exportProgress()">📤 Export tiến độ</button>
-        <div class="bulk-actions" id="bulk-actions-panel" style="display:none">
-            <span id="selected-count">0 từ đã chọn</span>
-            <select id="bulk-action-select">
-                <option value="">-- Hành động --</option>
-                <option value="mark_learned">Đánh dấu Đã thuộc</option>
-                <option value="mark_learning">Đánh dấu Đang học</option>
-                <option value="reset">Reset về Từ mới</option>
-            </select>
-            <button id="btn-bulk-apply" class="btn" onclick="applyBulkAction()">Áp dụng</button>
-        </div>
-    </div>
-
-    <!-- Vocabulary Table -->
-    <div style="overflow-x: auto;">
-        <table class="words-table">
-            <thead>
-                <tr>
-                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this.checked)"></th>
-                    <th style="width: 110px;">Trạng thái</th>
-                    <th>Từ vựng</th>
-                    <th>Dịch nghĩa rút gọn</th>
-                    <th style="width: 90px; text-align: center;">Điểm</th>
-                    <th style="width: 140px; text-align: center;">Hành động</th>
-                </tr>
-            </thead>
-            <tbody id="words-table-body">
-                <!-- Table rows will populate here dynamically -->
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Pagination Bar -->
-    <div class="pagination-container">
-        <button class="btn-page" id="btn-prev" onclick="changePage(-1)">← Trang trước</button>
-        <span id="page-indicator">Trang 1 / 1</span>
-        <button class="btn-page" id="btn-next" onclick="changePage(1)">Trang sau →</button>
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for w in recent_words %}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; background: var(--bg); border-radius: 1rem; border: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span class="badge badge-{{ w.status }}">{{ w.word }}</span>
+                    {% if w.phonetic and w.phonetic != '--' and w.phonetic.strip() != '' %}
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;">{{ w.phonetic }}</span>
+                    {% endif %}
+                </div>
+                <span style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 500;">{{ w.short_translation }}</span>
+            </div>
+        {% else %}
+            <div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0;">Chưa có từ vựng nào.</div>
+        {% endfor %}
     </div>
 </section>
 
@@ -763,43 +723,6 @@
 <footer class="footer-stats">
     Tổng điểm tích luỹ: <span id="footer-sum">0</span> | Điểm trung bình: <span id="footer-avg">0.0</span> / từ
 </footer>
-
-<!-- Import Modal -->
-<div id="import-modal" class="modal-overlay" style="display:none">
-    <div class="modal">
-        <div class="modal-header">
-            <h3>📥 Import từ vựng từ CSV</h3>
-            <button class="close-btn" onclick="closeImportModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-            <div id="drop-zone" class="drop-zone">
-                <span class="drop-zone-icon">📁</span>
-                <p>Kéo và thả file CSV ở đây hoặc</p>
-                <button class="select-file-btn" onclick="document.getElementById('file-input').click()">Chọn file</button>
-                <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleFileSelect(this.files)">
-                <p class="format-help">Định dạng: CSV (cột Word, Translation, và tùy chọn Phonetic, Date)</p>
-            </div>
-            
-            <div id="file-preview" class="file-preview" style="display:none">
-                <span class="file-icon">📄</span>
-                <span id="preview-filename">filename.csv</span>
-                <button class="btn-import-start" id="btn-start-import" onclick="startImport()">Bắt đầu import</button>
-            </div>
-            
-            <div id="import-loading" class="import-loading" style="display:none">
-                <div class="spinner"></div>
-                <p>Đang xử lý dữ liệu...</p>
-            </div>
-            
-            <div id="import-result" class="import-result" style="display:none">
-                <div class="result-icon">🎉</div>
-                <h4 id="result-summary">Hoàn thành!</h4>
-                <p id="result-details" style="color: var(--text-secondary); margin-top: 0.5rem;"></p>
-                <button class="btn-close-result" onclick="closeImportModal(true)">Đóng</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Settings Modal -->
 <div id="settings-modal" class="modal-overlay" style="display:none">
@@ -857,36 +780,17 @@
         requestAnimationFrame(update);
     }
 
-    // Dashboard State
-    const state = {
-        status: 'all',
-        sort: 'score_desc',
-        page: 1,
-        per_page: 30,
-        totalPages: 1,
-        stats: null
-    };
-
     // Fetch Global Stats on Load
     async function fetchStats() {
         try {
             const response = await fetch('/api/stats');
             const stats = await response.json();
-            state.stats = stats;
             
             // Animate counts
             animateCount(document.getElementById('stat-new'), stats.new);
             animateCount(document.getElementById('stat-learning'), stats.learning);
             animateCount(document.getElementById('stat-learned'), stats.learned);
             animateCount(document.getElementById('stat-today'), stats.reviewed_today);
-            
-            // Tab titles counters
-            document.getElementById('count-all').textContent = stats.total;
-            document.getElementById('count-new').textContent = stats.new;
-            document.getElementById('count-learning').textContent = stats.learning;
-            document.getElementById('count-learned').textContent = stats.learned;
-            const countWarningEl = document.getElementById('count-warning');
-            if (countWarningEl) countWarningEl.textContent = stats.needs_review || 0;
             
             // Progress Bar
             const total = stats.total;
@@ -910,440 +814,6 @@
             
         } catch (err) {
             console.error("Error loading stats:", err);
-        }
-    }
-
-    // Fetch paginated lists
-    async function fetchWordList() {
-        try {
-            const url = `/api/words/list?status=${state.status}&sort=${state.sort}&page=${state.page}&per_page=${state.per_page}`;
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            state.totalPages = data.pages;
-            renderWordList(data.words);
-            updatePaginationUI(data.page, data.pages);
-        } catch (err) {
-            console.error("Error loading words list:", err);
-            showToast("Lỗi tải danh sách từ vựng!", "error");
-        }
-    }
-
-    // Render Table Row elements
-    function renderWordList(words) {
-        // Uncheck master checkbox on list change
-        const selectAllCheck = document.getElementById('select-all-checkbox');
-        if (selectAllCheck) selectAllCheck.checked = false;
-        onCheckboxChange(); // Hide bulk actions panel
-        
-        const tableBody = document.getElementById('words-table-body');
-        tableBody.innerHTML = '';
-        
-        if (words.length === 0) {
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="6" style="padding: 3rem 1rem;">
-                        <div class="empty-state" style="margin: 0 auto; border: none; background: transparent;">
-                            <div class="empty-state-icon">📭</div>
-                            <p>Chưa có từ vựng nào.</p>
-                            <small>Bấm 'Import CSV' để bắt đầu!</small>
-                            <button class="btn btn-primary" onclick="openImportModal()" style="margin-top: 1rem;">📥 Import CSV</button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-        
-        words.forEach(w => {
-            // Determine action buttons HTML
-            let actionBtnHtml = '';
-            if (w.status === 'learning') {
-                actionBtnHtml = `<button class="btn-inline btn-learned-inline" onclick="markLearnedInline(event, ${w.id})">✅ Đã thuộc</button>`;
-            } else if (w.status === 'learned') {
-                actionBtnHtml = `<button class="btn-inline btn-review-inline" onclick="markLearningInline(event, ${w.id})">🔄 Ôn lại</button>`;
-            }
-            
-            const phoneticText = w.phonetic && w.phonetic !== '--' ? `<span class="phonetic-display">${w.phonetic}</span>` : '';
-            const shortTransText = w.short_translation || 'N/A';
-            
-            const warningBadge = w.needs_review === 1 ? `<span class="badge-warning" style="margin-left: 0.35rem;" title="Từ này cần ôn lại">⚠️ Cần ôn</span>` : '';
-            
-            // Main row
-            const mainRow = document.createElement('tr');
-            mainRow.className = 'word-row';
-            mainRow.id = `word-row-${w.id}`;
-            mainRow.setAttribute('onclick', `toggleExpand(${w.id})`);
-            
-            mainRow.innerHTML = `
-                <td style="text-align: center;" onclick="event.stopPropagation()"><input type="checkbox" class="word-checkbox" data-id="${w.id}" onchange="onCheckboxChange()"></td>
-                <td><span class="badge badge-${w.status}" id="badge-${w.id}">${getStatusLabel(w.status)}</span>${warningBadge}</td>
-                <td><span class="word-display">${w.word}</span>${phoneticText}</td>
-                <td><div class="trans-display">${shortTransText}</div></td>
-                <td style="text-align: center;"><span class="score-display">⭐ <span id="score-${w.id}">${w.total_score}</span></span></td>
-                <td style="text-align: center;" id="action-cell-${w.id}">${actionBtnHtml}</td>
-            `;
-            
-            // Details row (initially hidden)
-            const detailRow = document.createElement('tr');
-            detailRow.className = 'detail-row';
-            detailRow.id = `detail-row-${w.id}`;
-            
-            const dismissWarningBtn = w.needs_review === 1 ? `<button class="btn-inline btn-review-inline" style="background: var(--danger-light); color: var(--danger); border-color: rgba(239, 68, 68, 0.2); margin-left: 1rem; padding: 0.25rem 0.75rem;" onclick="dismissWarning(event, ${w.id})">💡 Bỏ qua cảnh báo</button>` : '';
-            
-            detailRow.innerHTML = `
-                <td colspan="6">
-                    <div class="detail-content">
-                        <p style="margin-bottom: 0.5rem;"><strong>Nghĩa đầy đủ:</strong> ${w.translation || 'Chưa cập nhật'}</p>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary);">
-                            Số lần ôn: ${w.review_count} lần | Ôn lần cuối: ${w.last_reviewed || 'Chưa ôn tập'}
-                            ${dismissWarningBtn}
-                        </p>
-                    </div>
-                </td>
-            `;
-            
-            tableBody.appendChild(mainRow);
-            tableBody.appendChild(detailRow);
-        });
-    }
-
-    function getStatusLabel(status) {
-        switch (status) {
-            case 'new': return 'Mới';
-            case 'learning': return 'Đang học';
-            case 'learned': return 'Đã thuộc';
-            default: return status;
-        }
-    }
-
-    function toggleExpand(id) {
-        const detailRow = document.getElementById(`detail-row-${id}`);
-        if (detailRow) {
-            detailRow.classList.toggle('open');
-        }
-    }
-
-    // Pagination Actions
-    const updatePaginationUI = (currentPage, totalPages) => {
-        const prevBtn = document.getElementById('btn-prev');
-        const nextBtn = document.getElementById('btn-next');
-        const indicator = document.getElementById('page-indicator');
-        
-        if (prevBtn) prevBtn.disabled = (currentPage === 1);
-        if (nextBtn) nextBtn.disabled = (currentPage >= totalPages);
-        if (indicator) indicator.textContent = `Trang ${currentPage} / ${totalPages}`;
-    };
-
-    function changePage(direction) {
-        const newPage = state.page + direction;
-        if (newPage >= 1 && newPage <= state.totalPages) {
-            state.page = newPage;
-            fetchWordList();
-        }
-    }
-
-    // Filter Action Tabs
-    function setFilter(status, element) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        element.classList.add('active');
-        
-        state.status = status;
-        state.page = 1; // Reset to page 1
-        fetchWordList();
-    }
-
-    // Sorting changes
-    function setSort(sortValue) {
-        state.sort = sortValue;
-        state.page = 1; // Reset to page 1
-        fetchWordList();
-    }
-
-    // Inline API updates
-    async function markLearnedInline(event, wordId) {
-        event.stopPropagation(); // Prevent row expand
-        try {
-            const response = await fetch('/api/word/mark-learned', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word_id: wordId })
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                showToast("✅ Đã thuộc!", "success");
-                
-                // Update Badge class & text inline
-                const badge = document.getElementById(`badge-${wordId}`);
-                if (badge) {
-                    badge.textContent = 'Đã thuộc';
-                    badge.className = 'badge badge-learned';
-                }
-                
-                // Update Action Cell inline
-                const actionCell = document.getElementById(`action-cell-${wordId}`);
-                if (actionCell) {
-                    actionCell.innerHTML = `<button class="btn-inline btn-review-inline" onclick="markLearningInline(event, ${wordId})">🔄 Ôn lại</button>`;
-                }
-                
-                // Update stats in cards
-                fetchStats();
-                fetchAnalytics();
-            } else {
-                showToast("Lỗi cập nhật trạng thái!", "error");
-            }
-        } catch (err) {
-            console.error("Error marking learned inline:", err);
-            showToast("Lỗi máy chủ!", "error");
-        }
-    }
-
-    async function markLearningInline(event, wordId) {
-        event.stopPropagation(); // Prevent row expand
-        try {
-            const response = await fetch('/api/word/mark-learning', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word_id: wordId })
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                showToast("Chuyển sang Đang học!", "info");
-                
-                // Update Badge inline
-                const badge = document.getElementById(`badge-${wordId}`);
-                if (badge) {
-                    badge.textContent = 'Đang học';
-                    badge.className = 'badge badge-learning';
-                }
-                
-                // Update Action Cell inline
-                const actionCell = document.getElementById(`action-cell-${wordId}`);
-                if (actionCell) {
-                    actionCell.innerHTML = `<button class="btn-inline btn-learned-inline" onclick="markLearnedInline(event, ${wordId})">✅ Đã thuộc</button>`;
-                }
-                
-                // Update stats in cards
-                fetchStats();
-                fetchAnalytics();
-            } else {
-                showToast("Lỗi cập nhật trạng thái!", "error");
-            }
-        } catch (err) {
-            console.error("Error marking learning inline:", err);
-            showToast("Lỗi máy chủ!", "error");
-        }
-    }
-
-    async function dismissWarning(event, wordId) {
-        event.stopPropagation();
-        try {
-            const response = await fetch(`/api/word/${wordId}/dismiss-warning`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const data = await response.json();
-            if (data.success) {
-                showToast("Đã xóa cảnh báo ôn tập!", "success");
-                fetchStats();
-                fetchAnalytics();
-                fetchWordList();
-            } else {
-                showToast("Lỗi xóa cảnh báo!", "error");
-            }
-        } catch (err) {
-            console.error("Error dismissing warning:", err);
-            showToast("Lỗi máy chủ!", "error");
-        }
-    }
-
-    // Checkboxes & Bulk select state
-    function onCheckboxChange() {
-        const checkboxes = document.querySelectorAll('.word-checkbox');
-        const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
-        const checkedCount = checkedBoxes.length;
-        
-        const bulkPanel = document.getElementById('bulk-actions-panel');
-        const selectedCountLabel = document.getElementById('selected-count');
-        
-        if (bulkPanel && selectedCountLabel) {
-            if (checkedCount > 0) {
-                selectedCountLabel.textContent = `${checkedCount} từ đã chọn`;
-                bulkPanel.style.display = 'flex';
-            } else {
-                bulkPanel.style.display = 'none';
-            }
-        }
-        
-        // Sync select-all checkbox state
-        const selectAllCheck = document.getElementById('select-all-checkbox');
-        if (selectAllCheck && checkboxes.length > 0) {
-            selectAllCheck.checked = (checkedCount === checkboxes.length);
-        }
-    }
-
-    function toggleSelectAll(checked) {
-        const checkboxes = document.querySelectorAll('.word-checkbox');
-        checkboxes.forEach(cb => {
-            cb.checked = checked;
-        });
-        onCheckboxChange();
-    }
-
-    async function applyBulkAction() {
-        const actionSelect = document.getElementById('bulk-action-select');
-        const action = actionSelect.value;
-        if (!action) {
-            showToast("Vui lòng chọn hành động!", "error");
-            return;
-        }
-        
-        const checkboxes = document.querySelectorAll('.word-checkbox:checked');
-        const wordIds = Array.from(checkboxes).map(cb => parseInt(cb.getAttribute('data-id')));
-        
-        if (wordIds.length === 0) {
-            showToast("Chưa chọn từ vựng nào!", "error");
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/words/bulk-action', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: action, word_ids: wordIds })
-            });
-            const data = await response.json();
-            if (data.success) {
-                showToast(`Đã áp dụng hành động cho ${data.affected} từ!`, "success");
-                
-                // Reset action select
-                actionSelect.value = '';
-                
-                // Refresh data
-                fetchStats();
-                fetchAnalytics();
-                fetchWordList();
-            } else {
-                showToast(data.message || "Lỗi áp dụng hành động!", "error");
-            }
-        } catch (err) {
-            console.error("Bulk action error:", err);
-            showToast("Lỗi kết nối máy chủ!", "error");
-        }
-    }
-
-    // Export Progress
-    function exportProgress() {
-        showToast("Đang chuẩn bị file tải về...", "info");
-        window.location = '/api/export';
-    }
-
-    // Import Modal Actions
-    let selectedFile = null;
-
-    function openImportModal() {
-        const modal = document.getElementById('import-modal');
-        modal.style.display = 'flex';
-        
-        // Reset modal body states
-        document.getElementById('drop-zone').style.display = 'flex';
-        document.getElementById('file-preview').style.display = 'none';
-        document.getElementById('import-loading').style.display = 'none';
-        document.getElementById('import-result').style.display = 'none';
-        document.getElementById('file-input').value = '';
-        selectedFile = null;
-        
-        // Setup Drag and Drop event listeners if not already done
-        const dropZone = document.getElementById('drop-zone');
-        if (dropZone && !dropZone.dataset.listenersAttached) {
-            dropZone.dataset.listenersAttached = 'true';
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    dropZone.classList.add('dragover');
-                }, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    dropZone.classList.remove('dragover');
-                }, false);
-            });
-            
-            dropZone.addEventListener('drop', (e) => {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                handleFileSelect(files);
-            }, false);
-        }
-    }
-
-    function closeImportModal(shouldRefresh = false) {
-        document.getElementById('import-modal').style.display = 'none';
-        if (shouldRefresh) {
-            fetchStats();
-            fetchWordList();
-        }
-    }
-
-    function handleFileSelect(files) {
-        if (files.length === 0) return;
-        const file = files[0];
-        if (!file.name.toLowerCase().endsWith('.csv')) {
-            showToast("Vui lòng chọn file định dạng CSV!", "error");
-            return;
-        }
-        
-        selectedFile = file;
-        document.getElementById('preview-filename').textContent = file.name;
-        document.getElementById('drop-zone').style.display = 'none';
-        document.getElementById('file-preview').style.display = 'flex';
-    }
-
-    async function startImport() {
-        if (!selectedFile) return;
-        
-        document.getElementById('file-preview').style.display = 'none';
-        document.getElementById('import-loading').style.display = 'flex';
-        
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        
-        try {
-            const response = await fetch('/api/import', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-            document.getElementById('import-loading').style.display = 'none';
-            document.getElementById('import-result').style.display = 'flex';
-            
-            const resultSummary = document.getElementById('result-summary');
-            const resultDetails = document.getElementById('result-details');
-            
-            if (data.success) {
-                resultSummary.textContent = "Hoàn thành!";
-                resultDetails.innerHTML = `✅ ${data.imported} từ mới | ♻️ ${data.updated} từ cập nhật | ⚠️ ${data.skipped} từ bỏ qua | Tổng cộng: ${data.total} hàng`;
-                showToast("Import dữ liệu thành công!", "success");
-            } else {
-                resultSummary.textContent = "Thất bại!";
-                resultDetails.textContent = data.error || "Lỗi xử lý file CSV.";
-                showToast("Import dữ liệu thất bại!", "error");
-            }
-        } catch (err) {
-            console.error("Import error:", err);
-            document.getElementById('import-loading').style.display = 'none';
-            document.getElementById('import-result').style.display = 'flex';
-            document.getElementById('result-summary').textContent = "Thất bại!";
-            document.getElementById('result-details').textContent = "Lỗi kết nối máy chủ!";
-            showToast("Lỗi máy chủ khi import!", "error");
         }
     }
 
@@ -1593,7 +1063,6 @@
     // On Load Page Initialization
     window.addEventListener('DOMContentLoaded', () => {
         fetchStats();
-        fetchWordList();
         fetchAnalytics();
     });
 </script>

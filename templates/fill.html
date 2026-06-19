@@ -219,79 +219,97 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-    <div>
-        <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; color: var(--text-primary);">✏️ Điền Nghĩa</h2>
-        <p style="color: var(--text-secondary); font-size: 0.95rem;">Luyện viết từ vựng hoặc dịch nghĩa để thử thách bản thân.</p>
+<div class="study-header">
+    <a href="/" class="btn btn-ghost btn-sm">← Dashboard</a>
+    
+    <div class="filter-bar">
+        <!-- Toggle translation direction -->
+        <button class="btn btn-ghost btn-sm" id="btn-toggle-mode" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; border: 1.5px solid var(--border-default); border-radius: var(--radius-md);">🇬🇧 EN → 🇻🇳 VI</button>
+
+        <!-- Dropdown filter -->
+        <div class="filter-dropdown" id="filter-dropdown-container">
+            <button class="filter-trigger" onclick="toggleFilterMenu(event)">
+                <span id="filter-label">Tất cả từ</span>
+                <i class="ph ph-funnel"></i>
+            </button>
+            <div class="filter-menu" id="filter-menu" hidden>
+                <!-- Rendered dynamically -->
+            </div>
+        </div>
+        
+        <!-- Quick status pills -->
+        <div class="status-pills">
+            <button class="pill active" data-status="all">Tất cả</button>
+            <button class="pill" data-status="new">Mới</button>
+            <button class="pill" data-status="learning">Đang học</button>
+        </div>
     </div>
     
-    <div class="controls-group" style="display: flex; align-items: center; gap: 0.75rem;">
-        <!-- Toggle translation direction -->
-        <button class="btn btn-ghost" id="btn-toggle-mode" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🇬🇧 EN → 🇻🇳 VI</button>
-        
-        <select class="filter-select" id="filter-dropdown" style="background: var(--card-bg); border: 1px solid var(--border); color: var(--text-primary); padding: 0.45rem 1.5rem 0.45rem 0.75rem; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 500; outline: none; cursor: pointer;">
-            <option value="all">Tất cả trạng thái</option>
-            <option value="new">Từ mới</option>
-            <option value="learning">Đang học</option>
-            <option value="learned">Đã thuộc</option>
-        </select>
+    <!-- Session progress -->
+    <div class="session-progress">
+        <span id="progress-text">0 / 15</span>
+        <div class="progress-track" style="width:120px">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
     </div>
 </div>
 
 <!-- Empty State (hidden by default) -->
 <div id="fill-empty-state" class="empty-state" style="display:none;">
     <div class="empty-state-icon">📭</div>
-    <p>Không có từ nào phù hợp.</p>
-    <small>Không có từ nào trong nhóm này. Thử chọn 'Tất cả'!</small>
+    <p id="empty-state-text">Không có từ nào phù hợp.</p>
+    <small>Không có từ nào trong nhóm này. Thử chọn bộ lọc khác!</small>
     <a href="/">Về Dashboard</a>
 </div>
 
-<div id="fill-stage-container" style="display: block; width: 100%;">
-    <!-- Session Statistics Counter -->
-    <div class="session-info">
-        Đã ôn: <span id="session-count">0</span> từ | Điểm: <span id="session-score">0</span> hôm nay
-    </div>
-
-    <!-- Stage Card -->
-    <main class="prompt-card">
-        <div class="card-top">
-            <span class="status-badge badge" id="card-status-badge">Trống</span>
-            <span class="flag-icon" id="question-flag">🇬🇧</span>
+<div id="card-container" style="width: 100%;">
+    <div id="fill-stage-container" style="display: block; width: 100%;">
+        <!-- Session Counter Summary -->
+        <div id="session-summary-info" style="align-self: flex-start; background: var(--primary-light); border: 1px solid rgba(79, 70, 229, 0.15); padding: 0.6rem 1.2rem; border-radius: 1rem; font-size: 0.9rem; font-weight: 600; font-family: var(--font-display); margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); color: var(--primary); display: inline-block;">
+            Phiên học mới
         </div>
-        
-        <div style="margin: auto 0; padding: 1rem 0;">
-            <div class="question-hint-label" id="question-hint-label">Nghĩa tiếng Việt là gì?</div>
-            <div class="prompt-display" id="question-prompt">Word Prompt</div>
-            <div class="phonetic-display" id="question-phonetic">/phonetic/</div>
-        </div>
-        
-        <div class="card-bottom">
-            <span id="card-score">Điểm: 0 ⭐</span>
-            <span>Tự đánh giá đáp án</span>
-        </div>
-    </main>
 
-    <!-- Input and Actions Panel -->
-    <div class="input-area">
-        <input type="text" autocomplete="off" class="answer-input" id="answer-input" placeholder="Nhập nghĩa tiếng Việt...">
-        <button class="btn btn-primary btn-check" id="btn-action" style="padding: 0.9rem 2.5rem; font-size: 1.05rem; border-radius: var(--radius);">Kiểm tra →</button>
-    </div>
+        <!-- Stage Card -->
+        <main class="prompt-card">
+            <div class="card-top">
+                <span class="status-badge badge" id="card-status-badge">Trống</span>
+                <span class="flag-icon" id="question-flag">🇬🇧</span>
+            </div>
+            
+            <div style="margin: auto 0; padding: 1rem 0;">
+                <div class="question-hint-label" id="question-hint-label">Nghĩa tiếng Việt là gì?</div>
+                <div class="prompt-display" id="question-prompt">Word Prompt</div>
+                <div class="phonetic-display" id="question-phonetic">/phonetic/</div>
+            </div>
+            
+            <div class="card-bottom">
+                <span id="card-score">Điểm: 0 ⭐</span>
+                <span>Tự đánh giá đáp án</span>
+            </div>
+        </main>
 
-    <!-- Answer box (yellow) -->
-    <div class="answer-box" id="answer-box">
-        <div class="ans-label">📖 Đáp án chính xác:</div>
-        <div class="ans-short" id="short-answer">Short translation</div>
-        <div class="ans-full" id="full-answer">Full detail definition description translation context goes here.</div>
-        
-        <div class="eval-actions">
-            <button class="btn-eval btn-correct" onclick="window.evaluate(true)">✅ Tôi đúng rồi (+5 điểm)</button>
-            <button class="btn-eval btn-wrong" onclick="window.evaluate(false)">❌ Tôi sai rồi (-3 điểm)</button>
+        <!-- Input and Actions Panel -->
+        <div class="input-area">
+            <input type="text" autocomplete="off" class="answer-input" id="answer-input" placeholder="Nhập nghĩa tiếng Việt...">
+            <button class="btn btn-primary btn-check" id="btn-action" style="padding: 0.9rem 2.5rem; font-size: 1.05rem; border-radius: var(--radius);">Kiểm tra →</button>
         </div>
-    </div>
 
-    <!-- Skip Button -->
-    <div class="skip-action">
-        <button class="btn btn-ghost" id="btn-skip">⏭ Bỏ qua từ này</button>
+        <!-- Answer box (yellow) -->
+        <div class="answer-box" id="answer-box">
+            <div class="ans-label">📖 Đáp án chính xác:</div>
+            <div class="ans-short" id="short-answer">Short translation</div>
+            <div class="ans-full" id="full-answer">Full detail definition description translation context goes here.</div>
+            
+            <div class="eval-actions">
+                <button class="btn-eval btn-correct" onclick="window.evaluate(true)">✅ Tôi đúng rồi (+5 điểm)</button>
+                <button class="btn-eval btn-wrong" onclick="window.evaluate(false)">❌ Tôi sai rồi (-3 điểm)</button>
+            </div>
+        </div>
+
+        <!-- Skip Button -->
+        <div class="skip-action">
+            <button class="btn btn-ghost" id="btn-skip">⏭ Bỏ qua từ này</button>
+        </div>
     </div>
 </div>
 {% endblock %}

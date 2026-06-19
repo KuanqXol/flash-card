@@ -1,50 +1,59 @@
 // Flashcard Game State
-const state = {
-    currentWord: null,
-    isFlipped: false,
-    currentFilter: 'all',
-    sessionCount: 0,
+const session = {
+    queue: [],
+    index: 0,
+    filter: 'smart_priority',
+    status: 'all',
     sessionScore: 0,
-    useUrlParams: true
+    sessionCorrect: 0,
+    sessionWrong: 0,
+    startedAt: null,
+    currentWord: null,
+    isFlipped: false
 };
 
-// Session State
-const sessionState = {
-    seenIds: [],       // word_ids đã xem trong phiên này
-    queue: [],         // queue từ /api/session/start
-    currentIndex: 0,
-};
+// DOM Cache (mutable since innerHTML gets replaced on restarts)
+let cardEl = null;
+let wordEl = null;
+let phoneticEl = null;
+let statusBadgeEl = null;
+let translationEl = null;
+let cardScoreEl = null;
+let cardReviewsEl = null;
+let ratingBarEl = null;
+let btnFlipEl = null;
 
-// DOM Cache
-const cardEl = document.getElementById('flashcard');
-const wordEl = document.getElementById('card-word');
-const phoneticEl = document.getElementById('card-phonetic');
-const statusBadgeEl = document.getElementById('card-status-badge');
-const translationEl = document.getElementById('card-translation');
-const cardScoreEl = document.getElementById('card-score');
-const cardReviewsEl = document.getElementById('card-reviews');
-const ratingBarEl = document.getElementById('rating-bar');
-const btnFlipEl = document.getElementById('btn-flip');
+const progressTextEl = document.getElementById('progress-text');
+const progressFillEl = document.getElementById('progress-fill');
 
-const sessionCountEl = document.getElementById('session-count');
-const sessionScoreEl = document.getElementById('session-score');
-const filterDropdownEl = document.getElementById('filter-dropdown');
+function initDOMCache() {
+    cardEl = document.getElementById('flashcard');
+    wordEl = document.getElementById('card-word');
+    phoneticEl = document.getElementById('card-phonetic');
+    statusBadgeEl = document.getElementById('card-status-badge');
+    translationEl = document.getElementById('card-translation');
+    cardScoreEl = document.getElementById('card-score');
+    cardReviewsEl = document.getElementById('card-reviews');
+    ratingBarEl = document.getElementById('rating-bar');
+    btnFlipEl = document.getElementById('btn-flip');
+    
+    setupStars();
+}
 
 // Setup event listeners
-function init() {
-    // Dropdown change
-    if (filterDropdownEl) {
-        filterDropdownEl.addEventListener('change', (e) => {
-            state.currentFilter = e.target.value;
-            startSession();
-        });
-    }
+async function init() {
+    // Store original container HTML to restore on session restarts
+    window.originalCardContainerHTML = document.getElementById('card-container').innerHTML;
 
     // Keyboard bindings
     document.addEventListener('keydown', handleKeyDown);
 
-    // Initial load
-    startSession();
+    // Initial load and setup of headers
+    await initStudyHeaderFilters(async (filter, status) => {
+        session.filter = filter;
+        session.status = status;
+        await startSession();
+    });
 }
 
 // Keyboard shortcuts
@@ -54,7 +63,7 @@ function handleKeyDown(e) {
         e.preventDefault();
         flipCard();
     } else if (e.key >= '1' && e.key <= '5') {
-        if (state.isFlipped && state.currentWord) {
+        if (session.isFlipped && session.currentWord) {
             rateWord(parseInt(e.key));
         }
     } else if (e.key === 'Enter') {
@@ -63,85 +72,52 @@ function handleKeyDown(e) {
     }
 }
 
-// Khi load phiên mới:
+// Khởi tạo session mới
 async function startSession() {
+    // Restore stage container HTML
+    document.getElementById('card-container').innerHTML = window.originalCardContainerHTML;
+    initDOMCache();
+
+    // Hide empty state
+    document.getElementById('flashcard-empty-state').style.display = 'none';
+
     try {
-        const urlParams = new URLSearchParams(window.location.search);
-        let queue = [];
+        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=20`);
+        const data = await res.json();
         
-        if (state.currentFilter === 'recent_fails' || (state.useUrlParams && urlParams.get('mode') === 'recent_fails')) {
-            state.useUrlParams = false; // only use once
-            state.currentFilter = 'recent_fails';
-            
-            const res = await fetch('/api/words/recently-failed?hours=24');
-            queue = await res.json();
-            
-            if (filterDropdownEl) {
-                let opt = filterDropdownEl.querySelector('option[value="recent_fails"]');
-                if (!opt) {
-                    opt = document.createElement('option');
-                    opt.value = 'recent_fails';
-                    opt.textContent = '🔁 Từ vừa sai (24h)';
-                    filterDropdownEl.appendChild(opt);
-                }
-                filterDropdownEl.value = 'recent_fails';
-            }
-        } else {
-            let queryParams = `?status=${state.currentFilter}`;
-            if (state.useUrlParams && window.location.search) {
-                queryParams = window.location.search;
-                state.useUrlParams = false; // only use once
-            }
-            const res = await fetch(`/api/session/start${queryParams}`);
-            const data = await res.json();
-            queue = data.queue || [];
-        }
-        
-        sessionState.queue = queue;
-        sessionState.currentIndex = 0;
-        sessionState.seenIds = [];
-        
-        state.sessionCount = 0;
-        state.sessionScore = 0;
-        updateSessionUI();
-
-        // Hide completion state and empty state
-        const sessionCompleteEl = document.getElementById('flashcard-session-complete');
-        if (sessionCompleteEl) sessionCompleteEl.style.display = 'none';
-        
-        const emptyStateEl = document.getElementById('flashcard-empty-state');
-        if (emptyStateEl) emptyStateEl.style.display = 'none';
-
-        if (sessionState.queue.length === 0) {
-            state.currentWord = null;
-            displayEmptyState();
+        if (!data.queue || data.queue.length === 0) {
+            document.getElementById('flashcard-empty-state').style.display = 'flex';
+            document.getElementById('empty-state-text').textContent = `Không có từ nào phù hợp với bộ lọc "${data.filter_label}"`;
+            document.getElementById('card-container').innerHTML = ''; // Clear container
+            updateProgressText("0 / 0");
+            updateProgressFill(0);
             return;
         }
-
-        const stageContainer = document.getElementById('flashcard-stage-container');
-        if (stageContainer) stageContainer.style.display = 'block';
         
-        showNextFromQueue();
+        session.queue = data.queue;
+        session.index = 0;
+        session.sessionScore = 0;
+        session.sessionCorrect = 0;
+        session.sessionWrong = 0;
+        session.startedAt = Date.now();
+        
+        // Show summary info
+        const infoEl = document.getElementById('session-summary-info');
+        if (infoEl) {
+            infoEl.textContent = data.summary || `Phiên học: ${session.queue.length} từ`;
+        }
+        
+        showCard(session.queue[0]);
+        updateProgressUI();
     } catch (err) {
         console.error("Error starting session:", err);
         showToast("Lỗi khởi tạo phiên học!", "error");
     }
 }
 
-// Khi lấy từ tiếp theo:
-function showNextFromQueue() {
-    if (sessionState.currentIndex >= sessionState.queue.length) {
-        showSessionComplete();
-        return;
-    }
-    const word = sessionState.queue[sessionState.currentIndex++];
-    sessionState.seenIds.push(word.id);
-    renderCard(word);
-}
-
-function renderCard(word) {
-    state.currentWord = word;
-    state.isFlipped = false;
+function showCard(word) {
+    session.currentWord = word;
+    session.isFlipped = false;
     if (cardEl) {
         cardEl.classList.remove('flipped');
     }
@@ -155,39 +131,76 @@ function renderCard(word) {
 
 function skipWord() {
     showToast("⏭ Bỏ qua từ này", "info");
-    showNextFromQueue();
+    nextWord();
+}
+
+function nextWord() {
+    session.index++;
+    updateProgressUI();
+    if (session.index >= session.queue.length) {
+        showSessionComplete();
+        return;
+    }
+    showCard(session.queue[session.index]);
 }
 
 function showSessionComplete() {
-    state.currentWord = null;
-    const stageContainer = document.getElementById('flashcard-stage-container');
-    if (stageContainer) stageContainer.style.display = 'none';
+    session.currentWord = null;
+    const duration = Math.max(1, Math.round((Date.now() - session.startedAt) / 1000 / 60));
     
-    const emptyStateEl = document.getElementById('flashcard-empty-state');
-    if (emptyStateEl) emptyStateEl.style.display = 'none';
+    document.getElementById('card-container').innerHTML = `
+        <div class="session-complete">
+          <div class="complete-icon">🎉</div>
+          <h2>Hoàn thành phiên học!</h2>
+          <div class="complete-stats">
+            <div class="stat">
+              <span class="stat-number">${session.queue.length}</span>
+              <span class="stat-label">Từ đã ôn</span>
+            </div>
+            <div class="stat">
+              <span class="stat-number">+${session.sessionScore}</span>
+              <span class="stat-label">Điểm</span>
+            </div>
+            <div class="stat">
+              <span class="stat-number">${duration} phút</span>
+              <span class="stat-label">Thời gian</span>
+            </div>
+          </div>
+          <div class="complete-actions">
+            <button class="btn btn-primary" onclick="startSession()">Bắt đầu lại</button>
+            <a href="/" class="btn btn-ghost">Về Dashboard</a>
+          </div>
+        </div>
+    `;
     
-    const sessionCompleteEl = document.getElementById('flashcard-session-complete');
-    if (sessionCompleteEl) {
-        sessionCompleteEl.style.display = 'flex';
-        const countEl = document.getElementById('session-complete-count');
-        const scoreEl = document.getElementById('session-complete-score');
-        if (countEl) countEl.textContent = state.sessionCount;
-        if (scoreEl) scoreEl.textContent = state.sessionScore;
+    // Confetti animation
+    if (typeof confetti !== 'undefined') {
+        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
     }
 }
 
-function displayEmptyState() {
-    const stageContainer = document.getElementById('flashcard-stage-container');
-    if (stageContainer) stageContainer.style.display = 'none';
+function updateProgressUI() {
+    const textVal = `${session.index} / ${session.queue.length}`;
+    updateProgressText(textVal);
     
-    const emptyStateEl = document.getElementById('flashcard-empty-state');
-    if (emptyStateEl) emptyStateEl.style.display = 'flex';
+    if (session.queue.length > 0) {
+        const percent = Math.min(100, Math.round((session.index / session.queue.length) * 100));
+        updateProgressFill(percent);
+    }
+}
+
+function updateProgressText(text) {
+    if (progressTextEl) progressTextEl.textContent = text;
+}
+
+function updateProgressFill(percent) {
+    if (progressFillEl) progressFillEl.style.width = `${percent}%`;
 }
 
 function displayWord(word) {
     if (wordEl) wordEl.textContent = word.word;
     
-    // Phonetic handling: hide if "--", null, or empty
+    // Phonetic handling
     if (phoneticEl) {
         if (word.phonetic && word.phonetic !== '--' && word.phonetic.trim() !== '') {
             phoneticEl.textContent = word.phonetic;
@@ -197,20 +210,16 @@ function displayWord(word) {
         }
     }
 
-    // Status Badge styling
+    // Status Badge
     if (statusBadgeEl) {
         statusBadgeEl.textContent = getStatusText(word.status);
         statusBadgeEl.className = `badge badge-${word.status}`;
     }
 
-    // Warning Badge styling
+    // Warning Badge
     const warningBadgeEl = document.getElementById('card-warning-badge');
     if (warningBadgeEl) {
-        if (word.needs_review === 1) {
-            warningBadgeEl.style.display = 'inline-block';
-        } else {
-            warningBadgeEl.style.display = 'none';
-        }
+        warningBadgeEl.style.display = word.needs_review === 1 ? 'inline-block' : 'none';
     }
 
     // Back card content
@@ -232,15 +241,15 @@ function getStatusText(status) {
 
 // Flip logic
 function flipCard() {
-    if (!state.currentWord) return;
+    if (!session.currentWord) return;
     
-    state.isFlipped = !state.isFlipped;
+    session.isFlipped = !session.isFlipped;
     
     if (cardEl) {
-        cardEl.classList.toggle('flipped', state.isFlipped);
+        cardEl.classList.toggle('flipped', session.isFlipped);
     }
     
-    if (state.isFlipped) {
+    if (session.isFlipped) {
         if (btnFlipEl) btnFlipEl.style.display = 'none';
         if (ratingBarEl) ratingBarEl.classList.add('visible');
         resetStars();
@@ -252,14 +261,14 @@ function flipCard() {
 
 // Rate logic
 async function rateWord(rating) {
-    if (!state.currentWord) return;
+    if (!session.currentWord) return;
 
     try {
         const response = await fetch('/api/flashcard/rate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                word_id: state.currentWord.id,
+                word_id: session.currentWord.id,
                 rating: rating
             })
         });
@@ -272,17 +281,11 @@ async function rateWord(rating) {
             }
             showToast(`+${rating} điểm`, "success");
             
-            // Update Session count and score
-            state.sessionScore += rating;
-            state.sessionCount++;
-            
-            updateSessionUI();
-            
-            // Highlight chosen star and load next word after 800ms
+            session.sessionScore += rating;
             highlightChosenStar(rating);
             
             setTimeout(() => {
-                showNextFromQueue();
+                nextWord();
             }, 800);
         } else {
             showToast(data.message || "Lỗi đánh giá!", "error");
@@ -294,21 +297,22 @@ async function rateWord(rating) {
 }
 
 // Mark Learned logic
-async function markLearned() {
-    if (!state.currentWord) return;
+async function markLearned(event) {
+    if (event) event.stopPropagation();
+    if (!session.currentWord) return;
     
     try {
         const response = await fetch('/api/word/mark-learned', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word_id: state.currentWord.id })
+            body: JSON.stringify({ word_id: session.currentWord.id })
         });
         
         const data = await response.json();
         
         if (data.success) {
             showToast("✅ Đã thuộc!", "success");
-            showNextFromQueue();
+            nextWord();
         } else {
             showToast("Không thể cập nhật trạng thái!", "error");
         }
@@ -320,20 +324,20 @@ async function markLearned() {
 
 // Mark Learning logic
 async function markLearning() {
-    if (!state.currentWord) return;
+    if (!session.currentWord) return;
     
     try {
         const response = await fetch('/api/word/mark-learning', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word_id: state.currentWord.id })
+            body: JSON.stringify({ word_id: session.currentWord.id })
         });
         
         const data = await response.json();
         
         if (data.success) {
             showToast("Chuyển sang Đang học!", "info");
-            showNextFromQueue();
+            nextWord();
         } else {
             showToast("Không thể cập nhật trạng thái!", "error");
         }
@@ -341,11 +345,6 @@ async function markLearning() {
         console.error("Error marking learning:", err);
         showToast("Lỗi kết nối máy chủ!", "error");
     }
-}
-
-function updateSessionUI() {
-    if (sessionCountEl) sessionCountEl.textContent = state.sessionCount;
-    if (sessionScoreEl) sessionScoreEl.textContent = state.sessionScore;
 }
 
 // Star rating UI updates
@@ -360,7 +359,6 @@ function highlightChosenStar(rating) {
     });
 }
 
-// Reset Star ratings
 function resetStars() {
     const stars = document.querySelectorAll('.star-rating svg');
     stars.forEach(star => {
@@ -368,12 +366,11 @@ function resetStars() {
     });
 }
 
-// Bind direct hover/click handlers to star SVG items
-document.addEventListener('DOMContentLoaded', () => {
+function setupStars() {
     const stars = document.querySelectorAll('.star-rating svg');
     stars.forEach(star => {
         star.addEventListener('mouseenter', function() {
-            if (!state.isFlipped) return;
+            if (!session.isFlipped) return;
             const val = parseInt(this.dataset.val);
             stars.forEach((s, idx) => {
                 if (idx < val) s.classList.add('hover');
@@ -386,15 +383,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         star.addEventListener('click', function(e) {
-            e.stopPropagation(); // prevent flipping back
-            if (!state.isFlipped) return;
+            e.stopPropagation();
+            if (!session.isFlipped) return;
             const val = parseInt(this.dataset.val);
             rateWord(val);
         });
     });
-
-    init();
-});
+}
 
 function renderPosEntries(posEntries, fullTranslation) {
   if (!posEntries || posEntries.length === 0) {
@@ -409,3 +404,8 @@ function renderPosEntries(posEntries, fullTranslation) {
     </div>
   `).join('');
 }
+
+// Bind load hooks
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+});

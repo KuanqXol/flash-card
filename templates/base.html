@@ -10,6 +10,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Cohesive clean stylesheet -->
     <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Phosphor Icons -->
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/style.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     {% block styles %}{% endblock %}
 </head>
 <body>
@@ -22,6 +26,10 @@
             <nav class="sidebar-nav">
                 <a href="/" class="nav-link" id="nav-dashboard">
                     <span class="nav-icon">🏠</span> Dashboard
+                </a>
+                <a href="/words" class="nav-link" id="nav-words">
+                    <span class="nav-icon"><i class="ph ph-books"></i></span> Từ vựng
+                    <span class="nav-badge" id="nav-word-count">0</span>
                 </a>
                 <a href="/flashcard" class="nav-link" id="nav-flashcard">
                     <span class="nav-icon">🃏</span> Flash Card
@@ -45,6 +53,10 @@
             <a href="/" class="bottom-nav-link" id="bnav-dashboard">
                 <span class="nav-icon">🏠</span>
                 <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="/words" class="bottom-nav-link" id="bnav-words">
+                <span class="nav-icon"><i class="ph ph-books"></i></span>
+                <span class="nav-text">Từ vựng</span>
             </a>
             <a href="/flashcard" class="bottom-nav-link" id="bnav-flashcard">
                 <span class="nav-icon">🃏</span>
@@ -94,7 +106,8 @@
     function updateActiveNav() {
         const path = window.location.pathname;
         let activeId = 'dashboard';
-        if (path.startsWith('/flashcard')) activeId = 'flashcard';
+        if (path.startsWith('/words')) activeId = 'words';
+        else if (path.startsWith('/flashcard')) activeId = 'flashcard';
         else if (path.startsWith('/matching')) activeId = 'matching';
         else if (path.startsWith('/fill')) activeId = 'fill';
 
@@ -114,10 +127,189 @@
     }
     updateActiveNav();
 
+    // Global total count badge update
+    async function updateWordCountBadge() {
+        try {
+            const res = await fetch('/api/stats');
+            const stats = await res.json();
+            const badge = document.getElementById('nav-word-count');
+            if (badge) {
+                badge.textContent = stats.total || 0;
+            }
+        } catch (err) {
+            console.error("Error updating word badge:", err);
+        }
+    }
+    updateWordCountBadge();
+
+    // Global Filter Dropdown populator helper
+    async function populateFilterDropdown(dropdownId, initialValue = 'smart_priority') {
+      const dropdown = document.getElementById(dropdownId);
+      if (!dropdown) return;
+      
+      try {
+        const res = await fetch('/api/filters/list');
+        const data = await res.json();
+        
+        dropdown.innerHTML = '';
+        
+        // Add default/status options
+        const allOpt = document.createElement('option');
+        allOpt.value = 'all';
+        allOpt.textContent = '📖 Tất cả từ vựng';
+        dropdown.appendChild(allOpt);
+        
+        const statusGroup = document.createElement('optgroup');
+        statusGroup.label = 'Trạng thái';
+        
+        const statuses = [
+            { value: 'new', label: 'Từ mới' },
+            { value: 'learning', label: 'Đang học' },
+            { value: 'learned', label: 'Đã thuộc' }
+        ];
+        statuses.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.value;
+            opt.textContent = s.label;
+            statusGroup.appendChild(opt);
+        });
+        dropdown.appendChild(statusGroup);
+        
+        // Add dynamic quick/performance/smart filters
+        data.groups.forEach(g => {
+            const optGroup = document.createElement('optgroup');
+            optGroup.label = g.label;
+            
+            g.filters.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                let text = f.label;
+                if (f.pool_mode) text += ' (pool)';
+                opt.textContent = text;
+                optGroup.appendChild(opt);
+            });
+            dropdown.appendChild(optGroup);
+        });
+        
+        dropdown.value = initialValue;
+      } catch (err) {
+        console.error("Error populating filter dropdown:", err);
+      }
+    }
+
+    // Global dynamic study header filters setup
+    async function initStudyHeaderFilters(onFilterChangeCallback) {
+        const filterTrigger = document.querySelector('.filter-trigger');
+        const filterMenu = document.getElementById('filter-menu');
+        const filterLabel = document.getElementById('filter-label');
+        
+        if (!filterMenu) return;
+        
+        // Load initial filter selection from sessionStorage or default to smart_priority
+        const saved = JSON.parse(sessionStorage.getItem('lastFilter') || '{}');
+        let currentFilter = saved.filter || 'smart_priority';
+        let currentStatus = saved.status || 'all';
+        
+        // Function to toggle menu
+        window.toggleFilterMenu = function(e) {
+            if (e) e.stopPropagation();
+            filterMenu.hidden = !filterMenu.hidden;
+        };
+        
+        // Hide menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (filterMenu && !filterMenu.hidden && !e.target.closest('.filter-dropdown')) {
+                filterMenu.hidden = true;
+            }
+        });
+        
+        try {
+            const res = await fetch('/api/filters/list');
+            const data = await res.json();
+            
+            // Build the menu options
+            filterMenu.innerHTML = '';
+            
+            // General option
+            const allBtn = document.createElement('button');
+            allBtn.className = `menu-item ${currentFilter === 'all' ? 'active' : ''}`;
+            allBtn.dataset.filter = 'all';
+            allBtn.textContent = '📖 Tất cả từ vựng';
+            allBtn.addEventListener('click', () => selectFilter('all', 'Tất cả từ vựng'));
+            filterMenu.appendChild(allBtn);
+            
+            if (currentFilter === 'all' && filterLabel) {
+                filterLabel.textContent = 'Tất cả từ vựng';
+            }
+            
+            // Group options
+            data.groups.forEach(g => {
+                const groupTitle = document.createElement('div');
+                groupTitle.className = 'menu-group-title';
+                groupTitle.textContent = g.label;
+                filterMenu.appendChild(groupTitle);
+                
+                g.filters.forEach(f => {
+                    const btn = document.createElement('button');
+                    btn.className = `menu-item ${currentFilter === f.id ? 'active' : ''}`;
+                    btn.dataset.filter = f.id;
+                    let text = f.label;
+                    if (f.pool_mode) text += ' (pool)';
+                    btn.textContent = text;
+                    btn.addEventListener('click', () => selectFilter(f.id, f.label));
+                    filterMenu.appendChild(btn);
+                    
+                    if (currentFilter === f.id && filterLabel) {
+                        filterLabel.textContent = f.label;
+                    }
+                });
+            });
+            
+            function selectFilter(filterId, labelText) {
+                currentFilter = filterId;
+                if (filterLabel) filterLabel.textContent = labelText;
+                
+                // Update active state in menu
+                filterMenu.querySelectorAll('.menu-item').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.filter === filterId);
+                });
+                
+                filterMenu.hidden = true;
+                saveAndTrigger();
+            }
+            
+            // Setup Quick status pills
+            const pills = document.querySelectorAll('.status-pills .pill');
+            pills.forEach(pill => {
+                pill.classList.toggle('active', pill.dataset.status === currentStatus);
+                pill.addEventListener('click', function() {
+                    pills.forEach(p => p.classList.remove('active'));
+                    this.classList.add('active');
+                    currentStatus = this.dataset.status;
+                    saveAndTrigger();
+                });
+            });
+            
+            function saveAndTrigger() {
+                // Save to sessionStorage
+                sessionStorage.setItem('lastFilter', JSON.stringify({ filter: currentFilter, status: currentStatus }));
+                onFilterChangeCallback(currentFilter, currentStatus);
+            }
+            
+            // Initial call to let JS load the queue
+            onFilterChangeCallback(currentFilter, currentStatus);
+            
+        } catch (err) {
+            console.error("Error setting up study header filters:", err);
+            // Fallback: trigger callback with defaults anyway
+            onFilterChangeCallback(currentFilter, currentStatus);
+        }
+    }
+
     // Global Keyboard Shortcuts
     document.addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      const map = { 'd': '/', 'f': '/flashcard', 'm': '/matching', 't': '/fill' };
+      const map = { 'd': '/', 'w': '/words', 'f': '/flashcard', 'm': '/matching', 't': '/fill' };
       if (map[e.key.toLowerCase()]) window.location.href = map[e.key.toLowerCase()];
     });
     </script>
