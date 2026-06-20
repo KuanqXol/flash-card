@@ -4,107 +4,202 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}FlashVocab{% endblock %}</title>
+    <meta name="description" content="FlashVocab - Nền tảng học từ vựng tiếng Anh thông minh với SRS, flashcard, trắc nghiệm và nhiều chế độ luyện tập">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Cohesive clean stylesheet -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Design System -->
     <link rel="stylesheet" href="/static/css/style.css">
     <!-- Phosphor Icons -->
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/style.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <!-- Canvas Confetti -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Theme (load early to prevent FOUC) -->
+    <script src="/static/js/theme.js"></script>
     {% block styles %}{% endblock %}
 </head>
 <body>
     <div class="app-layout">
         <!-- Sidebar Navigation (Desktop) -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="app-sidebar">
             <div class="sidebar-brand">
-                <a href="/">📚 FlashVocab</a>
+                <a href="/">
+                    <span class="brand-icon"><i class="ph-fill ph-lightning"></i></span>
+                    <span class="brand-text">FlashVocab</span>
+                </a>
             </div>
+
             <nav class="sidebar-nav">
                 <a href="/" class="nav-link" id="nav-dashboard">
-                    <span class="nav-icon">🏠</span> Dashboard
+                    <span class="nav-icon"><i class="ph ph-house-simple"></i></span>
+                    <span>Dashboard</span>
                 </a>
                 <a href="/words" class="nav-link" id="nav-words">
-                    <span class="nav-icon"><i class="ph ph-books"></i></span> Từ vựng
+                    <span class="nav-icon"><i class="ph ph-book-open-text"></i></span>
+                    <span>Từ vựng</span>
                     <span class="nav-badge" id="nav-word-count">0</span>
                 </a>
+
+                <div style="padding: 0 12px; margin: 12px 0 4px;">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary);">Luyện tập</span>
+                </div>
+
                 <a href="/flashcard" class="nav-link" id="nav-flashcard">
-                    <span class="nav-icon">🃏</span> Flash Card
+                    <span class="nav-icon"><i class="ph ph-cards-three"></i></span>
+                    <span>Flash Card</span>
                 </a>
                 <a href="/matching" class="nav-link" id="nav-matching">
-                    <span class="nav-icon">🔗</span> Nối Từ
+                    <span class="nav-icon"><i class="ph ph-link-simple"></i></span>
+                    <span>Nối Từ</span>
                 </a>
                 <a href="/fill" class="nav-link" id="nav-fill">
-                    <span class="nav-icon">✏️</span> Điền Nghĩa
+                    <span class="nav-icon"><i class="ph ph-pencil-simple-line"></i></span>
+                    <span>Điền Nghĩa</span>
                 </a>
                 <a href="/mcq" class="nav-link" id="nav-mcq">
-                    <span class="nav-icon">🧩</span> Trắc nghiệm
+                    <span class="nav-icon"><i class="ph ph-list-checks"></i></span>
+                    <span>Trắc nghiệm</span>
                 </a>
             </nav>
+
+            <!-- Dark Mode Toggle -->
+            <button class="theme-toggle" onclick="FlashVocabTheme.toggle()" aria-label="Toggle dark mode">
+                <span class="theme-toggle-icon"><i class="ph ph-moon"></i></span>
+                <span class="theme-toggle-label">Dark Mode</span>
+            </button>
+
+            <!-- Sidebar Footer Stats -->
+            <div class="sidebar-footer">
+                <div class="sidebar-stat">
+                    <i class="ph ph-fire" style="color: var(--color-warning); font-size: 16px;"></i>
+                    <span>Streak</span>
+                    <span class="sidebar-stat-value" id="sidebar-streak">0</span>
+                </div>
+                <div class="sidebar-stat">
+                    <i class="ph ph-star" style="color: var(--color-primary); font-size: 16px;"></i>
+                    <span>XP</span>
+                    <span class="sidebar-stat-value" id="sidebar-xp">0</span>
+                </div>
+                <div class="sidebar-stat">
+                    <i class="ph ph-check-circle" style="color: var(--color-success); font-size: 16px;"></i>
+                    <span>Thuộc</span>
+                    <span class="sidebar-stat-value" id="sidebar-mastered">0</span>
+                </div>
+            </div>
         </aside>
 
         <!-- Main Content Area -->
         <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="sidebar-toggle" id="sidebar-toggle-btn" aria-label="Toggle Sidebar" style="position: static; margin-right: var(--sp-2); display: none;">
+                        <i class="ph ph-list"></i>
+                    </button>
+                    <div class="breadcrumbs" id="topbar-breadcrumbs">
+                        <span class="breadcrumb-item">FlashVocab</span>
+                        <i class="ph ph-caret-right" style="font-size: 10px; color: var(--text-tertiary);"></i>
+                        <span class="breadcrumb-item active" id="breadcrumb-current">Dashboard</span>
+                    </div>
+                </div>
+                
+                <div class="topbar-center">
+                    <div class="global-search-container">
+                        <i class="ph ph-magnifying-glass search-icon"></i>
+                        <input type="search" id="global-search-input" placeholder="Tìm từ vựng..." autocomplete="off">
+                        <div class="search-dropdown" id="search-dropdown-menu" hidden>
+                            <!-- Search results will show here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="topbar-right">
+                    <!-- Sound toggle -->
+                    <button class="topbar-btn" id="btn-sound-toggle" onclick="toggleGlobalSound()" title="Tự động phát âm thanh">
+                        <i class="ph ph-speaker-high" id="sound-toggle-icon"></i>
+                    </button>
+                    
+                    <!-- User Menu Dropdown -->
+                    <div class="user-menu-dropdown">
+                        <button class="user-menu-trigger" onclick="toggleUserMenu(event)">
+                            <div class="user-avatar" id="topbar-avatar">G</div>
+                            <span class="user-name-label" id="topbar-username">Guest</span>
+                            <i class="ph ph-caret-down"></i>
+                        </button>
+                        <div class="user-dropdown-menu" id="user-dropdown-menu" hidden>
+                            <div class="user-dropdown-header">
+                                <strong id="menu-user-name">Guest User</strong>
+                                <span id="menu-user-level">Hạng: Đồng (LV 1)</span>
+                            </div>
+                            <div class="user-dropdown-divider"></div>
+                            <a href="/words" class="dropdown-item"><i class="ph ph-book-open"></i> Sổ từ vựng</a>
+                            <button class="dropdown-item" onclick="openGlobalSettings()"><i class="ph ph-gear-six"></i> Cài đặt</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
             {% block content %}{% endblock %}
         </main>
 
         <!-- Bottom Navigation (Mobile) -->
         <nav class="bottom-nav">
             <a href="/" class="bottom-nav-link" id="bnav-dashboard">
-                <span class="nav-icon">🏠</span>
+                <span class="nav-icon"><i class="ph ph-house-simple"></i></span>
                 <span class="nav-text">Dashboard</span>
             </a>
             <a href="/words" class="bottom-nav-link" id="bnav-words">
-                <span class="nav-icon"><i class="ph ph-books"></i></span>
+                <span class="nav-icon"><i class="ph ph-book-open-text"></i></span>
                 <span class="nav-text">Từ vựng</span>
             </a>
             <a href="/flashcard" class="bottom-nav-link" id="bnav-flashcard">
-                <span class="nav-icon">🃏</span>
+                <span class="nav-icon"><i class="ph ph-cards-three"></i></span>
                 <span class="nav-text">Flash Card</span>
             </a>
             <a href="/matching" class="bottom-nav-link" id="bnav-matching">
-                <span class="nav-icon">🔗</span>
+                <span class="nav-icon"><i class="ph ph-link-simple"></i></span>
                 <span class="nav-text">Nối Từ</span>
             </a>
             <a href="/fill" class="bottom-nav-link" id="bnav-fill">
-                <span class="nav-icon">✏️</span>
+                <span class="nav-icon"><i class="ph ph-pencil-simple-line"></i></span>
                 <span class="nav-text">Điền Nghĩa</span>
             </a>
             <a href="/mcq" class="bottom-nav-link" id="bnav-mcq">
-                <span class="nav-icon">🧩</span>
+                <span class="nav-icon"><i class="ph ph-list-checks"></i></span>
                 <span class="nav-text">Trắc nghiệm</span>
             </a>
         </nav>
     </div>
 
     <!-- Toast Container -->
-    <div id="toast-container" style="position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="toast-container"></div>
     
     <script>
-    // Global Toast Notification System
-    function showToast(message, type = 'success', duration = 2500) {
-      const colors = { success: '#10B981', error: '#EF4444', info: '#4F46E5', warning: '#F59E0B' };
-      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    // Global Toast Notification System (upgraded with premium styling)
+    function showToast(message, type = 'success', duration = 3000) {
+      const icons = {
+        success: '<i class="ph-fill ph-check-circle" style="font-size: 18px; color: var(--color-success);"></i>',
+        error:   '<i class="ph-fill ph-x-circle" style="font-size: 18px; color: var(--color-danger);"></i>',
+        info:    '<i class="ph-fill ph-info" style="font-size: 18px; color: var(--color-primary);"></i>',
+        warning: '<i class="ph-fill ph-warning" style="font-size: 18px; color: var(--color-warning);"></i>'
+      };
       
       let container = document.getElementById('toast-container');
       if (!container) {
           container = document.createElement('div');
           container.id = 'toast-container';
-          container.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;`;
           document.body.appendChild(container);
       }
       
       const toast = document.createElement('div');
-      toast.innerHTML = `<span>${icons[type]}</span> ${message}`;
-      toast.style.cssText = `background:${colors[type]};color:white;padding:12px 20px;border-radius:8px;font-size:0.9rem;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:8px;transform:translateX(120%);transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);max-width:300px;`;
+      toast.className = `toast toast-${type}`;
+      toast.innerHTML = `${icons[type] || icons.info} <span>${message}</span>`;
       container.appendChild(toast);
       
-      setTimeout(() => toast.style.transform = 'translateX(0)', 10);
       setTimeout(() => {
-        toast.style.transform = 'translateX(120%)';
+        toast.style.animation = `toastSlideOut var(--duration-normal) var(--ease-default) forwards`;
         setTimeout(() => toast.remove(), 300);
       }, duration);
     }
@@ -135,7 +230,38 @@
     }
     updateActiveNav();
 
-    // Global total count badge update
+    // User Level title helper
+    function getLevelTitle(level) {
+        if (level < 5) return 'Đồng';
+        if (level < 10) return 'Bạc';
+        if (level < 15) return 'Vàng';
+        if (level < 20) return 'Bạch Kim';
+        return 'Kim Cương';
+    }
+
+    // Global username and profile loading
+    async function loadUserHeader() {
+        try {
+            const res = await fetch('/api/settings');
+            const settings = await res.json();
+            const displayName = settings.display_name || 'Khách';
+            
+            const topbarUsername = document.getElementById('topbar-username');
+            const topbarAvatar = document.getElementById('topbar-avatar');
+            const menuUserName = document.getElementById('menu-user-name');
+            
+            if (topbarUsername) topbarUsername.textContent = displayName;
+            if (topbarAvatar && displayName) topbarAvatar.textContent = displayName.charAt(0).toUpperCase();
+            if (menuUserName) menuUserName.textContent = displayName;
+            
+            // Dispatch custom event so pages like Dashboard can update their greetings
+            window.dispatchEvent(new CustomEvent('userLoaded', { detail: { displayName } }));
+        } catch (err) {
+            console.error("Error loading user header:", err);
+        }
+    }
+
+    // Global total count badge update + sidebar stats
     async function updateWordCountBadge() {
         try {
             const res = await fetch('/api/stats');
@@ -144,11 +270,169 @@
             if (badge) {
                 badge.textContent = stats.total || 0;
             }
+            // Update sidebar footer stats
+            const masteredEl = document.getElementById('sidebar-mastered');
+            if (masteredEl) masteredEl.textContent = stats.learned || 0;
+
+            // XP = total_score_sum
+            const xpEl = document.getElementById('sidebar-xp');
+            if (xpEl) xpEl.textContent = stats.total_score_sum || 0;
+            
+            // Update topbar user stats
+            const totalXp = stats.total_score_sum || 0;
+            const level = Math.floor(totalXp / 100) + 1;
+            const levelTitle = getLevelTitle(level);
+            
+            const menuLevelEl = document.getElementById('menu-user-level');
+            if (menuLevelEl) menuLevelEl.textContent = `Hạng: ${levelTitle} (LV ${level})`;
+            
         } catch (err) {
             console.error("Error updating word badge:", err);
         }
     }
     updateWordCountBadge();
+
+    // Update streak in sidebar (from daily progress)
+    async function updateSidebarStreak() {
+        try {
+            const res = await fetch('/api/analytics/daily-progress');
+            const data = await res.json();
+            const streakEl = document.getElementById('sidebar-streak');
+            if (streakEl && data.today) {
+                let streak = 0;
+                if (data.weekly) {
+                    for (let i = data.weekly.length - 1; i >= 0; i--) {
+                        if (data.weekly[i].review_count > 0) streak++;
+                        else break;
+                    }
+                }
+                streakEl.textContent = streak;
+            }
+        } catch (err) {
+            // Silently fail
+        }
+    }
+    updateSidebarStreak();
+
+    // Breadcrumbs auto updater
+    function updateBreadcrumbs() {
+        const currentEl = document.getElementById('breadcrumb-current');
+        if (!currentEl) return;
+        
+        const path = window.location.pathname;
+        let label = 'Dashboard';
+        if (path.startsWith('/words')) label = 'Từ vựng';
+        else if (path.startsWith('/flashcard')) label = 'Flash Card';
+        else if (path.startsWith('/matching')) label = 'Nối Từ';
+        else if (path.startsWith('/fill')) label = 'Điền Nghĩa';
+        else if (path.startsWith('/mcq')) label = 'Trắc nghiệm';
+        
+        currentEl.textContent = label;
+    }
+
+    // User Menu dropdown visibility toggler
+    function toggleUserMenu(event) {
+        if (event) event.stopPropagation();
+        const menu = document.getElementById('user-dropdown-menu');
+        if (menu) {
+            menu.hidden = !menu.hidden;
+        }
+    }
+
+    // Settings redirection or modal trigger helper
+    function openGlobalSettings() {
+        if (typeof openSettingsModal === 'function') {
+            openSettingsModal();
+        } else {
+            window.location.href = '/?settings=true';
+        }
+    }
+
+    // Sound toggle autoplay state
+    let soundAutoplay = localStorage.getItem('soundAutoplay') !== 'false';
+    function updateSoundIcon() {
+        const icon = document.getElementById('sound-toggle-icon');
+        if (icon) {
+            icon.className = soundAutoplay ? 'ph ph-speaker-high' : 'ph-speaker-slash';
+        }
+    }
+    function toggleGlobalSound() {
+        soundAutoplay = !soundAutoplay;
+        localStorage.setItem('soundAutoplay', soundAutoplay ? 'true' : 'false');
+        updateSoundIcon();
+        showToast(soundAutoplay ? "Đã bật tự động phát âm thanh 🔊" : "Đã tắt tự động phát âm thanh 🔇", "info");
+    }
+
+    // Global Search Auto-Complete dropdown implementation
+    const globalSearchInput = document.getElementById('global-search-input');
+    const searchDropdown = document.getElementById('search-dropdown-menu');
+
+    if (globalSearchInput && searchDropdown) {
+        globalSearchInput.addEventListener('input', debounceSearch(async () => {
+            const query = globalSearchInput.value.trim();
+            if (!query) {
+                searchDropdown.hidden = true;
+                searchDropdown.innerHTML = '';
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/words/search?q=${encodeURIComponent(query)}&per_page=6`);
+                const data = await res.json();
+                
+                if (data.words && data.words.length > 0) {
+                    searchDropdown.innerHTML = data.words.map(w => `
+                        <a href="/words?q=${encodeURIComponent(w.word)}" class="search-dropdown-item">
+                            <span class="word-part">${highlightSearchMatch(w.word, query)}</span>
+                            <span class="trans-part">${highlightSearchMatch(w.short_translation || '', query)}</span>
+                        </a>
+                    `).join('');
+                    searchDropdown.hidden = false;
+                } else {
+                    searchDropdown.innerHTML = `<div style="padding: var(--sp-2) var(--sp-3); font-size: var(--text-xs); color: var(--text-tertiary); text-align: center;">Không tìm thấy từ nào</div>`;
+                    searchDropdown.hidden = false;
+                }
+            } catch (err) {
+                console.error("Global search fetch error:", err);
+            }
+        }, 250));
+        
+        globalSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const query = globalSearchInput.value.trim();
+                if (query) {
+                    window.location.href = `/words?q=${encodeURIComponent(query)}`;
+                }
+            }
+        });
+    }
+
+    function debounceSearch(fn, delay) {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn(...args), delay);
+        };
+    }
+
+    function highlightSearchMatch(text, query) {
+        if (!text) return '';
+        if (!query) return text;
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`(${escapedQuery})`, 'gi');
+        return text.replace(re, '<mark>$1</mark>');
+    }
+
+    // Hide dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (searchDropdown && !e.target.closest('.global-search-container')) {
+            searchDropdown.hidden = true;
+        }
+        const userMenu = document.getElementById('user-dropdown-menu');
+        if (userMenu && !userMenu.hidden && !e.target.closest('.user-menu-dropdown')) {
+            userMenu.hidden = true;
+        }
+    });
 
     // Global Filter Dropdown populator helper
     async function populateFilterDropdown(dropdownId, initialValue = 'smart_priority') {
@@ -317,8 +601,24 @@
     // Global Keyboard Shortcuts
     document.addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === '/') {
+        e.preventDefault();
+        const searchInput = document.getElementById('global-search-input');
+        if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+        }
+        return;
+      }
       const map = { 'd': '/', 'w': '/words', 'f': '/flashcard', 'm': '/matching', 't': '/fill', 'q': '/mcq' };
       if (map[e.key.toLowerCase()]) window.location.href = map[e.key.toLowerCase()];
+    });
+
+    // Run updates on DOM load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUserHeader();
+        updateSoundIcon();
+        updateBreadcrumbs();
     });
     </script>
     <!-- TTS Pronunciation Helper -->

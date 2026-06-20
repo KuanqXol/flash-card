@@ -116,9 +116,32 @@
     }
 
     .answer-input:disabled {
-        opacity: 0.6;
+        opacity: 0.8;
         cursor: not-allowed;
         border-color: var(--border);
+    }
+
+    .answer-input.correct-pulse {
+        border-color: var(--color-success) !important;
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.25) !important;
+        background: var(--color-success-subtle) !important;
+        color: var(--color-success-hover) !important;
+    }
+
+    .answer-input.wrong-pulse {
+        border-color: var(--color-danger) !important;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.25) !important;
+        background: var(--color-danger-subtle) !important;
+        color: var(--color-danger-hover) !important;
+    }
+
+    @keyframes inputShake {
+        0%, 100% { transform: translateX(0); }
+        20%, 60% { transform: translateX(-6px); }
+        40%, 80% { transform: translateX(6px); }
+    }
+    .shake {
+        animation: inputShake 0.4s ease;
     }
 
     .btn-check {
@@ -208,6 +231,14 @@
         transform: translateY(-2px);
     }
 
+    .btn-eval.highlight-eval {
+        transform: scale(1.05) translateY(-3px) !important;
+        box-shadow: 0 8px 20px currentColor !important;
+        font-weight: 800;
+        outline: 3px solid currentColor;
+        outline-offset: 2px;
+    }
+
     /* Skip actions */
     .skip-action {
         display: flex;
@@ -280,9 +311,14 @@
                 <div class="question-hint-label" id="question-hint-label">Nghĩa tiếng Việt là gì?</div>
                 <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.5rem;">
                     <div class="prompt-display" id="question-prompt" style="margin-bottom: 0;">Word Prompt</div>
-                    <button class="btn-tts" id="fill-prompt-btn-tts" onclick="playWord(document.getElementById('question-prompt').textContent, 'normal')" data-word="" aria-label="Nghe phát âm" style="display: none;">
-                        <i class="ph ph-speaker-high"></i>
-                    </button>
+                    <div class="card-tts-group" id="fill-prompt-tts-group" style="display: none; gap: var(--sp-1-5); align-items: center;">
+                        <button class="btn-tts" id="fill-prompt-btn-tts" onclick="playWord(document.getElementById('question-prompt').textContent, 'normal')" data-word="" data-speed="normal" aria-label="Nghe phát âm">
+                            <i class="ph ph-speaker-high"></i>
+                        </button>
+                        <button class="btn-tts" id="fill-prompt-btn-tts-slow" onclick="playWord(document.getElementById('question-prompt').textContent, 'slow')" data-word="" data-speed="slow" style="font-size: var(--text-xs); padding: 2px var(--sp-1-5); display: inline-flex; align-items: center; gap: var(--sp-1);" aria-label="Nghe phát âm chậm">
+                            <i class="ph ph-speaker-low"></i> Chậm
+                        </button>
+                    </div>
                 </div>
                 <div class="phonetic-display" id="question-phonetic">/phonetic/</div>
             </div>
@@ -304,9 +340,14 @@
             <div class="ans-label">📖 Đáp án chính xác:</div>
             <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.5rem;">
                 <div class="ans-short" id="short-answer" style="margin-bottom: 0;">Short translation</div>
-                <button class="btn-tts" id="fill-answer-btn-tts" onclick="playWord(session.currentWord.word, 'normal')" data-word="" aria-label="Nghe phát âm">
-                    <i class="ph ph-speaker-high"></i>
-                </button>
+                <div class="card-tts-group" style="display: inline-flex; gap: var(--sp-1-5); align-items: center;">
+                    <button class="btn-tts" id="fill-answer-btn-tts" onclick="playWord(session.currentWord.word, 'normal')" data-word="" data-speed="normal" aria-label="Nghe phát âm">
+                        <i class="ph ph-speaker-high"></i>
+                    </button>
+                    <button class="btn-tts" id="fill-answer-btn-tts-slow" onclick="playWord(session.currentWord.word, 'slow')" data-word="" data-speed="slow" style="font-size: var(--text-xs); padding: 2px var(--sp-1-5); display: inline-flex; align-items: center; gap: var(--sp-1);" aria-label="Nghe phát âm chậm">
+                        <i class="ph ph-speaker-low"></i> Chậm
+                    </button>
+                </div>
             </div>
             <div class="ans-full" id="full-answer">Full detail definition description translation context goes here.</div>
             

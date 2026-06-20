@@ -126,7 +126,8 @@
 
     @media (min-width: 640px) {
         .choices-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--sp-4);
         }
     }
 
@@ -282,7 +283,7 @@
 
     .completion-stats {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: var(--sp-4);
         margin-bottom: var(--sp-8);
     }
@@ -392,8 +393,12 @@
             </div>
             <div class="stat-badge-group">
                 <div class="stat-badge correct">
-                    <span class="stat-icon">✔️</span>
+                    <span class="stat-icon"><i class="ph ph-check"></i></span>
                     <span id="correct-count">0</span>
+                </div>
+                <div class="stat-badge streak" id="mcq-streak-badge" style="display: none; color: var(--color-warning); background: var(--color-warning-subtle);">
+                    <span class="stat-icon"><i class="ph-fill ph-fire"></i></span>
+                    <span id="mcq-streak-count">0</span>
                 </div>
             </div>
         </div>
@@ -402,9 +407,14 @@
             <div class="question-hint-label">Chọn nghĩa đúng của từ</div>
             <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: var(--sp-2);">
                 <div class="word-prompt" id="word-prompt" style="margin-bottom: 0;">Word</div>
-                <button class="btn-tts" id="mcq-btn-tts" onclick="playWord(document.getElementById('word-prompt').textContent, 'normal')" data-word="" aria-label="Nghe phát âm">
-                    <i class="ph ph-speaker-high"></i>
-                </button>
+                <div class="card-tts-group" style="display: inline-flex; gap: var(--sp-1-5);">
+                    <button class="btn-tts" id="mcq-btn-tts" onclick="playWord(document.getElementById('word-prompt').textContent, 'normal')" data-word="" data-speed="normal" aria-label="Nghe phát âm">
+                        <i class="ph ph-speaker-high"></i>
+                    </button>
+                    <button class="btn-tts" id="mcq-btn-tts-slow" onclick="playWord(document.getElementById('word-prompt').textContent, 'slow')" data-word="" data-speed="slow" style="font-size: var(--text-xs); padding: 2px var(--sp-1-5); display: inline-flex; align-items: center; gap: var(--sp-1);" aria-label="Nghe phát âm chậm">
+                        <i class="ph ph-speaker-low"></i> Chậm
+                    </button>
+                </div>
             </div>
             <div class="phonetic-prompt" id="phonetic-prompt">/phonetic/</div>
             <div class="pos-container" id="pos-container">
@@ -432,15 +442,19 @@
             <div class="completion-stats">
                 <div class="comp-stat-card">
                     <div class="comp-stat-val" id="stat-total-words">10</div>
-                    <div class="comp-stat-lbl">Đã học</div>
+                    <div class="comp-stat-lbl">Đã ôn</div>
                 </div>
                 <div class="comp-stat-card">
-                    <div class="comp-stat-val" id="stat-correct-count" style="color: var(--color-success);">0</div>
-                    <div class="comp-stat-lbl">Chính xác</div>
+                    <div class="comp-stat-val" id="stat-xp-gained" style="color: var(--color-warning);">+0 XP</div>
+                    <div class="comp-stat-lbl">Kinh nghiệm</div>
                 </div>
                 <div class="comp-stat-card">
                     <div class="comp-stat-val" id="stat-accuracy">0%</div>
-                    <div class="comp-stat-lbl">Tỷ lệ đúng</div>
+                    <div class="comp-stat-lbl">Chính xác</div>
+                </div>
+                <div class="comp-stat-card">
+                    <div class="comp-stat-val" id="stat-duration">0s</div>
+                    <div class="comp-stat-lbl">Thời gian</div>
                 </div>
             </div>
 

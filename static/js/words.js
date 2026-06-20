@@ -167,7 +167,7 @@ function renderWordList(words) {
                 </td>
                 <td class="cell-word">
                     <div class="word-spelling-container" style="display: flex; align-items: center; gap: 8px;">
-                        <span class="word-spelling">${highlightedSpelling}</span>
+                        <span class="word-spelling" onclick="event.stopPropagation(); openDetailModal(${w.id})" style="cursor: pointer; text-decoration: underline; color: var(--primary);">${highlightedSpelling}</span>
                         <button class="btn-tts" onclick="event.stopPropagation(); playWord('${w.word.replace(/'/g, "\\'")}', 'normal')" data-word="${w.word}" aria-label="Nghe phát âm">
                             <i class="ph ph-speaker-high"></i>
                         </button>
@@ -182,11 +182,11 @@ function renderWordList(words) {
                     <span class="score-badge">${w.total_score}</span>
                 </td>
                 <td class="cell-actions" onclick="event.stopPropagation()">
-                    <button class="action-btn" title="Chỉnh sửa" onclick="openEditModal(${w.id}, '${escapeQuote(w.word)}', '${escapeQuote(w.phonetic || '')}', '${escapeQuote(w.translation)}')">
-                        ✏️
+                    <button class="action-btn" title="Chỉnh sửa" onclick="openEditModal(${w.id}, '${escapeQuote(w.word)}', '${escapeQuote(w.phonetic || '')}', '${escapeQuote(w.translation)}', '${escapeQuote(w.example || '')}')">
+                        <i class="ph ph-pencil-simple"></i>
                     </button>
                     <button class="action-btn btn-delete" title="Xóa từ" onclick="deleteWord(${w.id}, '${escapeQuote(w.word)}')">
-                        🗑️
+                        <i class="ph ph-trash"></i>
                     </button>
                 </td>
             </tr>
@@ -208,7 +208,7 @@ function renderWordList(words) {
                                 <div>
                                     <div class="detail-part-title">
                                         Tiến trình ôn tập
-                                        <span style="font-size: 0.75rem; text-transform: none; font-weight: normal; color: var(--text-secondary);" id="detail-last-reviewed-${w.id}"></span>
+                                         <span style="font-size: 0.75rem; text-transform: none; font-weight: normal; color: var(--text-secondary);" id="detail-last-reviewed-${w.id}"></span>
                                     </div>
                                     <div class="detail-stats-grid">
                                         <div class="stat-item">
@@ -233,35 +233,38 @@ function renderWordList(words) {
                             
                             <!-- Detailed Action Buttons inside Expanded panel -->
                             <div class="detail-footer-actions">
-                                <button class="btn btn-ghost" onclick="openEditModal(${w.id}, '${escapeQuote(w.word)}', '${escapeQuote(w.phonetic || '')}', '${escapeQuote(w.translation)}')">
-                                    ✏️ Chỉnh sửa từ
+                                <button class="btn btn-primary" onclick="openDetailModal(${w.id})">
+                                    <i class="ph ph-file-text"></i> Xem phân tích chi tiết
+                                </button>
+                                <button class="btn btn-ghost" onclick="openEditModal(${w.id}, '${escapeQuote(w.word)}', '${escapeQuote(w.phonetic || '')}', '${escapeQuote(w.translation)}', '${escapeQuote(w.example || '')}')">
+                                    <i class="ph ph-pencil-simple"></i> Chỉnh sửa từ
                                 </button>
                                 <button class="btn btn-ghost" onclick="viewHistory(${w.id}, '${escapeQuote(w.word)}', '${escapeQuote(w.short_translation || '')}')">
-                                    📊 Xem lịch sử ôn
+                                    <i class="ph ph-clock-counter-clockwise"></i> Lịch sử ôn
                                 </button>
                                 <button class="btn btn-ghost" id="warn-toggle-btn-${w.id}" onclick="toggleNeedsReview(${w.id})">
-                                    ${w.needs_review ? '✅ Bỏ đánh dấu Cần ôn' : '⚠️ Đánh dấu Cần ôn lại'}
+                                    ${w.needs_review ? '<i class="ph ph-check-square"></i> Bỏ Cần ôn' : '<i class="ph ph-warning"></i> Đánh dấu Cần ôn'}
                                 </button>
                                 
                                 <div style="margin-left: auto; display: flex; gap: var(--sp-2);">
                                     ${w.status === 'new' ? `
                                         <button class="btn btn-primary" onclick="updateStatus(${w.id}, 'mark_learning')">
-                                            🚀 Bắt đầu học
+                                            <i class="ph ph-rocket-launch"></i> Bắt đầu học
                                         </button>
                                         <button class="btn btn-success" onclick="updateStatus(${w.id}, 'mark_learned')">
-                                            ✅ Đã thuộc
+                                            <i class="ph ph-check-circle"></i> Đã thuộc
                                         </button>
                                     ` : (w.status === 'learning' ? `
                                         <button class="btn btn-success" onclick="updateStatus(${w.id}, 'mark_learned')">
-                                            ✅ Đã thuộc
+                                            <i class="ph ph-check-circle"></i> Đã thuộc
                                         </button>
                                     ` : `
                                         <button class="btn btn-ghost" onclick="updateStatus(${w.id}, 'mark_learning')">
-                                            🔓 Bỏ đánh dấu
+                                            <i class="ph ph-lock-key-open"></i> Bỏ đánh dấu
                                         </button>
                                     `)}
                                     <button class="btn btn-danger" onclick="resetWordStats(${w.id})">
-                                        🧹 Đặt lại điểm số
+                                        <i class="ph ph-sparkle"></i> Đặt lại điểm số
                                     </button>
                                 </div>
                             </div>
@@ -625,16 +628,20 @@ const formSubmitBtn = document.getElementById('form-submit-btn');
 function openAddModal() {
     wordForm.reset();
     formWordId.value = '';
+    const formExample = document.getElementById('form-word-example');
+    if (formExample) formExample.value = '';
     wordModalTitle.textContent = 'Thêm từ vựng';
     formSubmitBtn.textContent = 'Thêm từ mới';
     wordModal.style.display = 'flex';
 }
 
-function openEditModal(id, word, phonetic, translation) {
+function openEditModal(id, word, phonetic, translation, example = '') {
     formWordId.value = id;
     formSpelling.value = word;
     formPhonetic.value = phonetic;
     formTranslation.value = translation;
+    const formExample = document.getElementById('form-word-example');
+    if (formExample) formExample.value = example;
     wordModalTitle.textContent = 'Chỉnh sửa từ vựng';
     formSubmitBtn.textContent = 'Lưu thay đổi';
     wordModal.style.display = 'flex';
@@ -650,10 +657,12 @@ async function handleWordSubmit(event) {
     const id = formWordId.value;
     const isEdit = id && id.trim() !== '';
     
+    const formExample = document.getElementById('form-word-example');
     const payload = {
         word: formSpelling.value.trim(),
         phonetic: formPhonetic.value.trim(),
-        translation: formTranslation.value.trim()
+        translation: formTranslation.value.trim(),
+        example: formExample ? formExample.value.trim() : ''
     };
 
     if (!payload.word || !payload.translation) {
@@ -1019,6 +1028,113 @@ async function loadFilters() {
 
 // Initialization
 window.addEventListener('DOMContentLoaded', async () => {
+    const params = new URLSearchParams(window.location.search);
+    const urlQ = params.get('q');
+    if (urlQ) {
+        state.query = urlQ;
+        if (searchInput) searchInput.value = urlQ;
+    }
     await loadFilters();
     fetchWords();
 });
+
+// ═══ WORD DETAIL MODAL & ANALYTICS BREAKDOWN ═══
+async function openDetailModal(id) {
+    try {
+        const res = await fetch(`/api/words/${id}`);
+        if (!res.ok) throw new Error("Failed to fetch word details");
+        const data = await res.json();
+        const word = data.word;
+        
+        document.getElementById('detail-word-spelling').textContent = word.word;
+        document.getElementById('detail-word-phonetic').textContent = word.phonetic || '';
+        document.getElementById('detail-word-status-badge').textContent = getStatusLabel(word.status);
+        document.getElementById('detail-word-status-badge').className = `status-badge badge badge-${word.status}`;
+        document.getElementById('detail-word-score').textContent = `${word.total_score || 0} ⭐`;
+        
+        // Populate translation
+        const translationContainer = document.getElementById('detail-word-translation');
+        if (translationContainer) {
+            if (word.pos_entries && word.pos_entries.length > 0) {
+                translationContainer.innerHTML = word.pos_entries.map(e => `
+                    <div class="pos-entry" style="display: flex; gap: 8px; margin-bottom: 6px; align-items: center;">
+                        <span class="badge badge-pos badge-${e.pos || 'phrase'}" style="background: var(--primary-light); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.75rem;">${e.pos || 'phrase'}</span>
+                        <span class="meaning-text">${e.meaning}</span>
+                    </div>
+                `).join('');
+            } else {
+                translationContainer.innerHTML = `<p class="meaning-text" style="margin: 0;">${word.translation}</p>`;
+            }
+        }
+        
+        // Populate example
+        const exampleContainer = document.getElementById('detail-word-example');
+        if (exampleContainer) {
+            exampleContainer.textContent = word.example || 'Chưa có ví dụ câu.';
+        }
+        
+        // Set data-word attributes for TTS in details modal
+        const ttsBtn = document.getElementById('detail-btn-tts');
+        const ttsBtnSlow = document.getElementById('detail-btn-tts-slow');
+        if (ttsBtn) ttsBtn.setAttribute('data-word', word.word);
+        if (ttsBtnSlow) ttsBtnSlow.setAttribute('data-word', word.word);
+        
+        // Populate analytics table
+        const tbody = document.getElementById('detail-analytics-tbody');
+        tbody.innerHTML = '';
+        
+        const modes = [
+            { key: 'flashcard', name: 'Thẻ ghi nhớ (Flashcard)' },
+            { key: 'mcq', name: 'Trắc nghiệm (MCQ)' },
+            { key: 'matching', name: 'Nối từ (Matching)' },
+            { key: 'fill', name: 'Điền nghĩa (Fill in Blank)' },
+            { key: 'total', name: 'Tổng cộng (Total)' }
+        ];
+        
+        modes.forEach(m => {
+            const seen = word[`${m.key}_seen`] || 0;
+            const correct = word[`${m.key}_correct`] || 0;
+            const wrong = word[`${m.key}_wrong`] || 0;
+            const accuracy = seen > 0 ? Math.round((correct / seen) * 100) : 0;
+            
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--border)';
+            tr.innerHTML = `
+                <td style="padding: 10px 12px; font-weight: ${m.key === 'total' ? '700' : 'normal'};">${m.name}</td>
+                <td style="padding: 10px 12px; text-align: center;">${seen}</td>
+                <td style="padding: 10px 12px; text-align: center; color: var(--success); font-weight: bold;">${correct}</td>
+                <td style="padding: 10px 12px; text-align: center; color: var(--danger); font-weight: bold;">${wrong}</td>
+                <td style="padding: 10px 12px; text-align: right; font-weight: bold;">${accuracy}%</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        
+        // Save current editing id on edit button
+        const editBtn = document.getElementById('detail-btn-edit-word');
+        if (editBtn) {
+            editBtn.onclick = () => {
+                closeDetailModal();
+                openEditModal(word.id, word.word, word.phonetic || '', word.translation, word.example || '');
+            };
+        }
+        
+        document.getElementById('detail-modal').style.display = 'flex';
+    } catch (err) {
+        console.error("Error loading word details:", err);
+        showToast("Lỗi tải chi tiết từ vựng!", "error");
+    }
+}
+
+function closeDetailModal() {
+    document.getElementById('detail-modal').style.display = 'none';
+}
+
+function getStatusLabel(status) {
+    switch (status) {
+        case 'new': return 'Mới';
+        case 'learning': return 'Học';
+        case 'learned': return 'Thuộc';
+        case 'mastered': return 'Thuộc';
+        default: return status;
+    }
+}

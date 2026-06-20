@@ -26,12 +26,17 @@ async function startNewSession() {
         currentIndex: 0,
         correctAnswers: 0,
         results: [],
-        hasAnsweredCurrent: false
+        hasAnsweredCurrent: false,
+        streak: 0,
+        startedAt: Date.now()
     };
     
     document.getElementById('correct-count').textContent = '0';
     document.getElementById('progress-val').textContent = '0/10';
     document.getElementById('progress-fill').style.width = '0%';
+    
+    const streakBadge = document.getElementById('mcq-streak-badge');
+    if (streakBadge) streakBadge.style.display = 'none';
     
     try {
         const response = await fetch('/api/mcq/queue');
@@ -95,6 +100,8 @@ function renderQuestion() {
     if (promptCard) promptCard.setAttribute('data-word', word.word);
     const btnTts = document.getElementById('mcq-btn-tts');
     if (btnTts) btnTts.setAttribute('data-word', word.word);
+    const btnTtsSlow = document.getElementById('mcq-btn-tts-slow');
+    if (btnTtsSlow) btnTtsSlow.setAttribute('data-word', word.word);
     
     // Autoplay pronunciation when new question loads
     setTimeout(() => {
@@ -220,8 +227,29 @@ async function selectChoice(selectedChoice, selectedIndex) {
         if (isCorrect) {
             session.correctAnswers++;
             document.getElementById('correct-count').textContent = session.correctAnswers;
+            
+            // Increment streak combo
+            session.streak = (session.streak || 0) + 1;
+            const streakBadge = document.getElementById('mcq-streak-badge');
+            const streakCount = document.getElementById('mcq-streak-count');
+            if (streakBadge && streakCount) {
+                streakCount.textContent = session.streak;
+                if (session.streak >= 2) {
+                    streakBadge.style.display = 'inline-flex';
+                    streakBadge.style.transform = 'scale(1.2)';
+                    setTimeout(() => { streakBadge.style.transform = 'scale(1)'; }, 150);
+                }
+            }
+            
             showToast(`+3 điểm`, "success");
         } else {
+            // Reset streak
+            session.streak = 0;
+            const streakBadge = document.getElementById('mcq-streak-badge');
+            if (streakBadge) {
+                streakBadge.style.display = 'none';
+            }
+            
             // Check if score changed (might not change if word is mastered)
             const scoreDiff = data.new_score - word.knowledge_score;
             if (scoreDiff === 0 && word.status === 'mastered') {
@@ -263,10 +291,35 @@ function showCompletionScreen() {
     
     const total = session.queue.length;
     document.getElementById('stat-total-words').textContent = total;
-    document.getElementById('stat-correct-count').textContent = session.correctAnswers;
+    
+    // Calculate total net XP gained in session
+    const netXp = session.results.reduce((sum, res) => sum + (res.new_score - res.old_score), 0);
+    const xpEl = document.getElementById('stat-xp-gained');
+    if (xpEl) {
+        xpEl.textContent = (netXp >= 0 ? '+' : '') + netXp + ' XP';
+    }
     
     const accuracy = total > 0 ? Math.round((session.correctAnswers / total) * 100) : 0;
     document.getElementById('stat-accuracy').textContent = `${accuracy}%`;
+    
+    // Calculate duration
+    const durationMs = Date.now() - session.startedAt;
+    const durationSec = Math.round(durationMs / 1000);
+    let durationStr = durationSec + 's';
+    if (durationSec >= 60) {
+        const mins = Math.floor(durationSec / 60);
+        const secs = durationSec % 60;
+        durationStr = `${mins}m ${secs}s`;
+    }
+    const durationEl = document.getElementById('stat-duration');
+    if (durationEl) {
+        durationEl.textContent = durationStr;
+    }
+    
+    // Confetti celebration
+    if (typeof confetti !== 'undefined' && accuracy >= 80) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    }
     
     // Choose trophy and title based on accuracy
     const trophyEl = document.getElementById('trophy-icon');

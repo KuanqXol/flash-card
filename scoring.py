@@ -10,10 +10,14 @@ SCORE_CONFIG = {
 }
 
 def _get_status_from_score(score: int) -> str:
-    if 0 <= score <= 50:
+    if 0 <= score <= 29:
+        return 'danger'
+    elif 30 <= score <= 49:
         return 'new'
-    elif 51 <= score <= 89:
+    elif 50 <= score <= 69:
         return 'learning'
+    elif 70 <= score <= 89:
+        return 'familiar'
     elif 90 <= score <= 100:
         return 'mastered'
     return 'new'
@@ -21,10 +25,7 @@ def _get_status_from_score(score: int) -> str:
 def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
     """
     Updates the knowledge_score of a word based on exercise type and correctness.
-    Applies diminishing returns factor based on seen_count.
-    Handles mastered rules: no negative changes allowed.
-    Updates status automatically.
-    Returns: new_score
+    Recalculates score strictly using the V2 accuracy and frequency formula.
     """
     # Normalize fill to typing
     if exercise == 'fill':
@@ -44,36 +45,82 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
         cursor = db.cursor()
         
         # 1. Fetch current word details
-        cursor.execute("SELECT status, knowledge_score, total_score, correct_count, wrong_count, correct_streak, consecutive_wrong, needs_review, last_failed_at, self_correct_count, self_wrong_count FROM words WHERE id = ?", (word_id,))
+        cursor.execute("""
+            SELECT status, knowledge_score, total_score, correct_count, wrong_count, 
+                   correct_streak, consecutive_wrong, needs_review, last_failed_at, 
+                   self_correct_count, self_wrong_count,
+                   flashcard_seen, flashcard_correct, flashcard_wrong,
+                   mcq_seen, mcq_correct, mcq_wrong,
+                   matching_seen, matching_correct, matching_wrong,
+                   fill_seen, fill_correct, fill_wrong
+            FROM words WHERE id = ?
+        """, (word_id,))
         word = cursor.fetchone()
         if not word:
             raise ValueError(f"Word with id {word_id} not found")
             
-        old_score = word['knowledge_score']
-        if old_score is None:
-            old_score = 30
-        status = word['status']
+        # 2. Increment mode-specific seen/correct/wrong counters
+        fc_seen = word['flashcard_seen'] or 0
+        fc_corr = word['flashcard_correct'] or 0
+        fc_wrong = word['flashcard_wrong'] or 0
         
-        # 2. Get seen_count from word_stats (before updating stats)
-        cursor.execute("SELECT seen FROM word_stats WHERE word_id = ? AND exercise = ?", (word_id, exercise))
-        stat_row = cursor.fetchone()
-        seen_count = stat_row['seen'] if stat_row else 0
+        mcq_seen = word['mcq_seen'] or 0
+        mcq_corr = word['mcq_correct'] or 0
+        mcq_wrong = word['mcq_wrong'] or 0
         
-        # 3. Calculate factor and delta
-        factor = 1.0 / math.sqrt(seen_count + 1)
-        base_delta = SCORE_CONFIG[exercise]['correct'] if is_correct else SCORE_CONFIG[exercise]['wrong']
-        effective_delta = base_delta * factor
+        mat_seen = word['matching_seen'] or 0
+        mat_corr = word['matching_correct'] or 0
+        mat_wrong = word['matching_wrong'] or 0
         
-        # 4. Handle mastered word rules (no negative changes)
-        if status == 'mastered' and effective_delta < 0:
-            effective_delta = 0
+        fill_seen = word['fill_seen'] or 0
+        fill_corr = word['fill_correct'] or 0
+        fill_wrong = word['fill_wrong'] or 0
+        
+        if exercise == 'flashcard':
+            # flashcard_seen is incremented on flip, not here
+            if is_correct:
+                fc_corr += 1
+            else:
+                fc_wrong += 1
+        elif exercise == 'mcq':
+            mcq_seen += 1
+            if is_correct:
+                mcq_corr += 1
+            else:
+                mcq_wrong += 1
+        elif exercise == 'matching':
+            mat_seen += 1
+            if is_correct:
+                mat_corr += 1
+            else:
+                mat_wrong += 1
+        elif exercise == 'typing':
+            fill_seen += 1
+            if is_correct:
+                fill_corr += 1
+            else:
+                fill_wrong += 1
+                
+        tot_seen = fc_seen + mcq_seen + mat_seen + fill_seen
+        tot_corr = fc_corr + mcq_corr + mat_corr + fill_corr
+        tot_wrong = fc_wrong + mcq_wrong + mat_wrong + fill_wrong
+        
+        # 3. Recalculate knowledge score
+        if word['status'] == 'mastered' and not is_correct:
+            new_score = word['knowledge_score'] if word['knowledge_score'] is not None else 95
+        else:
+            if tot_seen > 0:
+                accuracy = tot_corr / tot_seen
+                accuracy_bonus = accuracy * 40
+                frequency_bonus = min(math.log2(tot_seen + 1) * 10, 30)
+                new_score = int(round(30 + accuracy_bonus + frequency_bonus))
+                new_score = max(0, min(100, new_score))
+            else:
+                new_score = 30
             
-        # 5. Compute new score
-        new_score = max(0, min(100, int(round(old_score + effective_delta))))
         new_status = _get_status_from_score(new_score)
         
-        # 6. Update word_stats
-        # Flashcard seen count is updated on flip, other exercises are updated here
+        # 4. Update word_stats (for backward compatibility)
         seen_increment = 0 if exercise == 'flashcard' else 1
         correct_increment = 1 if is_correct else 0
         cursor.execute("""
@@ -84,33 +131,33 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
                 correct = correct + ?
         """, (word_id, exercise, seen_increment, correct_increment, seen_increment, correct_increment))
         
-        # 7. Update other metrics to keep compatibility with dashboard/history
+        # 5. Calculate other metrics
         now_str = datetime.now().isoformat()
-        
-        # correct/wrong count
         c_count_inc = 1 if is_correct else 0
         w_count_inc = 0 if not is_correct else 1
-        
-        # streak
         new_streak = (word['correct_streak'] or 0) + 1 if is_correct else 0
         new_consec_wrong = 0 if is_correct else (word['consecutive_wrong'] or 0) + 1
-        
         last_failed_at = now_str if not is_correct else word['last_failed_at']
         
-        # needs_review flag logic
         needs_review = word['needs_review'] or 0
-        if new_consec_wrong >= 3:
-            needs_review = 1
-        if new_streak >= 2:
-            needs_review = 0
+        if not is_correct:
+            if word['status'] == 'mastered':
+                needs_review = 1
+            elif new_consec_wrong >= 3:
+                needs_review = 1
+        else:
+            if word['status'] == 'mastered':
+                needs_review = 0
+            elif new_streak >= 2:
+                needs_review = 0
             
-        # Self evaluation counts
         self_c_inc = 1 if (exercise == 'typing' and is_correct) else 0
         self_w_inc = 1 if (exercise == 'typing' and not is_correct) else 0
         
-        # total_score (gamification) update
+        base_delta = SCORE_CONFIG[exercise]['correct'] if is_correct else SCORE_CONFIG[exercise]['wrong']
         new_total_score = max(0, (word['total_score'] or 0) + base_delta)
         
+        # 6. Save back to words table
         cursor.execute("""
             UPDATE words SET
                 knowledge_score = ?,
@@ -125,17 +172,30 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
                 needs_review = ?,
                 self_correct_count = self_correct_count + ?,
                 self_wrong_count = self_wrong_count + ?,
-                last_reviewed = ?
+                last_reviewed = ?,
+                flashcard_seen = ?, flashcard_correct = ?, flashcard_wrong = ?,
+                mcq_seen = ?, mcq_correct = ?, mcq_wrong = ?,
+                matching_seen = ?, matching_correct = ?, matching_wrong = ?,
+                fill_seen = ?, fill_correct = ?, fill_wrong = ?,
+                total_seen = ?, total_correct = ?, total_wrong = ?
             WHERE id = ?
-        """, (new_score, new_status, new_total_score, c_count_inc, w_count_inc,
-              new_streak, new_consec_wrong, last_failed_at, needs_review,
-              self_c_inc, self_w_inc, now_str, word_id))
+        """, (
+            new_score, new_status, new_total_score, c_count_inc, w_count_inc,
+            new_streak, new_consec_wrong, last_failed_at, needs_review,
+            self_c_inc, self_w_inc, now_str,
+            fc_seen, fc_corr, fc_wrong,
+            mcq_seen, mcq_corr, mcq_wrong,
+            mat_seen, mat_corr, mat_wrong,
+            fill_seen, fill_corr, fill_wrong,
+            tot_seen, tot_corr, tot_wrong,
+            word_id
+        ))
         
-        # 8. Record review history
+        # 7. Record review history
         cursor.execute("""
             INSERT INTO review_history (word_id, mode, score_delta, is_correct, rating, reviewed_at)
             VALUES (?, ?, ?, ?, NULL, ?)
-        """, (word_id, exercise, int(round(effective_delta)), 1 if is_correct else 0, now_str))
+        """, (word_id, exercise, base_delta, 1 if is_correct else 0, now_str))
         
         if should_close:
             db.commit()
@@ -430,8 +490,15 @@ def get_review_queue(db, n: int = 10, status_filter: str = 'all',
         words = [dict(r) for r in db.execute(query).fetchall()]
     else:
         sf = 'mastered' if status_filter == 'learned' else status_filter
-        query = "SELECT * FROM words WHERE status = ?"
-        words = [dict(r) for r in db.execute(query, (sf,)).fetchall()]
+        if sf == 'learning':
+            query = "SELECT * FROM words WHERE status IN ('learning', 'danger', 'familiar')"
+            words = [dict(r) for r in db.execute(query).fetchall()]
+        elif sf == 'mastered':
+            query = "SELECT * FROM words WHERE status = 'mastered'"
+            words = [dict(r) for r in db.execute(query).fetchall()]
+        else:
+            query = "SELECT * FROM words WHERE status = ?"
+            words = [dict(r) for r in db.execute(query, (sf,)).fetchall()]
     
     words = [w for w in words if w['id'] not in exclude_ids]
     

@@ -750,6 +750,11 @@
                     <textarea id="form-word-translation" class="form-control" rows="4" placeholder="Ví dụ: n. người đại diện; v. đại diện cho; adj. tiêu biểu" required autocomplete="off"></textarea>
                     <p class="form-help">Nhập theo dạng: <code>n. nghĩa n; v. nghĩa v</code> hoặc nhập cụm từ tự do.</p>
                 </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="form-word-example">Ví dụ câu (Tiếng Anh - Việt)</label>
+                    <textarea id="form-word-example" class="form-control" rows="2" placeholder="Ví dụ: She represents the brand. — Cô ấy đại diện cho thương hiệu." autocomplete="off"></textarea>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="closeWordModal()">Hủy bỏ</button>
@@ -824,6 +829,76 @@
         </div>
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="closeHistoryModal()">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: WORD DETAIL & ANALYTICS -->
+<div class="modal-overlay" id="detail-modal" style="display:none">
+    <div class="modal" style="max-width: 600px; width: 90%;">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--bg) 0%, rgba(79, 70, 229, 0.05) 100%);">
+            <h3><i class="ph ph-file-text" style="color: var(--primary);"></i> Chi tiết từ vựng</h3>
+            <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: var(--sp-5) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-4);">
+            <!-- Header Word Info -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border); padding-bottom: var(--sp-3);">
+                <div>
+                    <div style="display: flex; align-items: center; gap: var(--sp-3);">
+                        <h2 id="detail-word-spelling" style="font-family: var(--font-display); font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin: 0;">word</h2>
+                        <div class="card-tts-group" style="display: inline-flex; gap: 4px;">
+                            <button class="btn-tts" id="detail-btn-tts" onclick="playWord(document.getElementById('detail-word-spelling').textContent, 'normal')" data-word="" data-speed="normal" style="padding: 6px;" aria-label="Nghe phát âm">
+                                <i class="ph ph-speaker-high"></i>
+                            </button>
+                            <button class="btn-tts" id="detail-btn-tts-slow" onclick="playWord(document.getElementById('detail-word-spelling').textContent, 'slow')" data-word="" data-speed="slow" style="padding: 6px; font-size: var(--text-xs);" aria-label="Nghe phát âm chậm">
+                                <i class="ph ph-speaker-low"></i> Chậm
+                            </button>
+                        </div>
+                    </div>
+                    <div id="detail-word-phonetic" style="color: var(--text-secondary); font-size: var(--text-base); font-family: var(--font-sans); margin-top: 4px;">/phonetic/</div>
+                </div>
+                <div style="text-align: right;">
+                    <span class="status-badge badge" id="detail-word-status-badge">status</span>
+                    <div id="detail-word-score" style="font-weight: 700; font-size: var(--text-lg); color: var(--primary); margin-top: 8px;">Score: 30 ⭐</div>
+                </div>
+            </div>
+
+            <!-- Meanings & POS -->
+            <div class="form-group">
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary);"><i class="ph ph-translate"></i> Định nghĩa & Từ loại</label>
+                <div id="detail-word-translation" style="background: var(--bg); border: 1px solid var(--border); padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.95rem; line-height: 1.5;"></div>
+            </div>
+
+            <!-- Example sentence -->
+            <div class="form-group">
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary);"><i class="ph ph-chat-centered-text"></i> Ví dụ câu</label>
+                <div id="detail-word-example" style="background: var(--bg); border: 1px solid var(--border); padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.95rem; line-height: 1.5; font-style: italic;">Chưa có ví dụ câu.</div>
+            </div>
+
+            <!-- Analytics tables -->
+            <div class="form-group">
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 8px;"><i class="ph ph-chart-line"></i> Chỉ số ôn tập chi tiết</label>
+                <div style="border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                         <thead>
+                             <tr style="background: var(--bg); border-bottom: 1px solid var(--border);">
+                                 <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary);">Chế độ</th>
+                                 <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: center;">Đã gặp</th>
+                                 <th style="padding: 10px 12px; font-weight: 700; color: var(--text-success); text-align: center;">Đúng</th>
+                                 <th style="padding: 10px 12px; font-weight: 700; color: var(--text-danger); text-align: center;">Sai</th>
+                                 <th style="padding: 10px 12px; font-weight: 700; color: var(--text-secondary); text-align: right;">Tỷ lệ</th>
+                             </tr>
+                         </thead>
+                         <tbody id="detail-analytics-tbody">
+                             <!-- Appended dynamically -->
+                         </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="background: var(--bg); border-top: 1px solid var(--border);">
+            <button class="btn btn-ghost" onclick="closeDetailModal()">Đóng lại</button>
+            <button class="btn btn-primary" id="detail-btn-edit-word" onclick="editFromDetail()"><i class="ph ph-pencil"></i> Chỉnh sửa</button>
         </div>
     </div>
 </div>

@@ -174,6 +174,7 @@ function startRound() {
     
     updateRoundProgressUI();
     renderColumns();
+    drawLines();
 }
 
 function updateRoundProgressUI() {
@@ -194,6 +195,10 @@ function updateProgressUI(matchedCount, totalCount) {
 function renderColumns() {
     if (!enColumnEl || !viColumnEl) return;
     
+    // Clear SVG canvas
+    const svgCanvas = document.getElementById('matching-svg-canvas');
+    if (svgCanvas) svgCanvas.innerHTML = '';
+    
     // Render English items
     enColumnEl.innerHTML = '';
     session.words.forEach(w => {
@@ -203,10 +208,15 @@ function renderColumns() {
         card.dataset.type = 'en';
         card.setAttribute('data-word', w.word);
         card.innerHTML = `
-            <span style="flex-grow: 1;">${w.word}</span>
-            <button class="btn-tts" data-word="${w.word}" onclick="event.stopPropagation(); playWord('${w.word.replace(/'/g, "\\'")}', 'normal')" style="margin-left: 8px;" aria-label="Nghe phát âm">
-                <i class="ph ph-speaker-high"></i>
-            </button>
+            <span style="flex-grow: 1; word-break: break-all;">${w.word}</span>
+            <div class="card-tts-group" style="display: inline-flex; gap: 4px; align-items: center; margin-left: 4px; flex-shrink: 0;">
+                <button class="btn-tts" data-word="${w.word}" data-speed="normal" onclick="event.stopPropagation(); playWord('${w.word.replace(/'/g, "\\'")}', 'normal')" style="padding: 4px;" aria-label="Nghe phát âm">
+                    <i class="ph ph-speaker-high"></i>
+                </button>
+                <button class="btn-tts" data-word="${w.word}" data-speed="slow" onclick="event.stopPropagation(); playWord('${w.word.replace(/'/g, "\\'")}', 'slow')" style="padding: 4px; font-size: var(--text-xs);" aria-label="Nghe phát âm chậm">
+                    <i class="ph ph-speaker-low"></i>
+                </button>
+            </div>
         `;
         card.addEventListener('click', handleEnClick);
         enColumnEl.appendChild(card);
@@ -225,6 +235,98 @@ function renderColumns() {
     });
 }
 
+// Draw dynamic matching lines on the SVG canvas
+function drawLines() {
+    const svgCanvas = document.getElementById('matching-svg-canvas');
+    if (!svgCanvas) return;
+    
+    svgCanvas.innerHTML = '';
+    const canvasRect = svgCanvas.getBoundingClientRect();
+    
+    // 1. Draw already matched connections
+    session.matched.forEach(wordId => {
+        const enCard = document.querySelector(`#en-column .match-card[data-id="${wordId}"]`);
+        const viCard = document.querySelector(`#vi-column .match-card[data-id="${wordId}"]`);
+        if (enCard && viCard) {
+            drawLineBetweenElements(svgCanvas, canvasRect, enCard, viCard, 'matched');
+        }
+    });
+    
+    // 2. Draw currently checking / selected pairs
+    if (session.selectedEn !== null && session.selectedVi !== null) {
+        const enCard = document.querySelector(`#en-column .match-card[data-id="${session.selectedEn}"]`);
+        const viCard = document.querySelector(`#vi-column .match-card[data-id="${session.selectedVi}"]`);
+        if (enCard && viCard) {
+            const isCorrect = (session.selectedEn === session.selectedVi);
+            drawLineBetweenElements(svgCanvas, canvasRect, enCard, viCard, isCorrect ? 'correct' : 'wrong');
+        }
+    } else if (session.selectedEn !== null) {
+        // Draw dashed draft line to cursor position? (skipped for clean UI unless requested)
+    }
+}
+
+function drawLineBetweenElements(svgCanvas, canvasRect, el1, el2, status) {
+    const isEl1En = el1.dataset.type === 'en';
+    const leftEl = isEl1En ? el1 : el2;
+    const rightEl = isEl1En ? el2 : el1;
+    
+    const leftRect = leftEl.getBoundingClientRect();
+    const rightRect = rightEl.getBoundingClientRect();
+    
+    const x1 = leftRect.right - canvasRect.left;
+    const y1 = leftRect.top + leftRect.height / 2 - canvasRect.top;
+    
+    const x2 = rightRect.left - canvasRect.left;
+    const y2 = rightRect.top + rightRect.height / 2 - canvasRect.top;
+    
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    
+    // Smooth cubic bezier curve
+    const controlX1 = x1 + (x2 - x1) * 0.4;
+    const controlY1 = y1;
+    const controlX2 = x1 + (x2 - x1) * 0.6;
+    const controlY2 = y2;
+    
+    path.setAttribute('d', `M ${x1} ${y1} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${x2} ${y2}`);
+    path.setAttribute('fill', 'none');
+    
+    let strokeColor = 'var(--color-primary)';
+    let strokeWidth = '3';
+    let opacity = '1';
+    let strokeDash = 'none';
+    
+    if (status === 'matched') {
+        strokeColor = 'var(--color-success)';
+        strokeWidth = '2';
+        opacity = '0.35';
+    } else if (status === 'correct') {
+        strokeColor = 'var(--color-success)';
+        strokeWidth = '4';
+        opacity = '1';
+    } else if (status === 'wrong') {
+        strokeColor = 'var(--color-danger)';
+        strokeWidth = '4';
+        opacity = '1';
+    }
+    
+    path.setAttribute('stroke', strokeColor);
+    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('opacity', opacity);
+    if (strokeDash !== 'none') {
+        path.setAttribute('stroke-dasharray', strokeDash);
+    }
+    
+    path.classList.add('matching-line');
+    path.classList.add(`matching-line-${status}`);
+    
+    svgCanvas.appendChild(path);
+}
+
+// Resize listener to redraw lines dynamically
+window.addEventListener('resize', () => {
+    drawLines();
+});
+
 // Selection handlers
 function handleEnClick() {
     if (gridLocked || session.matched.has(parseInt(this.dataset.id))) return;
@@ -236,6 +338,7 @@ function handleEnClick() {
     document.querySelectorAll('#en-column .match-card').forEach(c => c.classList.remove('selected'));
     this.classList.add('selected');
     
+    drawLines();
     tryMatch();
 }
 
@@ -249,6 +352,7 @@ function handleViClick() {
     document.querySelectorAll('#vi-column .match-card').forEach(c => c.classList.remove('selected'));
     this.classList.add('selected');
     
+    drawLines();
     tryMatch();
 }
 
@@ -258,6 +362,8 @@ function tryMatch() {
     
     const enCard = document.querySelector(`#en-column .match-card[data-id="${session.selectedEn}"]`);
     const viCard = document.querySelector(`#vi-column .match-card[data-id="${session.selectedVi}"]`);
+    
+    gridLocked = true;
     
     if (session.selectedEn === session.selectedVi) {
         // MATCH CORRECT
@@ -275,15 +381,26 @@ function tryMatch() {
         
         if (btnSubmitEl) btnSubmitEl.disabled = false;
         
-        resetSelections();
+        drawLines();
         updateRoundProgressUI();
         
-        // Auto submit when complete
-        if (session.matched.size === session.words.length) {
-            setTimeout(() => {
-                submitResults();
-            }, 600);
-        }
+        setTimeout(() => {
+            enCard.classList.remove('correct');
+            viCard.classList.remove('correct');
+            enCard.classList.add('matched');
+            viCard.classList.add('matched');
+            
+            resetSelections();
+            gridLocked = false;
+            drawLines();
+            
+            // Auto submit when complete
+            if (session.matched.size === session.words.length) {
+                setTimeout(() => {
+                    submitResults();
+                }, 400);
+            }
+        }, 500);
         
     } else {
         // MATCH INCORRECT
@@ -301,15 +418,15 @@ function tryMatch() {
         enCard.classList.add('wrong', 'shake');
         viCard.classList.add('wrong', 'shake');
         
-        gridLocked = true;
+        drawLines();
         
         setTimeout(() => {
             enCard.classList.remove('wrong', 'shake');
             viCard.classList.remove('wrong', 'shake');
             gridLocked = false;
+            resetSelections();
+            drawLines();
         }, 600);
-        
-        resetSelections();
     }
 }
 

@@ -155,35 +155,40 @@ function nextWord() {
 function showSessionComplete() {
     session.currentWord = null;
     const duration = Math.max(1, Math.round((Date.now() - session.startedAt) / 1000 / 60));
+    const totalAttempted = session.sessionCorrect + session.sessionWrong;
+    const accuracy = totalAttempted > 0 ? Math.round((session.sessionCorrect / totalAttempted) * 100) : 100;
     
     document.getElementById('card-container').innerHTML = `
-        <div class="session-complete">
-          <div class="complete-icon">🎉</div>
-          <h2>Hoàn thành phiên học!</h2>
-          <div class="complete-stats">
-            <div class="stat">
-              <span class="stat-number">${session.queue.length}</span>
-              <span class="stat-label">Từ đã ôn</span>
+        <div class="session-complete animate-fade-in" style="max-width: 500px; margin: var(--sp-8) auto; text-align: center;">
+          <div class="complete-icon" style="font-size: var(--text-5xl); margin-bottom: var(--sp-4); animation: float 3s ease-in-out infinite;">🏆</div>
+          <h2 style="font-family: var(--font-display); font-weight: var(--weight-extrabold); font-size: var(--text-2xl); color: var(--text-primary); margin-bottom: var(--sp-2);">Phiên học hoàn tất!</h2>
+          <p style="color: var(--text-secondary); font-size: var(--text-sm); margin-bottom: var(--sp-6);">Bạn đang làm rất tốt, hãy duy trì phong độ nhé!</p>
+          
+          <div class="complete-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-8);">
+            <div class="stat-box" style="background: var(--surface-sunken); border: 1px solid var(--border-default); padding: var(--sp-4) var(--sp-2); border-radius: var(--radius-xl);">
+              <span class="stat-number" style="display: block; font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); color: var(--color-primary);">${session.queue.length}</span>
+              <span class="stat-label" style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: var(--weight-semibold);">Từ đã ôn</span>
             </div>
-            <div class="stat">
-              <span class="stat-number">+${session.sessionScore}</span>
-              <span class="stat-label">Điểm</span>
+            <div class="stat-box" style="background: var(--surface-sunken); border: 1px solid var(--border-default); padding: var(--sp-4) var(--sp-2); border-radius: var(--radius-xl);">
+              <span class="stat-number" style="display: block; font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); color: var(--color-success);">+${session.sessionScore} XP</span>
+              <span class="stat-label" style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: var(--weight-semibold);">Điểm nhận</span>
             </div>
-            <div class="stat">
-              <span class="stat-number">${duration} phút</span>
-              <span class="stat-label">Thời gian</span>
+            <div class="stat-box" style="background: var(--surface-sunken); border: 1px solid var(--border-default); padding: var(--sp-4) var(--sp-2); border-radius: var(--radius-xl);">
+              <span class="stat-number" style="display: block; font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); color: var(--color-warning);">${accuracy}%</span>
+              <span class="stat-label" style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: var(--weight-semibold);">Độ chính xác</span>
             </div>
           </div>
-          <div class="complete-actions">
-            <button class="btn btn-primary" onclick="startSession()">Bắt đầu lại</button>
-            <a href="/" class="btn btn-ghost">Về Dashboard</a>
+          
+          <div class="complete-actions" style="display: flex; gap: var(--sp-3); justify-content: center;">
+            <button class="btn btn-primary" onclick="startSession()"><i class="ph ph-arrow-clockwise"></i> Học tiếp</button>
+            <a href="/" class="btn btn-ghost"><i class="ph ph-house"></i> Dashboard</a>
           </div>
         </div>
     `;
     
     // Confetti animation
     if (typeof confetti !== 'undefined') {
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
 }
 
@@ -218,9 +223,9 @@ function displayWord(word) {
     if (btnTts) btnTts.setAttribute('data-word', word.word);
     if (btnTtsSlow) btnTtsSlow.setAttribute('data-word', word.word);
     
-    // Autoplay pronunciation after 300ms
+    // Autoplay pronunciation after 300ms if soundAutoplay is true
     setTimeout(() => {
-        if (session.currentWord && session.currentWord.word === word.word) {
+        if (session.currentWord && session.currentWord.word === word.word && localStorage.getItem('soundAutoplay') !== 'false') {
             playWord(word.word, 'normal');
         }
     }, 300);
@@ -311,13 +316,18 @@ async function rateWord(isCorrect) {
         
         if (data.success) {
             if (isCorrect) {
+                session.sessionCorrect++;
                 showToast(`+1 điểm`, "success");
                 session.sessionScore += 1;
+                if (cardEl) cardEl.className = 'flashcard flipped card-slide-right';
             } else {
+                session.sessionWrong++;
                 showToast(`Ghi nhận đã xem`, "info");
+                if (cardEl) cardEl.className = 'flashcard flipped card-shake';
             }
             
             setTimeout(() => {
+                if (cardEl) cardEl.className = 'flashcard flipped';
                 nextWord();
             }, 600);
         } else {
@@ -344,8 +354,21 @@ async function markLearned(event) {
         const data = await response.json();
         
         if (data.success) {
-            showToast("✅ Đã thuộc!", "success");
-            nextWord();
+            session.sessionCorrect++;
+            session.sessionScore += 2; // Extra reward for mastering!
+            showToast("✅ Đã thuộc! (+2 điểm)", "success");
+            
+            if (cardEl) cardEl.className = 'flashcard flipped card-slide-left';
+            
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 30, angle: 60, spread: 55, origin: { x: 0 } });
+                confetti({ particleCount: 30, angle: 120, spread: 55, origin: { x: 1 } });
+            }
+            
+            setTimeout(() => {
+                if (cardEl) cardEl.className = 'flashcard flipped';
+                nextWord();
+            }, 600);
         } else {
             showToast("Không thể cập nhật trạng thái!", "error");
         }

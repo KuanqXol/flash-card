@@ -32,22 +32,19 @@ def test_diminishing_returns(db):
     word_id = cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     # 1st try (seen=0):
-    cursor.execute("INSERT OR REPLACE INTO word_stats (word_id, exercise, seen, correct) VALUES (?, 'mcq', 0, 0)", (word_id,))
-    cursor.execute("UPDATE words SET knowledge_score = 30, status = 'new' WHERE id = ?", (word_id,))
+    cursor.execute("UPDATE words SET mcq_seen = 0, mcq_correct = 0, knowledge_score = 30, status = 'new' WHERE id = ?", (word_id,))
     db.commit()
     s1 = update_score(word_id, 'mcq', True, db=db)
     delta1 = s1 - 30
     
     # 5th try (seen=4):
-    cursor.execute("INSERT OR REPLACE INTO word_stats (word_id, exercise, seen, correct) VALUES (?, 'mcq', 4, 0)", (word_id,))
-    cursor.execute("UPDATE words SET knowledge_score = 30, status = 'new' WHERE id = ?", (word_id,))
+    cursor.execute("UPDATE words SET mcq_seen = 4, mcq_correct = 0, knowledge_score = 30, status = 'new' WHERE id = ?", (word_id,))
     db.commit()
     s5 = update_score(word_id, 'mcq', True, db=db)
     delta5 = s5 - 30
     
     # 10th try (seen=9):
-    cursor.execute("INSERT OR REPLACE INTO word_stats (word_id, exercise, seen, correct) VALUES (?, 'mcq', 9, 0)", (word_id,))
-    cursor.execute("UPDATE words SET knowledge_score = 30, status = 'new' WHERE id = ?", (word_id,))
+    cursor.execute("UPDATE words SET mcq_seen = 9, mcq_correct = 0, knowledge_score = 30, status = 'new' WHERE id = ?", (word_id,))
     db.commit()
     s10 = update_score(word_id, 'mcq', True, db=db)
     delta10 = s10 - 30

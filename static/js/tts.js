@@ -76,7 +76,7 @@ async function playWord(word, speed = 'normal') {
                 audio.addEventListener('ended', cleanup);
                 audio.addEventListener('error', () => {
                     cleanup();
-                    playFallback(word, activeButtons);
+                    playFallback(word, activeButtons, speed);
                 });
                 
                 try {
@@ -84,7 +84,7 @@ async function playWord(word, speed = 'normal') {
                 } catch (playErr) {
                     console.warn("Audio play rejected, falling back:", playErr);
                     cleanup();
-                    playFallback(word, activeButtons);
+                    playFallback(word, activeButtons, speed);
                 }
                 return;
             } else if (response.status === 202) {
@@ -97,7 +97,7 @@ async function playWord(word, speed = 'normal') {
         } catch (err) {
             console.warn("TTS API fetch error, using Web Speech API fallback:", err);
             restoreButtons();
-            playFallback(word, activeButtons);
+            playFallback(word, activeButtons, speed);
             return;
         }
     }
@@ -105,10 +105,10 @@ async function playWord(word, speed = 'normal') {
     // Timeout fallback
     console.warn("TTS API polling timeout, using Web Speech API fallback");
     restoreButtons();
-    playFallback(word, activeButtons);
+    playFallback(word, activeButtons, speed);
 }
 
-function playFallback(word, buttons = null) {
+function playFallback(word, buttons = null, speed = 'normal') {
     if (!('speechSynthesis' in window)) {
         console.warn("Web Speech API not supported.");
         if (buttons) {
@@ -129,6 +129,7 @@ function playFallback(word, buttons = null) {
         
         const utterance = new SpeechSynthesisUtterance(word);
         utterance.lang = 'en-US';
+        utterance.rate = speed === 'slow' ? 0.7 : 1.0;
         
         // Try to select American English voice
         const voices = window.speechSynthesis.getVoices();

@@ -79,6 +79,13 @@ async function init() {
     // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyDown);
     
+    // Auto refocus input when clicking elsewhere on the page
+    document.addEventListener('click', (e) => {
+        if (answerInputEl && !answerInputEl.disabled && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('select') && !e.target.closest('a')) {
+            answerInputEl.focus();
+        }
+    });
+    
     // Setup filter headers
     await initStudyHeaderFilters(async (filter, status) => {
         session.filter = filter;
@@ -100,6 +107,7 @@ function toggleMode() {
         if (answerInputEl) {
             answerInputEl.value = '';
             answerInputEl.disabled = false;
+            answerInputEl.classList.remove('correct-pulse', 'wrong-pulse', 'shake');
             answerInputEl.placeholder = session.mode === 'en_to_vi' ? 'Nhập nghĩa tiếng Việt...' : 'Type English spelling here...';
             answerInputEl.focus();
         }
@@ -177,6 +185,7 @@ function showWordAtIndex() {
     if (answerInputEl) {
         answerInputEl.value = '';
         answerInputEl.disabled = false;
+        answerInputEl.classList.remove('correct-pulse', 'wrong-pulse', 'shake');
         answerInputEl.placeholder = session.mode === 'en_to_vi' ? 'Nhập nghĩa tiếng Việt...' : 'Type English spelling here...';
         answerInputEl.focus();
     }
@@ -200,17 +209,18 @@ function displayWord(word) {
         wordScoreEl.textContent = `Điểm: ${word.total_score || 0} ⭐`;
     }
 
+    const fillPromptGroup = document.getElementById('fill-prompt-tts-group');
     const fillPromptBtn = document.getElementById('fill-prompt-btn-tts');
+    const fillPromptBtnSlow = document.getElementById('fill-prompt-btn-tts-slow');
 
     if (session.mode === 'en_to_vi') {
         if (flagEl) flagEl.textContent = '🇬🇧';
         if (promptEl) promptEl.textContent = word.word;
         if (hintLabelEl) hintLabelEl.textContent = 'Nghĩa tiếng Việt là gì?';
         
-        if (fillPromptBtn) {
-            fillPromptBtn.setAttribute('data-word', word.word);
-            fillPromptBtn.style.display = 'inline-flex';
-        }
+        if (fillPromptBtn) fillPromptBtn.setAttribute('data-word', word.word);
+        if (fillPromptBtnSlow) fillPromptBtnSlow.setAttribute('data-word', word.word);
+        if (fillPromptGroup) fillPromptGroup.style.display = 'inline-flex';
         
         if (phoneticEl) {
             if (word.phonetic && word.phonetic !== '--' && word.phonetic.trim() !== '') {
@@ -229,8 +239,8 @@ function displayWord(word) {
         if (promptEl) promptEl.textContent = promptText;
         if (hintLabelEl) hintLabelEl.textContent = 'Từ tiếng Anh là gì?';
         
-        if (fillPromptBtn) {
-            fillPromptBtn.style.display = 'none';
+        if (fillPromptGroup) {
+            fillPromptGroup.style.display = 'none';
         }
         
         if (phoneticEl) phoneticEl.style.display = 'none';
@@ -251,9 +261,43 @@ function submitAnswer() {
     
     session.phase = 'evaluate';
     
+    const typed = answerInputEl.value.trim().toLowerCase();
+    let isMatch = false;
+    
+    if (session.mode === 'en_to_vi') {
+        const shortTr = (session.currentWord.short_translation || '').trim().toLowerCase();
+        const fullTr = (session.currentWord.translation || '').trim().toLowerCase();
+        isMatch = (typed.length > 0) && (shortTr.includes(typed) || fullTr.includes(typed) || typed.includes(shortTr));
+    } else {
+        const expected = session.currentWord.word.trim().toLowerCase();
+        isMatch = (typed === expected);
+    }
+    
     if (answerInputEl) {
         answerInputEl.disabled = true;
+        if (isMatch) {
+            answerInputEl.classList.add('correct-pulse');
+        } else {
+            answerInputEl.classList.add('wrong-pulse', 'shake');
+            setTimeout(() => {
+                answerInputEl.classList.remove('shake');
+            }, 500);
+        }
     }
+    
+    // Highlight correct or incorrect self-evaluation options
+    const btnCorrect = document.querySelector('.eval-actions .btn-correct');
+    const btnWrong = document.querySelector('.eval-actions .btn-wrong');
+    if (btnCorrect && btnWrong) {
+        btnCorrect.classList.remove('highlight-eval');
+        btnWrong.classList.remove('highlight-eval');
+        if (isMatch) {
+            btnCorrect.classList.add('highlight-eval');
+        } else {
+            btnWrong.classList.add('highlight-eval');
+        }
+    }
+    
     if (btnActionEl) {
         btnActionEl.style.display = 'none';
     }
@@ -276,8 +320,10 @@ function submitAnswer() {
     
     // Set data-word attribute for TTS button inside answer box
     const fillAnswerBtn = document.getElementById('fill-answer-btn-tts');
-    if (fillAnswerBtn && session.currentWord) {
-        fillAnswerBtn.setAttribute('data-word', session.currentWord.word);
+    const fillAnswerBtnSlow = document.getElementById('fill-answer-btn-tts-slow');
+    if (session.currentWord) {
+        if (fillAnswerBtn) fillAnswerBtn.setAttribute('data-word', session.currentWord.word);
+        if (fillAnswerBtnSlow) fillAnswerBtnSlow.setAttribute('data-word', session.currentWord.word);
     }
     
     if (answerBoxEl) {

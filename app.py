@@ -217,14 +217,65 @@ def api_flashcard_flip():
         
     conn = get_db()
     try:
-        conn.execute("""
+        cursor = conn.cursor()
+        
+        # Increment word_stats (for backward compatibility)
+        cursor.execute("""
             INSERT INTO word_stats (word_id, exercise, seen, correct)
             VALUES (?, 'flashcard', 1, 0)
             ON CONFLICT(word_id, exercise) DO UPDATE SET seen = seen + 1
         """, (word_id,))
+        
+        # Increment words table V2 analytics columns
+        cursor.execute("""
+            UPDATE words SET
+                flashcard_seen = flashcard_seen + 1,
+                total_seen = total_seen + 1
+            WHERE id = ?
+        """, (word_id,))
+        
+        # Fetch current counters to recalculate score
+        cursor.execute("""
+            SELECT flashcard_seen, flashcard_correct,
+                   mcq_seen, mcq_correct,
+                   matching_seen, matching_correct,
+                   fill_seen, fill_correct
+            FROM words WHERE id = ?
+        """, (word_id,))
+        word = cursor.fetchone()
+        
+        if word:
+            fc_seen = word['flashcard_seen'] or 0
+            fc_corr = word['flashcard_correct'] or 0
+            mcq_seen = word['mcq_seen'] or 0
+            mcq_corr = word['mcq_correct'] or 0
+            mat_seen = word['matching_seen'] or 0
+            mat_corr = word['matching_correct'] or 0
+            fill_seen = word['fill_seen'] or 0
+            fill_corr = word['fill_correct'] or 0
+            
+            tot_seen = fc_seen + mcq_seen + mat_seen + fill_seen
+            tot_corr = fc_corr + mcq_corr + mat_corr + fill_corr
+            
+            import math
+            from scoring import _get_status_from_score
+            if tot_seen > 0:
+                accuracy = tot_corr / tot_seen
+                accuracy_bonus = accuracy * 40
+                frequency_bonus = min(math.log2(tot_seen + 1) * 10, 30)
+                new_score = int(round(30 + accuracy_bonus + frequency_bonus))
+                new_score = max(0, min(100, new_score))
+            else:
+                new_score = 30
+                
+            new_status = _get_status_from_score(new_score)
+            
+            cursor.execute("UPDATE words SET knowledge_score = ?, status = ? WHERE id = ?", (new_score, new_status, word_id))
+            
         conn.commit()
         return jsonify({'success': True})
     except Exception as e:
+        conn.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
@@ -710,9 +761,30 @@ def api_daily_progress():
                 'review_count': day_reviewed,
                 'accuracy': day_accuracy
             })
+            
+        # Fetch all review counts for the last 84 days grouped by date
+        min_date = (datetime.now() - timedelta(days=83)).strftime('%Y-%m-%d')
+        rows = conn.execute("""
+            SELECT substr(reviewed_at, 1, 10) as day_str, COUNT(*) as count
+            FROM review_history
+            WHERE reviewed_at >= ?
+            GROUP BY day_str
+        """, (min_date,)).fetchall()
+        counts_by_day = {r['day_str']: r['count'] for r in rows}
+        
+        heatmap = []
+        for i in range(83, -1, -1):
+            day_date = datetime.now() - timedelta(days=i)
+            day_str = day_date.strftime('%Y-%m-%d')
+            heatmap.append({
+                'date': day_str,
+                'review_count': counts_by_day.get(day_str, 0)
+            })
+            
         return jsonify({
             'today': progress,
-            'weekly': weekly
+            'weekly': weekly,
+            'heatmap': heatmap
         })
     finally:
         conn.close()
@@ -885,6 +957,7 @@ def api_words_add():
     word = data.get('word', '').strip()
     phonetic = data.get('phonetic', '').strip()
     translation = data.get('translation', '').strip()
+    example = data.get('example', '').strip()
     
     if not word or not translation:
         return jsonify({'success': False, 'error': 'invalid', 'message': 'Word and translation cannot be empty'}), 400
@@ -902,9 +975,9 @@ def api_words_add():
         now = datetime.now().isoformat()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO words (word, phonetic, translation, short_translation, date_added, status, total_score, review_count, has_been_rated_five, last_reviewed, created_at)
-            VALUES (?, ?, ?, ?, ?, 'new', 0, 0, 0, NULL, ?)
-        """, (word, phonetic or None, translation, short_translation, now[:10], now))
+            INSERT INTO words (word, phonetic, translation, short_translation, date_added, status, total_score, review_count, has_been_rated_five, last_reviewed, created_at, knowledge_score, example)
+            VALUES (?, ?, ?, ?, ?, 'new', 0, 0, 0, NULL, ?, 30, ?)
+        """, (word, phonetic or None, translation, short_translation, now[:10], now, example or None))
         
         word_id = cursor.lastrowid
         
@@ -937,6 +1010,7 @@ def api_words_edit(word_id):
     word = data.get('word', '').strip()
     phonetic = data.get('phonetic', '').strip()
     translation = data.get('translation', '').strip()
+    example = data.get('example', '').strip()
     
     if not word or not translation:
         return jsonify({'success': False, 'error': 'invalid', 'message': 'Word and translation cannot be empty'}), 400
@@ -959,9 +1033,9 @@ def api_words_edit(word_id):
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE words
-            SET word = ?, phonetic = ?, translation = ?, short_translation = ?
+            SET word = ?, phonetic = ?, translation = ?, short_translation = ?, example = ?
             WHERE id = ?
-        """, (word, phonetic or None, translation, short_translation, word_id))
+        """, (word, phonetic or None, translation, short_translation, example or None, word_id))
         
         # Reset POS list
         cursor.execute("DELETE FROM word_pos WHERE word_id = ?", (word_id,))
@@ -982,6 +1056,28 @@ def api_words_edit(word_id):
     except Exception as e:
         conn.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/words/<int:word_id>', methods=['GET'])
+def api_get_word(word_id):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM words WHERE id = ?", (word_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'Word not found'}), 404
+        word = dict(row)
+        
+        # Load POS entries
+        pos_rows = conn.execute("SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order", (word_id,)).fetchall()
+        word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+        
+        # Load mastery score
+        word['mastery_score'] = calculate_mastery_score(word)
+        
+        return jsonify({'success': True, 'word': word})
     finally:
         conn.close()
 
@@ -1054,7 +1150,16 @@ def get_settings():
     conn = get_db()
     try:
         rows = conn.execute("SELECT key, value FROM settings").fetchall()
-        return jsonify({r['key']: r['value'] for r in rows})
+        settings_dict = {r['key']: r['value'] for r in rows}
+        
+        # Calculate display_name
+        user_name = settings_dict.get('user_name', '').strip()
+        if not user_name or user_name.lower() == 'guest':
+            settings_dict['display_name'] = 'Khách'
+        else:
+            settings_dict['display_name'] = user_name
+            
+        return jsonify(settings_dict)
     finally:
         conn.close()
 
@@ -1062,7 +1167,7 @@ def get_settings():
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     data = request.get_json() or {}
-    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme'}
+    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme', 'user_name'}
     conn = get_db()
     try:
         for key, value in data.items():

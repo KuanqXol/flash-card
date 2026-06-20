@@ -44,11 +44,119 @@ def init_db(conn=None):
     );
     ''')
     
-    # Ensure column knowledge_score exists
+    # Ensure column knowledge_score and new analytics columns exist
     cursor.execute("PRAGMA table_info(words)")
     columns = [row['name'] for row in cursor.fetchall()]
     if 'knowledge_score' not in columns:
         cursor.execute("ALTER TABLE words ADD COLUMN knowledge_score INTEGER DEFAULT 30")
+        
+    # Define V2 analytics and example columns
+    new_cols = {
+        'example': 'TEXT DEFAULT NULL',
+        'flashcard_seen': 'INTEGER DEFAULT 0',
+        'flashcard_correct': 'INTEGER DEFAULT 0',
+        'flashcard_wrong': 'INTEGER DEFAULT 0',
+        'mcq_seen': 'INTEGER DEFAULT 0',
+        'mcq_correct': 'INTEGER DEFAULT 0',
+        'mcq_wrong': 'INTEGER DEFAULT 0',
+        'matching_seen': 'INTEGER DEFAULT 0',
+        'matching_correct': 'INTEGER DEFAULT 0',
+        'matching_wrong': 'INTEGER DEFAULT 0',
+        'fill_seen': 'INTEGER DEFAULT 0',
+        'fill_correct': 'INTEGER DEFAULT 0',
+        'fill_wrong': 'INTEGER DEFAULT 0',
+        'total_seen': 'INTEGER DEFAULT 0',
+        'total_correct': 'INTEGER DEFAULT 0',
+        'total_wrong': 'INTEGER DEFAULT 0'
+    }
+    
+    added_any = False
+    for col_name, col_def in new_cols.items():
+        if col_name not in columns:
+            cursor.execute(f"ALTER TABLE words ADD COLUMN {col_name} {col_def}")
+            added_any = True
+            
+    # Backfill migration if new columns were added
+    if added_any:
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='word_stats'")
+        if cursor.fetchone():
+            import math
+            def get_status_from_score(score):
+                if 0 <= score <= 29:
+                    return 'danger'
+                elif 30 <= score <= 49:
+                    return 'new'
+                elif 50 <= score <= 69:
+                    return 'learning'
+                elif 70 <= score <= 89:
+                    return 'familiar'
+                elif 90 <= score <= 100:
+                    return 'mastered'
+                return 'new'
+
+            cursor.execute("SELECT word_id, exercise, seen, correct FROM word_stats")
+            stats_rows = cursor.fetchall()
+            word_stats_data = {}
+            for r in stats_rows:
+                wid = r['word_id']
+                exercise = r['exercise']
+                seen = r['seen'] or 0
+                correct = r['correct'] or 0
+                if wid not in word_stats_data:
+                    word_stats_data[wid] = {}
+                word_stats_data[wid][exercise] = (seen, correct)
+                
+            cursor.execute("SELECT id FROM words")
+            words_list = [r['id'] for r in cursor.fetchall()]
+            
+            for wid in words_list:
+                stats = word_stats_data.get(wid, {})
+                # flashcard
+                fc_seen, fc_corr = stats.get('flashcard', (0, 0))
+                fc_wrong = max(0, fc_seen - fc_corr)
+                # mcq
+                mcq_seen, mcq_corr = stats.get('mcq', (0, 0))
+                mcq_wrong = max(0, mcq_seen - mcq_corr)
+                # matching
+                mat_seen, mat_corr = stats.get('matching', (0, 0))
+                mat_wrong = max(0, mat_seen - mat_corr)
+                # fill (typing)
+                fill_seen, fill_corr = stats.get('typing', (0, 0))
+                fill_wrong = max(0, fill_seen - fill_corr)
+                
+                tot_seen = fc_seen + mcq_seen + mat_seen + fill_seen
+                tot_corr = fc_corr + mcq_corr + mat_corr + fill_corr
+                tot_wrong = fc_wrong + mcq_wrong + mat_wrong + fill_wrong
+                
+                if tot_seen > 0:
+                    accuracy = tot_corr / tot_seen
+                    accuracy_bonus = accuracy * 40
+                    frequency_bonus = min(math.log2(tot_seen + 1) * 10, 30)
+                    new_k_score = int(round(30 + accuracy_bonus + frequency_bonus))
+                    new_k_score = max(0, min(100, new_k_score))
+                else:
+                    new_k_score = 30
+                    
+                new_status = get_status_from_score(new_k_score)
+                
+                cursor.execute("""
+                    UPDATE words SET
+                        flashcard_seen = ?, flashcard_correct = ?, flashcard_wrong = ?,
+                        mcq_seen = ?, mcq_correct = ?, mcq_wrong = ?,
+                        matching_seen = ?, matching_correct = ?, matching_wrong = ?,
+                        fill_seen = ?, fill_correct = ?, fill_wrong = ?,
+                        total_seen = ?, total_correct = ?, total_wrong = ?,
+                        knowledge_score = ?, status = ?
+                    WHERE id = ?
+                """, (
+                    fc_seen, fc_corr, fc_wrong,
+                    mcq_seen, mcq_corr, mcq_wrong,
+                    mat_seen, mat_corr, mat_wrong,
+                    fill_seen, fill_corr, fill_wrong,
+                    tot_seen, tot_corr, tot_wrong,
+                    new_k_score, new_status, wid
+                ))
+            
         
     # Create word_events table
     cursor.execute('''
@@ -115,6 +223,7 @@ def init_db(conn=None):
         ('matching_pairs', '6'),
         ('new_word_ratio', '0.2'),
         ('theme', 'light'),
+        ('user_name', ''),
     ]
     for key, value in defaults:
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
@@ -138,6 +247,10 @@ def get_words_by_status(status):
     cursor = conn.cursor()
     if status == 'all':
         cursor.execute('SELECT * FROM words ORDER BY id DESC')
+    elif status == 'learned':
+        cursor.execute("SELECT * FROM words WHERE status = 'mastered' ORDER BY id DESC")
+    elif status == 'learning':
+        cursor.execute("SELECT * FROM words WHERE status IN ('learning', 'danger', 'familiar') ORDER BY id DESC")
     else:
         cursor.execute('SELECT * FROM words WHERE status = ? ORDER BY id DESC', (status,))
     rows = cursor.fetchall()
@@ -153,17 +266,34 @@ def get_random_words(n, status=None, exclude_id=None):
     if status == 'all':
         status = None
         
+    status_query = ""
+    params = []
+    
     if status:
-        if exclude_id is not None:
-            cursor.execute('SELECT * FROM words WHERE status = ? AND id != ? ORDER BY RANDOM() LIMIT ?', (status, exclude_id, n))
+        if status == 'learned':
+            status_query = "status = 'mastered'"
+        elif status == 'learning':
+            status_query = "status IN ('learning', 'danger', 'familiar')"
         else:
-            cursor.execute('SELECT * FROM words WHERE status = ? ORDER BY RANDOM() LIMIT ?', (status, n))
-    else:
-        if exclude_id is not None:
-            cursor.execute('SELECT * FROM words WHERE id != ? ORDER BY RANDOM() LIMIT ?', (exclude_id, n))
-        else:
-            cursor.execute('SELECT * FROM words ORDER BY RANDOM() LIMIT ?', (n,))
+            status_query = "status = ?"
+            params.append(status)
             
+    exclude_query = ""
+    if exclude_id is not None:
+        exclude_query = "id != ?"
+        params.append(exclude_id)
+        
+    where_parts = []
+    if status_query:
+        where_parts.append(status_query)
+    if exclude_query:
+        where_parts.append(exclude_query)
+        
+    where_clause = "WHERE " + " AND ".join(where_parts) if where_parts else ""
+    params.append(n)
+    
+    query = f"SELECT * FROM words {where_clause} ORDER BY RANDOM() LIMIT ?"
+    cursor.execute(query, tuple(params))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -331,14 +461,11 @@ def get_stats():
     cursor.execute("SELECT status, COUNT(*) as cnt FROM words GROUP BY status")
     rows = cursor.fetchall()
     
-    counts = {'new': 0, 'learning': 0, 'mastered': 0, 'learned': 0}
+    counts = {'danger': 0, 'new': 0, 'learning': 0, 'familiar': 0, 'mastered': 0}
     for r in rows:
         status_val = r['status']
         cnt = r['cnt']
-        if status_val == 'mastered' or status_val == 'learned':
-            counts['mastered'] += cnt
-            counts['learned'] += cnt
-        elif status_val in counts:
+        if status_val in counts:
             counts[status_val] = cnt
             
     # Total words count
@@ -363,11 +490,18 @@ def get_stats():
     
     conn.close()
     
+    # Map legacy categories
+    legacy_new = counts['new']
+    legacy_learning = counts['learning'] + counts['danger'] + counts['familiar']
+    legacy_learned = counts['mastered']
+    
     return {
-        'new': counts['new'],
-        'learning': counts['learning'],
-        'learned': counts['learned'],
-        'mastered': counts['mastered'],
+        'danger': counts['danger'],
+        'new': legacy_new,
+        'learning': legacy_learning,
+        'familiar': counts['familiar'],
+        'learned': legacy_learned,
+        'mastered': legacy_learned,
         'total': total,
         'reviewed_today': reviewed_today,
         'total_score_sum': total_score_sum,
@@ -536,8 +670,12 @@ def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
     
     # Status filter
     if status != 'all':
-        sf = 'mastered' if status == 'learned' else status
-        conditions.append(f"status = '{sf}'")
+        if status == 'learned':
+            conditions.append("status = 'mastered'")
+        elif status == 'learning':
+            conditions.append("status IN ('learning', 'danger', 'familiar')")
+        else:
+            conditions.append(f"status = '{status}'")
     
     # Named filter
     if filter_key != 'all' and filter_key in FILTERS:

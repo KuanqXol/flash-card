@@ -4,10 +4,9 @@
 
 {% block styles %}
 <style>
-    /* Specific styles for 3D Flashcard Practice page */
     .session-info span {
-        color: var(--primary-dark);
-        font-weight: 700;
+        color: var(--color-primary-hover);
+        font-weight: var(--weight-bold);
     }
 
     /* 3D Flashcard Stage */
@@ -16,14 +15,14 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        margin-bottom: 2.5rem;
+        margin-bottom: var(--sp-8);
         min-height: 380px;
     }
 
     .flashcard {
         width: 100%;
-        max-width: 550px;
-        height: 350px;
+        max-width: 560px;
+        height: 360px;
         position: relative;
         transform-style: preserve-3d;
         transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -39,77 +38,96 @@
         width: 100%;
         height: 100%;
         backface-visibility: hidden;
-        border-radius: 2rem;
-        padding: 2.5rem;
+        border-radius: var(--radius-2xl);
+        padding: var(--sp-8);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         align-items: center;
         box-shadow: var(--shadow-lg);
         text-align: center;
+        border: 1px solid var(--border-default);
+        transition: box-shadow var(--transition-normal);
     }
 
-    /* Front Face (Light Indigo/Silver) */
+    .flashcard:hover .card-face {
+        box-shadow: var(--shadow-xl);
+    }
+
+    /* Front Face */
     .card-front {
-        background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
-        border: 1px solid var(--border);
+        background: linear-gradient(135deg, var(--surface-card) 0%, var(--surface-sunken) 100%);
+    }
+
+    [data-theme="dark"] .card-front {
+        background: linear-gradient(135deg, var(--surface-card) 0%, var(--surface-raised) 100%);
     }
 
     .card-front .word-display {
         font-family: var(--font-display);
-        font-size: 3.2rem;
-        font-weight: 800;
+        font-size: var(--text-4xl);
+        font-weight: var(--weight-extrabold);
         color: var(--text-primary);
         letter-spacing: -0.02em;
-        margin-top: 1rem;
+        margin-top: var(--sp-4);
     }
 
     .card-front .phonetic-display {
-        font-size: 1.2rem;
-        color: var(--primary);
-        font-weight: 500;
-        margin-top: 0.5rem;
+        font-size: var(--text-lg);
+        color: var(--color-primary);
+        font-weight: var(--weight-medium);
+        margin-top: var(--sp-2);
     }
 
     .hint-click {
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        font-weight: 500;
-        opacity: 0.7;
+        font-size: var(--text-xs);
+        color: var(--text-tertiary);
+        font-weight: var(--weight-medium);
     }
 
-    /* Back Face (Light Violet) */
+    /* Back Face */
     .card-back {
-        background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+        background: linear-gradient(135deg, var(--surface-card) 0%, #FAF5FF 100%);
         transform: rotateY(180deg);
-        border: 1px solid var(--border);
+    }
+
+    [data-theme="dark"] .card-back {
+        background: linear-gradient(135deg, var(--surface-card) 0%, rgba(168, 85, 247, 0.08) 100%);
     }
 
     .card-back .translation-display {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #5b21b6;
-        line-height: 1.6;
+        font-size: var(--text-lg);
+        font-weight: var(--weight-semibold);
+        color: #5B21B6;
+        line-height: var(--leading-relaxed);
         margin: auto 0;
         max-height: 180px;
         overflow-y: auto;
-        padding: 0 1rem;
+        padding: 0 var(--sp-4);
         width: 100%;
+    }
+
+    [data-theme="dark"] .card-back .translation-display {
+        color: #C4B5FD;
     }
 
     .card-back .card-meta {
         display: flex;
-        gap: 1.5rem;
+        gap: var(--sp-6);
         justify-content: center;
         width: 100%;
-        border-top: 1px solid var(--border);
-        padding-top: 1rem;
+        border-top: 1px solid var(--border-default);
+        padding-top: var(--sp-4);
     }
 
     .meta-item {
-        font-size: 0.85rem;
-        color: #5b21b6;
-        font-weight: 600;
+        font-size: var(--text-sm);
+        color: #5B21B6;
+        font-weight: var(--weight-semibold);
+    }
+
+    [data-theme="dark"] .meta-item {
+        color: #C4B5FD;
     }
 
     /* Controls Panel */
@@ -117,29 +135,29 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 1.5rem;
+        gap: var(--sp-6);
         width: 100%;
-        max-width: 550px;
+        max-width: 560px;
         margin: 0 auto;
     }
 
     .primary-actions {
         display: flex;
-        gap: 1rem;
+        gap: var(--sp-4);
         width: 100%;
         justify-content: center;
         align-items: center;
     }
 
-    /* 5-Star Rating Bar */
+    /* Rating Bar */
     .rating-bar {
         display: none;
-        gap: 0.75rem;
+        gap: var(--sp-4);
         justify-content: center;
         align-items: center;
         opacity: 0;
         transform: translateY(10px);
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        transition: all var(--duration-slow) var(--ease-spring);
     }
 
     .rating-bar.visible {
@@ -148,45 +166,82 @@
         transform: translateY(0);
     }
 
-    .star-rating {
-        display: flex;
-        gap: 0.35rem;
-    }
-
-    .star-rating svg {
-        width: 2.25rem;
-        height: 2.25rem;
-        fill: #e2e8f0; /* unselected */
-        stroke: #cbd5e1;
-        stroke-width: 1.5;
-        cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .star-rating svg.hover {
-        fill: #fbbf24;
-        stroke: #d97706;
-        transform: scale(1.15);
-    }
-
-    .star-rating svg.selected {
-        fill: #fb923c;
-        stroke: #ea580c;
-        transform: scale(1.1) rotate(5deg);
-    }
-
     /* Badge Override for Front Card */
     .card-face .status-badge {
         position: absolute;
-        top: 1.5rem;
-        left: 1.5rem;
+        top: var(--sp-6);
+        left: var(--sp-6);
+    }
+
+    .badge-warning {
+        background: var(--color-warning-subtle);
+        color: var(--color-warning);
+        border: 1px solid var(--color-warning-muted);
+        padding: var(--sp-0-5) var(--sp-2-5);
+        border-radius: var(--radius-full);
+        font-weight: var(--weight-bold);
+        font-size: var(--text-xs);
+    }
+
+    /* TTS buttons in card */
+    .card-tts-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-1);
+        align-items: flex-start;
+        justify-content: center;
+        margin-top: var(--sp-4);
+    }
+
+    /* Session summary badge */
+    .session-badge {
+        align-self: flex-start;
+        background: var(--color-primary-subtle);
+        border: 1px solid rgba(79, 70, 229, 0.15);
+        padding: var(--sp-2) var(--sp-4);
+        border-radius: var(--radius-full);
+        font-size: var(--text-sm);
+        font-weight: var(--weight-semibold);
+        font-family: var(--font-display);
+        margin-bottom: var(--sp-6);
+        box-shadow: var(--shadow-xs);
+        color: var(--color-primary);
+        display: inline-block;
+    }
+
+    /* Swipe and Shake animations for flipped card reviews */
+    @keyframes cardShake {
+        0%, 100% { transform: rotateY(180deg) translateX(0); }
+        20%, 60% { transform: rotateY(180deg) translateX(-14px); }
+        40%, 80% { transform: rotateY(180deg) translateX(14px); }
+    }
+    .card-shake {
+        animation: cardShake 0.4s ease-in-out;
+    }
+
+    @keyframes cardSlideRight {
+        0% { transform: rotateY(180deg) translateX(0) scale(1); opacity: 1; }
+        50% { transform: rotateY(180deg) translateX(120px) scale(0.95) rotate(5deg); opacity: 0.5; }
+        100% { transform: rotateY(180deg) translateX(0) scale(1); opacity: 1; }
+    }
+    .card-slide-right {
+        animation: cardSlideRight 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes cardSlideLeft {
+        0% { transform: rotateY(180deg) translateX(0) scale(1); opacity: 1; }
+        50% { transform: rotateY(180deg) translateX(-120px) scale(0.95) rotate(-5deg); opacity: 0.5; }
+        100% { transform: rotateY(180deg) translateX(0) scale(1); opacity: 1; }
+    }
+    .card-slide-left {
+        animation: cardSlideLeft 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="study-header">
-    <a href="/" class="btn btn-ghost btn-sm">← Dashboard</a>
+    <a href="/" class="btn btn-ghost btn-sm"><i class="ph ph-arrow-left"></i> Dashboard</a>
     
     <div class="filter-bar">
         <!-- Dropdown filter -->
@@ -228,7 +283,7 @@
 <div id="card-container" style="width: 100%;">
     <div id="flashcard-stage-container" style="display: block; width: 100%;">
         <!-- Session Counter Summary -->
-        <div id="session-summary-info" style="align-self: flex-start; background: var(--primary-light); border: 1px solid rgba(79, 70, 229, 0.15); padding: 0.6rem 1.2rem; border-radius: 1rem; font-size: 0.9rem; font-weight: 600; font-family: var(--font-display); margin-bottom: 2rem; box-shadow: var(--shadow-sm); color: var(--primary); display: inline-block;">
+        <div id="session-summary-info" class="session-badge">
             Phiên học mới
         </div>
 
@@ -237,18 +292,18 @@
             <div class="flashcard" id="flashcard" onclick="flipCard()" data-word="">
                 <!-- Front Side -->
                 <div class="card-face card-front">
-                    <div style="position: absolute; top: 1.5rem; left: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                    <div style="position: absolute; top: var(--sp-6); left: var(--sp-6); display: flex; gap: var(--sp-2); align-items: center;">
                         <span class="status-badge badge" id="card-status-badge" style="position: static;">Trống</span>
-                        <span class="badge-warning" id="card-warning-badge" style="display: none; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 700; font-size: 0.75rem;" title="Từ này cần ôn lại">⚠️ Cần ôn</span>
+                        <span class="badge-warning" id="card-warning-badge" style="display: none;" title="Từ này cần ôn lại">⚠️ Cần ôn</span>
                     </div>
                     <div>
-                        <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: var(--sp-4); margin-bottom: var(--sp-2);">
                             <div class="word-display" id="card-word" style="margin-top: 0;">Loading...</div>
-                            <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start; justify-content: center; margin-top: 1rem;">
+                            <div class="card-tts-group">
                                 <button class="btn-tts" id="card-btn-tts" onclick="event.stopPropagation(); playWord(document.getElementById('card-word').textContent, 'normal')" data-word="" data-speed="normal" aria-label="Nghe phát âm">
                                     <i class="ph ph-speaker-high"></i>
                                 </button>
-                                <button class="btn-tts" id="card-btn-tts-slow" onclick="event.stopPropagation(); playWord(document.getElementById('card-word').textContent, 'slow')" data-word="" data-speed="slow" style="font-size: 0.8rem; padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px;" aria-label="Nghe phát âm chậm">
+                                <button class="btn-tts" id="card-btn-tts-slow" onclick="event.stopPropagation(); playWord(document.getElementById('card-word').textContent, 'slow')" data-word="" data-speed="slow" style="font-size: var(--text-xs); padding: 2px var(--sp-1-5); display: inline-flex; align-items: center; gap: var(--sp-1);" aria-label="Nghe phát âm chậm">
                                     <i class="ph ph-speaker-low"></i> Chậm
                                 </button>
                             </div>
@@ -275,18 +330,28 @@
         <!-- Controls Stage -->
         <div class="control-panel">
             <div class="primary-actions">
-                <button class="btn btn-primary" id="btn-flip" onclick="flipCard()" style="padding: 0.9rem 2.5rem; font-size: 1.1rem; border-radius: 1rem;">👁 Xem nghĩa</button>
+                <button class="btn btn-primary btn-lg" id="btn-flip" onclick="flipCard()">
+                    <i class="ph ph-eye"></i> Xem nghĩa
+                </button>
                 
                 <!-- Binary rating buttons -->
                 <div class="rating-bar" id="rating-bar" style="display: flex; gap: var(--sp-3); border: none; background: transparent; padding: 0; box-shadow: none;">
-                    <button class="btn btn-danger" onclick="rateWord(false)" style="padding: 0.9rem 2rem; font-size: 1.05rem; border-radius: 1rem;">❌ Chưa biết</button>
-                    <button class="btn btn-success" onclick="rateWord(true)" style="padding: 0.9rem 2rem; font-size: 1.05rem; border-radius: 1rem;">🙋 Đã xem / Biết</button>
+                    <button class="btn btn-danger btn-lg" onclick="rateWord(false)">
+                        <i class="ph ph-x"></i> Chưa biết
+                    </button>
+                    <button class="btn btn-success btn-lg" onclick="rateWord(true)">
+                        <i class="ph ph-check"></i> Đã xem / Biết
+                    </button>
                 </div>
 
-                <button class="btn btn-success" onclick="markLearned(event)" style="padding: 0.9rem 2rem; font-size: 1.05rem; border-radius: 1rem;">✅ Đã thuộc</button>
+                <button class="btn btn-success btn-lg" onclick="markLearned(event)">
+                    <i class="ph ph-check-circle"></i> Đã thuộc
+                </button>
             </div>
             
-            <button class="btn btn-ghost" onclick="skipWord()" style="margin-top: 1rem;">⏭ Bỏ qua</button>
+            <button class="btn btn-ghost" onclick="skipWord()" style="margin-top: var(--sp-4);">
+                <i class="ph ph-skip-forward"></i> Bỏ qua
+            </button>
         </div>
     </div>
 </div>
