@@ -62,13 +62,21 @@ function handleKeyDown(e) {
     if (e.code === 'Space') {
         e.preventDefault();
         flipCard();
-    } else if (e.key >= '1' && e.key <= '5') {
+    } else if (e.key === '1') {
         if (session.isFlipped && session.currentWord) {
-            rateWord(parseInt(e.key));
+            rateWord(false);
+        }
+    } else if (e.key === '2') {
+        if (session.isFlipped && session.currentWord) {
+            rateWord(true);
         }
     } else if (e.key === 'Enter') {
         e.preventDefault();
-        skipWord();
+        if (session.isFlipped) {
+            rateWord(true);
+        } else {
+            flipCard();
+        }
     }
 }
 
@@ -198,6 +206,7 @@ function updateProgressFill(percent) {
 }
 
 function displayWord(word) {
+    session.hasLoggedFlip = false;
     if (wordEl) wordEl.textContent = word.word;
     
     // Phonetic handling
@@ -252,7 +261,16 @@ function flipCard() {
     if (session.isFlipped) {
         if (btnFlipEl) btnFlipEl.style.display = 'none';
         if (ratingBarEl) ratingBarEl.classList.add('visible');
-        resetStars();
+        
+        // Log flip event to increment seen count (only once per card view)
+        if (!session.hasLoggedFlip) {
+            session.hasLoggedFlip = true;
+            fetch('/api/flashcard/flip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word_id: session.currentWord.id })
+            }).catch(err => console.error("Error logging flip:", err));
+        }
     } else {
         if (btnFlipEl) btnFlipEl.style.display = 'block';
         if (ratingBarEl) ratingBarEl.classList.remove('visible');
@@ -260,7 +278,7 @@ function flipCard() {
 }
 
 // Rate logic
-async function rateWord(rating) {
+async function rateWord(isCorrect) {
     if (!session.currentWord) return;
 
     try {
@@ -269,24 +287,23 @@ async function rateWord(rating) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 word_id: session.currentWord.id,
-                rating: rating
+                is_correct: isCorrect
             })
         });
         
         const data = await response.json();
         
         if (data.success) {
-            if (data.status_changed) {
-                showToast("🎉 Chuyển sang Đang học!", "success");
+            if (isCorrect) {
+                showToast(`+1 điểm`, "success");
+                session.sessionScore += 1;
+            } else {
+                showToast(`Ghi nhận đã xem`, "info");
             }
-            showToast(`+${rating} điểm`, "success");
-            
-            session.sessionScore += rating;
-            highlightChosenStar(rating);
             
             setTimeout(() => {
                 nextWord();
-            }, 800);
+            }, 600);
         } else {
             showToast(data.message || "Lỗi đánh giá!", "error");
         }

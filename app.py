@@ -25,7 +25,10 @@ from scoring import (
     mark_as_learning,
     _apply_score_change,
     get_review_queue,
-    calculate_mastery_score
+    calculate_mastery_score,
+    update_score,
+    get_practice_queue,
+    apply_forgetting_decay
 )
 
 app = Flask(__name__)
@@ -138,33 +141,62 @@ def api_flashcard_next():
     })
 
 
+# API POST /api/flashcard/flip -> logs flashcard flip (increments seen count)
+@app.route('/api/flashcard/flip', methods=['POST'])
+def api_flashcard_flip():
+    data = request.get_json() or {}
+    word_id = data.get('word_id')
+    if word_id is None:
+        return jsonify({'success': False, 'message': 'Missing word_id'}), 400
+        
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO word_stats (word_id, exercise, seen, correct)
+            VALUES (?, 'flashcard', 1, 0)
+            ON CONFLICT(word_id, exercise) DO UPDATE SET seen = seen + 1
+        """, (word_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        conn.close()
+
 # API POST /api/flashcard/rate -> rates a flashcard word, adjusts score and handles potential upgrades
 @app.route('/api/flashcard/rate', methods=['POST'])
 def api_flashcard_rate():
     data = request.get_json() or {}
     word_id = data.get('word_id')
     rating = data.get('rating')
+    is_correct = data.get('is_correct')
     
-    if word_id is None or rating is None:
-        return jsonify({'success': False, 'message': 'Missing word_id or rating'}), 400
+    if word_id is None:
+        return jsonify({'success': False, 'message': 'Missing word_id'}), 400
         
-    try:
-        word_id = int(word_id)
-        rating = int(rating)
-    except ValueError:
-        return jsonify({'success': False, 'message': 'Invalid type for word_id or rating'}), 400
+    if is_correct is None and rating is not None:
+        is_correct = rating >= 4
         
-    if rating < 1 or rating > 5:
-        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5'}), 400
+    if is_correct is None:
+        return jsonify({'success': False, 'message': 'Missing is_correct or rating'}), 400
         
     conn = get_db()
     try:
-        res = apply_flashcard_rating(conn, word_id, rating)
+        # Check if seen was incremented in this card view. If not, increment it.
+        cursor = conn.cursor()
+        cursor.execute("SELECT seen FROM word_stats WHERE word_id = ? AND exercise = 'flashcard'", (word_id,))
+        row = cursor.fetchone()
+        if not row:
+            cursor.execute("INSERT INTO word_stats (word_id, exercise, seen, correct) VALUES (?, 'flashcard', 1, 0)", (word_id,))
+            
+        new_score = update_score(int(word_id), 'flashcard', bool(is_correct), db=conn)
+        word = conn.execute("SELECT status, total_score FROM words WHERE id = ?", (word_id,)).fetchone()
+        
         return jsonify({
             'success': True,
-            'new_score': res['new_score'],
-            'new_status': res['new_status'],
-            'status_changed': res['status_changed'],
+            'new_score': new_score,
+            'new_status': word['status'],
+            'status_changed': True,
             'message': 'Rating updated successfully'
         })
     except ValueError as e:
@@ -330,23 +362,21 @@ def api_fill_evaluate():
     if word_id is None or is_correct is None:
         return jsonify({'success': False, 'message': 'Missing word_id or is_correct'}), 400
         
-    delta = 5 if is_correct else -3
+    delta = 5 if is_correct else -1
     
     conn = get_db()
     try:
-        # update_word_after_review has handled self_correct_count, last_failed_at, consecutive_wrong
-        word, status_changed = update_word_after_review(
-            conn, int(word_id), delta, 'fill', is_correct=bool(is_correct)
-        )
+        new_score = update_score(int(word_id), 'typing', bool(is_correct), db=conn)
+        word = conn.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
         
         return jsonify({
             'success': True,
-            'new_score': word['total_score'],
+            'new_score': new_score,
             'mastery_score': calculate_mastery_score(word),
             'delta': delta,
             'consecutive_wrong': word['consecutive_wrong'],
             'needs_review': word['needs_review'],
-            'status_changed': status_changed,
+            'status_changed': True,
             'new_status': word['status'],
         })
     except Exception as e:
@@ -514,7 +544,7 @@ def api_forgotten_words():
         rows = conn.execute("""
             SELECT * 
             FROM words 
-            WHERE status != 'learned' 
+            WHERE status != 'mastered' AND status != 'learned' 
             ORDER BY last_reviewed ASC NULLS FIRST 
             LIMIT ?
         """, (n,)).fetchall()
@@ -716,8 +746,9 @@ def api_words_search():
         params.append(f"%{q}%")
         
     if status != 'all':
+        sf = 'mastered' if status == 'learned' else status
         where_clauses.append("status = ?")
-        params.append(status)
+        params.append(sf)
         
     if filter_type != 'all' and filter_type in FILTERS:
         sql_cond = FILTERS[filter_type].get('sql')
@@ -1266,21 +1297,25 @@ def api_words_bulk_action():
         placeholders = ','.join('?' for _ in word_ids)
         
         if action == 'mark_learned':
-            cursor.execute(f"UPDATE words SET status = 'learned' WHERE id IN ({placeholders})", word_ids)
+            for wid in word_ids:
+                mark_as_learned(conn, int(wid))
+            affected = len(word_ids)
         elif action == 'mark_learning':
-            cursor.execute(f"UPDATE words SET status = 'learning' WHERE id IN ({placeholders})", word_ids)
+            for wid in word_ids:
+                mark_as_learning(conn, int(wid))
+            affected = len(word_ids)
         elif action == 'reset':
             cursor.execute(f"""
                 UPDATE words
                 SET status = 'new',
+                    knowledge_score = 30,
                     total_score = 0,
                     has_been_rated_five = 0,
                     review_count = 0,
                     last_reviewed = NULL
                 WHERE id IN ({placeholders})
             """, word_ids)
-            
-        affected = cursor.rowcount
+            affected = cursor.rowcount
         conn.commit()
         
         return jsonify({
@@ -1289,6 +1324,139 @@ def api_words_bulk_action():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+def get_mcq_options(db, word, pool_words):
+    word_id = word['id']
+    correct_text = word['short_translation'] or word['translation']
+    if not correct_text:
+        correct_text = ''
+    correct_text = correct_text.strip()
+    
+    pos_rows = db.execute("SELECT pos FROM word_pos WHERE word_id = ?", (word_id,)).fetchall()
+    pos_list = [r['pos'] for r in pos_rows if r['pos']]
+    
+    wrong_options = []
+    
+    if pos_list:
+        placeholders = ','.join('?' for _ in pos_list)
+        query = f"""
+            SELECT DISTINCT w.id, w.word, w.translation, w.short_translation 
+            FROM words w
+            JOIN word_pos wp ON w.id = wp.word_id
+            WHERE wp.pos IN ({placeholders}) AND w.id != ?
+            ORDER BY RANDOM() LIMIT 30
+        """
+        params = pos_list + [word_id]
+        pos_matching_rows = db.execute(query, params).fetchall()
+        for row in pos_matching_rows:
+            opt_text = (row['short_translation'] or row['translation'] or '').strip()
+            if opt_text and opt_text != correct_text and opt_text not in wrong_options:
+                wrong_options.append(opt_text)
+                if len(wrong_options) >= 3:
+                    break
+                    
+    if len(wrong_options) < 3:
+        query = """
+            SELECT id, word, translation, short_translation 
+            FROM words 
+            WHERE id != ? 
+            ORDER BY RANDOM() LIMIT 30
+        """
+        random_rows = db.execute(query, (word_id,)).fetchall()
+        for row in random_rows:
+            opt_text = (row['short_translation'] or row['translation'] or '').strip()
+            if opt_text and opt_text != correct_text and opt_text not in wrong_options:
+                wrong_options.append(opt_text)
+                if len(wrong_options) >= 3:
+                    break
+                    
+    while len(wrong_options) < 3:
+        wrong_options.append(f"Nghĩa giả lập {len(wrong_options) + 1}")
+        
+    wrong_options = wrong_options[:3]
+    all_choices = wrong_options + [correct_text]
+    import random
+    random.shuffle(all_choices)
+    
+    return all_choices, correct_text
+
+@app.route('/mcq')
+def mcq():
+    return render_template('mcq.html')
+
+@app.route('/api/mcq/queue', methods=['GET'])
+def api_mcq_queue():
+    db = get_db()
+    try:
+        word_ids = get_practice_queue('mcq', limit=10, db=db)
+        
+        queue = []
+        for wid in word_ids:
+            row = db.execute("SELECT * FROM words WHERE id = ?", (wid,)).fetchone()
+            if row:
+                word = dict(row)
+                pos_rows = db.execute("SELECT pos, meaning FROM word_pos WHERE word_id = ? ORDER BY sort_order", (wid,)).fetchall()
+                word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+                word['mastery_score'] = calculate_mastery_score(word)
+                
+                choices, correct_answer = get_mcq_options(db, word, queue)
+                
+                queue.append({
+                    'id': word['id'],
+                    'word': word['word'],
+                    'phonetic': word['phonetic'],
+                    'translation': word['translation'],
+                    'short_translation': word['short_translation'],
+                    'status': word['status'],
+                    'knowledge_score': word['knowledge_score'],
+                    'pos_entries': word['pos_entries'],
+                    'mastery_score': word['mastery_score'],
+                    'choices': choices,
+                    'correct_answer': correct_answer
+                })
+                
+        return jsonify({
+            'queue': queue,
+            'total': len(queue)
+        })
+    finally:
+        db.close()
+
+@app.route('/api/mcq/evaluate', methods=['POST'])
+def api_mcq_evaluate():
+    data = request.get_json() or {}
+    word_id = data.get('word_id')
+    is_correct = data.get('is_correct')
+    choice = data.get('choice')
+    
+    if word_id is None:
+        return jsonify({'success': False, 'message': 'Missing word_id'}), 400
+        
+    conn = get_db()
+    try:
+        if choice is not None:
+            word_row = conn.execute("SELECT translation, short_translation FROM words WHERE id = ?", (word_id,)).fetchone()
+            if word_row:
+                correct_text = (word_row['short_translation'] or word_row['translation'] or '').strip()
+                is_correct = choice.strip() == correct_text
+                
+        if is_correct is None:
+            return jsonify({'success': False, 'message': 'Missing is_correct or choice'}), 400
+            
+        new_score = update_score(int(word_id), 'mcq', bool(is_correct), db=conn)
+        word = conn.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
+        
+        return jsonify({
+            'success': True,
+            'new_score': new_score,
+            'mastery_score': calculate_mastery_score(word),
+            'is_correct': bool(is_correct),
+            'new_status': word['status']
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
 

@@ -135,13 +135,15 @@ function renderWordList(words) {
     const badgeClasses = {
         'new': 'badge-new',
         'learning': 'badge-learning',
-        'learned': 'badge-learned'
+        'learned': 'badge-learned',
+        'mastered': 'badge-learned'
     };
 
     const badgeLabels = {
         'new': 'Mới',
         'learning': 'Học',
-        'learned': 'Thuộc'
+        'learned': 'Thuộc',
+        'mastered': 'Thuộc'
     };
 
     let html = '';
@@ -239,15 +241,22 @@ function renderWordList(words) {
                                 </button>
                                 
                                 <div style="margin-left: auto; display: flex; gap: var(--sp-2);">
-                                    ${w.status !== 'learned' ? `
+                                    ${w.status === 'new' ? `
+                                        <button class="btn btn-primary" onclick="updateStatus(${w.id}, 'mark_learning')">
+                                            🚀 Bắt đầu học
+                                        </button>
+                                        <button class="btn btn-success" onclick="updateStatus(${w.id}, 'mark_learned')">
+                                            ✅ Đã thuộc
+                                        </button>
+                                    ` : (w.status === 'learning' ? `
                                         <button class="btn btn-success" onclick="updateStatus(${w.id}, 'mark_learned')">
                                             ✅ Đã thuộc
                                         </button>
                                     ` : `
                                         <button class="btn btn-ghost" onclick="updateStatus(${w.id}, 'mark_learning')">
-                                            🔄 Ôn lại
+                                            🔓 Bỏ đánh dấu
                                         </button>
-                                    `}
+                                    `)}
                                     <button class="btn btn-danger" onclick="resetWordStats(${w.id})">
                                         🧹 Đặt lại điểm số
                                     </button>

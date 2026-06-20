@@ -44,6 +44,35 @@ def init_db(conn=None):
     );
     ''')
     
+    # Ensure column knowledge_score exists
+    cursor.execute("PRAGMA table_info(words)")
+    columns = [row['name'] for row in cursor.fetchall()]
+    if 'knowledge_score' not in columns:
+        cursor.execute("ALTER TABLE words ADD COLUMN knowledge_score INTEGER DEFAULT 30")
+        
+    # Create word_events table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS word_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word_id INTEGER NOT NULL,
+        event TEXT NOT NULL,
+        timestamp TEXT DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY (word_id) REFERENCES words(id)
+    );
+    ''')
+
+    # Create word_stats table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS word_stats (
+        word_id INTEGER,
+        exercise TEXT,
+        seen INTEGER DEFAULT 0,
+        correct INTEGER DEFAULT 0,
+        PRIMARY KEY (word_id, exercise),
+        FOREIGN KEY (word_id) REFERENCES words(id) ON DELETE CASCADE
+    );
+    ''')
+    
     # Create review_history table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS review_history (
@@ -302,10 +331,15 @@ def get_stats():
     cursor.execute("SELECT status, COUNT(*) as cnt FROM words GROUP BY status")
     rows = cursor.fetchall()
     
-    counts = {'new': 0, 'learning': 0, 'learned': 0}
+    counts = {'new': 0, 'learning': 0, 'mastered': 0, 'learned': 0}
     for r in rows:
-        if r['status'] in counts:
-            counts[r['status']] = r['cnt']
+        status_val = r['status']
+        cnt = r['cnt']
+        if status_val == 'mastered' or status_val == 'learned':
+            counts['mastered'] += cnt
+            counts['learned'] += cnt
+        elif status_val in counts:
+            counts[status_val] = cnt
             
     # Total words count
     cursor.execute("SELECT COUNT(*) FROM words")
@@ -333,6 +367,7 @@ def get_stats():
         'new': counts['new'],
         'learning': counts['learning'],
         'learned': counts['learned'],
+        'mastered': counts['mastered'],
         'total': total,
         'reviewed_today': reviewed_today,
         'total_score_sum': total_score_sum,
@@ -434,7 +469,7 @@ FILTERS = {
   'lowest_score': {
     'label': 'Điểm thấp nhất',
     'group': 'performance',
-    'sql': "status != 'learned'",
+    'sql': "status != 'mastered' AND status != 'learned'",
     'order': 'total_score ASC',
     'pool_size': 20,
     'pool_mode': True,   # ← lấy top N rồi shuffle
@@ -501,7 +536,8 @@ def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
     
     # Status filter
     if status != 'all':
-        conditions.append(f"status = '{status}'")
+        sf = 'mastered' if status == 'learned' else status
+        conditions.append(f"status = '{sf}'")
     
     # Named filter
     if filter_key != 'all' and filter_key in FILTERS:

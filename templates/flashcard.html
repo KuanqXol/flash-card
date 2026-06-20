@@ -267,15 +267,10 @@
             <div class="primary-actions">
                 <button class="btn btn-primary" id="btn-flip" onclick="flipCard()" style="padding: 0.9rem 2.5rem; font-size: 1.1rem; border-radius: 1rem;">👁 Xem nghĩa</button>
                 
-                <!-- 5 Star rating bar -->
-                <div class="rating-bar" id="rating-bar">
-                    <div class="star-rating">
-                        <svg data-val="1" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                        <svg data-val="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                        <svg data-val="3" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                        <svg data-val="4" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                        <svg data-val="5" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                    </div>
+                <!-- Binary rating buttons -->
+                <div class="rating-bar" id="rating-bar" style="display: flex; gap: var(--sp-3); border: none; background: transparent; padding: 0; box-shadow: none;">
+                    <button class="btn btn-danger" onclick="rateWord(false)" style="padding: 0.9rem 2rem; font-size: 1.05rem; border-radius: 1rem;">❌ Chưa biết</button>
+                    <button class="btn btn-success" onclick="rateWord(true)" style="padding: 0.9rem 2rem; font-size: 1.05rem; border-radius: 1rem;">🙋 Đã xem / Biết</button>
                 </div>
 
                 <button class="btn btn-success" onclick="markLearned(event)" style="padding: 0.9rem 2rem; font-size: 1.05rem; border-radius: 1rem;">✅ Đã thuộc</button>

@@ -40,6 +40,9 @@
                 <a href="/fill" class="nav-link" id="nav-fill">
                     <span class="nav-icon">✏️</span> Điền Nghĩa
                 </a>
+                <a href="/mcq" class="nav-link" id="nav-mcq">
+                    <span class="nav-icon">🧩</span> Trắc nghiệm
+                </a>
             </nav>
         </aside>
 
@@ -69,6 +72,10 @@
             <a href="/fill" class="bottom-nav-link" id="bnav-fill">
                 <span class="nav-icon">✏️</span>
                 <span class="nav-text">Điền Nghĩa</span>
+            </a>
+            <a href="/mcq" class="bottom-nav-link" id="bnav-mcq">
+                <span class="nav-icon">🧩</span>
+                <span class="nav-text">Trắc nghiệm</span>
             </a>
         </nav>
     </div>
@@ -110,6 +117,7 @@
         else if (path.startsWith('/flashcard')) activeId = 'flashcard';
         else if (path.startsWith('/matching')) activeId = 'matching';
         else if (path.startsWith('/fill')) activeId = 'fill';
+        else if (path.startsWith('/mcq')) activeId = 'mcq';
 
         // Sidebar Links
         document.querySelectorAll('.nav-link').forEach(link => {
@@ -309,7 +317,7 @@
     // Global Keyboard Shortcuts
     document.addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      const map = { 'd': '/', 'w': '/words', 'f': '/flashcard', 'm': '/matching', 't': '/fill' };
+      const map = { 'd': '/', 'w': '/words', 'f': '/flashcard', 'm': '/matching', 't': '/fill', 'q': '/mcq' };
       if (map[e.key.toLowerCase()]) window.location.href = map[e.key.toLowerCase()];
     });
     </script>
