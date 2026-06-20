@@ -209,6 +209,22 @@ function displayWord(word) {
     session.hasLoggedFlip = false;
     if (wordEl) wordEl.textContent = word.word;
     
+    // Set data-word attributes for TTS
+    const cardContainer = document.getElementById('flashcard');
+    if (cardContainer) cardContainer.setAttribute('data-word', word.word);
+    
+    const btnTts = document.getElementById('card-btn-tts');
+    const btnTtsSlow = document.getElementById('card-btn-tts-slow');
+    if (btnTts) btnTts.setAttribute('data-word', word.word);
+    if (btnTtsSlow) btnTtsSlow.setAttribute('data-word', word.word);
+    
+    // Autoplay pronunciation after 300ms
+    setTimeout(() => {
+        if (session.currentWord && session.currentWord.word === word.word) {
+            playWord(word.word, 'normal');
+        }
+    }, 300);
+    
     // Phonetic handling
     if (phoneticEl) {
         if (word.phonetic && word.phonetic !== '--' && word.phonetic.trim() !== '') {

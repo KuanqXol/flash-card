@@ -166,8 +166,11 @@ function renderWordList(words) {
                     <span class="badge ${badgeClass}">${badgeLabel}</span>
                 </td>
                 <td class="cell-word">
-                    <div class="word-spelling-container">
+                    <div class="word-spelling-container" style="display: flex; align-items: center; gap: 8px;">
                         <span class="word-spelling">${highlightedSpelling}</span>
+                        <button class="btn-tts" onclick="event.stopPropagation(); playWord('${w.word.replace(/'/g, "\\'")}', 'normal')" data-word="${w.word}" aria-label="Nghe phát âm">
+                            <i class="ph ph-speaker-high"></i>
+                        </button>
                         ${warningBadge}
                     </div>
                     <div class="word-phonetic">${highlightedPhonetic}</div>

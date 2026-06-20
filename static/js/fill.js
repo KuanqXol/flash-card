@@ -200,10 +200,17 @@ function displayWord(word) {
         wordScoreEl.textContent = `Điểm: ${word.total_score || 0} ⭐`;
     }
 
+    const fillPromptBtn = document.getElementById('fill-prompt-btn-tts');
+
     if (session.mode === 'en_to_vi') {
         if (flagEl) flagEl.textContent = '🇬🇧';
         if (promptEl) promptEl.textContent = word.word;
         if (hintLabelEl) hintLabelEl.textContent = 'Nghĩa tiếng Việt là gì?';
+        
+        if (fillPromptBtn) {
+            fillPromptBtn.setAttribute('data-word', word.word);
+            fillPromptBtn.style.display = 'inline-flex';
+        }
         
         if (phoneticEl) {
             if (word.phonetic && word.phonetic !== '--' && word.phonetic.trim() !== '') {
@@ -221,6 +228,11 @@ function displayWord(word) {
         }
         if (promptEl) promptEl.textContent = promptText;
         if (hintLabelEl) hintLabelEl.textContent = 'Từ tiếng Anh là gì?';
+        
+        if (fillPromptBtn) {
+            fillPromptBtn.style.display = 'none';
+        }
+        
         if (phoneticEl) phoneticEl.style.display = 'none';
     }
 }
@@ -260,6 +272,12 @@ function submitAnswer() {
             details.push(session.currentWord.translation);
         }
         if (fullAnsEl) fullAnsEl.textContent = details.join(' | ');
+    }
+    
+    // Set data-word attribute for TTS button inside answer box
+    const fillAnswerBtn = document.getElementById('fill-answer-btn-tts');
+    if (fillAnswerBtn && session.currentWord) {
+        fillAnswerBtn.setAttribute('data-word', session.currentWord.word);
     }
     
     if (answerBoxEl) {

@@ -398,9 +398,14 @@
             </div>
         </div>
 
-        <div class="prompt-card" id="prompt-card">
+        <div class="prompt-card" id="prompt-card" data-word="">
             <div class="question-hint-label">Chọn nghĩa đúng của từ</div>
-            <div class="word-prompt" id="word-prompt">Word</div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: var(--sp-2);">
+                <div class="word-prompt" id="word-prompt" style="margin-bottom: 0;">Word</div>
+                <button class="btn-tts" id="mcq-btn-tts" onclick="playWord(document.getElementById('word-prompt').textContent, 'normal')" data-word="" aria-label="Nghe phát âm">
+                    <i class="ph ph-speaker-high"></i>
+                </button>
+            </div>
             <div class="phonetic-prompt" id="phonetic-prompt">/phonetic/</div>
             <div class="pos-container" id="pos-container">
                 <!-- POS Badges -->

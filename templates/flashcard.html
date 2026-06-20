@@ -234,7 +234,7 @@
 
         <!-- Card Stage -->
         <div class="flashcard-stage">
-            <div class="flashcard" id="flashcard" onclick="flipCard()">
+            <div class="flashcard" id="flashcard" onclick="flipCard()" data-word="">
                 <!-- Front Side -->
                 <div class="card-face card-front">
                     <div style="position: absolute; top: 1.5rem; left: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
@@ -242,7 +242,17 @@
                         <span class="badge-warning" id="card-warning-badge" style="display: none; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 700; font-size: 0.75rem;" title="Từ này cần ôn lại">⚠️ Cần ôn</span>
                     </div>
                     <div>
-                        <div class="word-display" id="card-word">Loading...</div>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.5rem;">
+                            <div class="word-display" id="card-word" style="margin-top: 0;">Loading...</div>
+                            <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start; justify-content: center; margin-top: 1rem;">
+                                <button class="btn-tts" id="card-btn-tts" onclick="event.stopPropagation(); playWord(document.getElementById('card-word').textContent, 'normal')" data-word="" data-speed="normal" aria-label="Nghe phát âm">
+                                    <i class="ph ph-speaker-high"></i>
+                                </button>
+                                <button class="btn-tts" id="card-btn-tts-slow" onclick="event.stopPropagation(); playWord(document.getElementById('card-word').textContent, 'slow')" data-word="" data-speed="slow" style="font-size: 0.8rem; padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px;" aria-label="Nghe phát âm chậm">
+                                    <i class="ph ph-speaker-low"></i> Chậm
+                                </button>
+                            </div>
+                        </div>
                         <div class="phonetic-display" id="card-phonetic">[/loading/]</div>
                     </div>
                     <span class="hint-click">Click thẻ hoặc nhấn Space để xem nghĩa</span>

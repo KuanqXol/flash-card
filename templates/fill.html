@@ -278,7 +278,12 @@
             
             <div style="margin: auto 0; padding: 1rem 0;">
                 <div class="question-hint-label" id="question-hint-label">Nghĩa tiếng Việt là gì?</div>
-                <div class="prompt-display" id="question-prompt">Word Prompt</div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.5rem;">
+                    <div class="prompt-display" id="question-prompt" style="margin-bottom: 0;">Word Prompt</div>
+                    <button class="btn-tts" id="fill-prompt-btn-tts" onclick="playWord(document.getElementById('question-prompt').textContent, 'normal')" data-word="" aria-label="Nghe phát âm" style="display: none;">
+                        <i class="ph ph-speaker-high"></i>
+                    </button>
+                </div>
                 <div class="phonetic-display" id="question-phonetic">/phonetic/</div>
             </div>
             
@@ -297,7 +302,12 @@
         <!-- Answer box (yellow) -->
         <div class="answer-box" id="answer-box">
             <div class="ans-label">📖 Đáp án chính xác:</div>
-            <div class="ans-short" id="short-answer">Short translation</div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.5rem;">
+                <div class="ans-short" id="short-answer" style="margin-bottom: 0;">Short translation</div>
+                <button class="btn-tts" id="fill-answer-btn-tts" onclick="playWord(session.currentWord.word, 'normal')" data-word="" aria-label="Nghe phát âm">
+                    <i class="ph ph-speaker-high"></i>
+                </button>
+            </div>
             <div class="ans-full" id="full-answer">Full detail definition description translation context goes here.</div>
             
             <div class="eval-actions">

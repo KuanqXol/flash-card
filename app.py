@@ -1,9 +1,10 @@
 import os
 import tempfile
 import csv
+import threading
 from io import StringIO
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify, make_response
+from flask import Flask, render_template, request, jsonify, make_response, send_file
 from database import (
     init_db, 
     get_stats, 
@@ -32,6 +33,71 @@ from scoring import (
 )
 
 app = Flask(__name__)
+
+# Ensure audio cache directory exists
+os.makedirs(os.path.join('static', 'audio'), exist_ok=True)
+
+# TTS Thread-safe structures for generation tracking
+generating_lock = threading.Lock()
+generating_files = set()
+generation_errors = {}
+generation_errors_lock = threading.Lock()
+
+def sanitize_word(word):
+    if not word:
+        return ""
+    return "".join(c for c in word if c.isalpha() or c.isspace() or c == '-')
+
+def slugify(word):
+    w = word.lower()
+    res = []
+    for c in w:
+        if c.isalnum() or c == '-':
+            res.append(c)
+        elif c == '_':
+            res.append(c)
+        elif c == ' ':
+            res.append('_')
+    return "".join(res)
+
+def cleanup_audio_cache():
+    cache_dir = os.path.join('static', 'audio')
+    if not os.path.exists(cache_dir):
+        return
+    
+    max_size = 100 * 1024 * 1024
+    files = []
+    total_size = 0
+    try:
+        for filename in os.listdir(cache_dir):
+            if filename.endswith('.mp3'):
+                filepath = os.path.join(cache_dir, filename)
+                try:
+                    size = os.path.getsize(filepath)
+                    files.append((filepath, size))
+                    total_size += size
+                except Exception as e:
+                    app.logger.warning(f"Error accessing cache file {filepath}: {e}")
+    except Exception as e:
+        app.logger.warning(f"Error listing cache directory: {e}")
+        return
+
+    if total_size > max_size:
+        try:
+            files.sort(key=lambda x: os.path.getmtime(x[0]))
+        except Exception as e:
+            app.logger.warning(f"Error sorting cache files by mtime: {e}")
+            
+        for filepath, size in files:
+            try:
+                os.remove(filepath)
+                total_size -= size
+                app.logger.info(f"LRU Eviction deleted cache file: {filepath}")
+                if total_size <= max_size:
+                    break
+            except Exception as e:
+                app.logger.warning(f"Failed to evict {filepath}: {e}")
+
 
 # Route GET / -> render template dashboard.html
 @app.route('/')
@@ -1459,6 +1525,114 @@ def api_mcq_evaluate():
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
+
+@app.route('/api/tts')
+def api_tts():
+    word = request.args.get('word', '').strip()
+    speed = request.args.get('speed', 'normal').strip().lower()
+    
+    clean_word = sanitize_word(word)
+    if not clean_word:
+        return jsonify({'error': 'Invalid or empty word'}), 400
+        
+    is_slow = (speed == 'slow')
+    filename = slugify(clean_word) + ('_slow.mp3' if is_slow else '.mp3')
+    filepath = os.path.join('static', 'audio', filename)
+    
+    # If already cached, serve immediately
+    if os.path.exists(filepath):
+        return send_file(filepath, mimetype='audio/mpeg')
+        
+    # Check if this file is currently being generated
+    with generating_lock:
+        is_generating = filename in generating_files
+        if not is_generating:
+            generating_files.add(filename)
+            
+    def run_gtts_generation():
+        try:
+            from gtts import gTTS
+            tts = gTTS(text=clean_word, lang='en', tld='us', slow=is_slow)
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.mp3', dir=os.path.join('static', 'audio'))
+            os.close(temp_fd)
+            try:
+                tts.save(temp_path)
+                cleanup_audio_cache()
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                    except Exception:
+                        pass
+                os.rename(temp_path, filepath)
+                with generation_errors_lock:
+                    generation_errors.pop(filename, None)
+            except Exception as e:
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except Exception:
+                        pass
+                raise e
+        except Exception as e:
+            app.logger.warning(f"gTTS error for word '{clean_word}': {e}")
+            with generation_errors_lock:
+                generation_errors[filename] = str(e)
+        finally:
+            with generating_lock:
+                generating_files.discard(filename)
+
+    if not is_generating:
+        thread = threading.Thread(target=run_gtts_generation)
+        thread.start()
+        thread.join(timeout=2.0)
+    else:
+        import time
+        start_time = time.time()
+        while time.time() - start_time < 2.0:
+            if os.path.exists(filepath):
+                break
+            time.sleep(0.1)
+
+    # Re-check if file exists
+    if os.path.exists(filepath):
+        return send_file(filepath, mimetype='audio/mpeg')
+        
+    with generation_errors_lock:
+        error = generation_errors.get(filename)
+        
+    if error:
+        with generation_errors_lock:
+            generation_errors.pop(filename, None)
+        return jsonify({'error': 'TTS generation failed', 'details': error}), 503
+        
+    with generating_lock:
+        still_generating = filename in generating_files
+        
+    if still_generating:
+        return jsonify({'status': 'processing', 'message': 'Audio is being generated'}), 202
+    else:
+        return jsonify({'error': 'TTS generation failed'}), 503
+
+@app.route('/api/tts/cache-stats')
+def api_tts_cache_stats():
+    cache_dir = os.path.join('static', 'audio')
+    total_files = 0
+    total_size = 0
+    if os.path.exists(cache_dir):
+        for filename in os.listdir(cache_dir):
+            if filename.endswith('.mp3'):
+                filepath = os.path.join(cache_dir, filename)
+                try:
+                    total_files += 1
+                    total_size += os.path.getsize(filepath)
+                except Exception as e:
+                    app.logger.warning(f"Error reading file size for {filepath}: {e}")
+                    
+    total_size_mb = round(total_size / (1024 * 1024), 2)
+    return jsonify({
+        'total_files': total_files,
+        'total_size_mb': total_size_mb
+    })
 
 if __name__ == '__main__':
     # Initialize SQLite database and tables

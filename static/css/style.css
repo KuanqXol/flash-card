@@ -652,4 +652,52 @@ body {
   justify-content: center;
 }
 
+/* TTS Pronunciation Button Styles */
+.btn-tts {
+  background: transparent;
+  border: none;
+  padding: var(--sp-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  transition: transform 150ms ease, color 150ms ease;
+  font-size: 1.15rem;
+  vertical-align: middle;
+  outline: none;
+}
+
+.btn-tts:hover {
+  transform: scale(1.15);
+  color: var(--primary-hover);
+}
+
+.btn-tts.loading {
+  pointer-events: none;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.btn-tts.loading i {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes tts-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.btn-tts.playing i {
+  display: inline-block;
+  animation: tts-pulse 1.2s ease-in-out infinite;
+  color: var(--color-success, #10B981);
+}
+
+
 

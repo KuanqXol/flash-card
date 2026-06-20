@@ -201,7 +201,13 @@ function renderColumns() {
         card.className = 'match-card';
         card.dataset.id = w.id;
         card.dataset.type = 'en';
-        card.textContent = w.word;
+        card.setAttribute('data-word', w.word);
+        card.innerHTML = `
+            <span style="flex-grow: 1;">${w.word}</span>
+            <button class="btn-tts" data-word="${w.word}" onclick="event.stopPropagation(); playWord('${w.word.replace(/'/g, "\\'")}', 'normal')" style="margin-left: 8px;" aria-label="Nghe phát âm">
+                <i class="ph ph-speaker-high"></i>
+            </button>
+        `;
         card.addEventListener('click', handleEnClick);
         enColumnEl.appendChild(card);
     });

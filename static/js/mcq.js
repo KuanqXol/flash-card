@@ -90,6 +90,19 @@ function renderQuestion() {
     document.getElementById('word-prompt').textContent = word.word;
     document.getElementById('phonetic-prompt').textContent = word.phonetic || '';
     
+    // Set data-word attributes for TTS
+    const promptCard = document.getElementById('prompt-card');
+    if (promptCard) promptCard.setAttribute('data-word', word.word);
+    const btnTts = document.getElementById('mcq-btn-tts');
+    if (btnTts) btnTts.setAttribute('data-word', word.word);
+    
+    // Autoplay pronunciation when new question loads
+    setTimeout(() => {
+        if (session.queue[session.currentIndex] && session.queue[session.currentIndex].word === word.word) {
+            playWord(word.word, 'normal');
+        }
+    }, 300);
+    
     // POS Badges
     const posContainer = document.getElementById('pos-container');
     posContainer.innerHTML = '';
