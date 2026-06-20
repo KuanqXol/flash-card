@@ -12,8 +12,17 @@
   --sp-4: 16px;
   --sp-5: 20px;
   --sp-6: 24px;
-  --color-primary-subtle: var(--primary-light);
-  --border-subtle: var(--border);
+  --primary: var(--color-primary);
+  --primary-light: var(--color-primary-subtle);
+  --border: var(--border-default);
+  --border-subtle: var(--border-default);
+  --card-bg: var(--surface-card);
+  --bg: var(--surface-page);
+  --radius: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-sm: var(--radius-sm);
+  --transition: var(--transition-fast);
+  --color-primary-subtle: var(--color-primary-subtle);
 }
 
 .words-container {
@@ -725,7 +734,7 @@
 </div>
 
 <!-- MODAL: ADD / EDIT WORD -->
-<div class="modal-overlay" id="word-modal">
+<div class="modal-overlay" id="word-modal" style="display: none;">
     <div class="modal" style="max-width: 500px;">
         <div class="modal-header">
             <h3 id="word-modal-title">Thêm từ vựng</h3>
@@ -765,7 +774,7 @@
 </div>
 
 <!-- MODAL: IMPORT CSV -->
-<div class="modal-overlay" id="import-modal">
+<div class="modal-overlay" id="import-modal" style="display: none;">
     <div class="modal" style="max-width: 480px;">
         <div class="modal-header">
             <h3>Import CSV</h3>
@@ -778,8 +787,8 @@
                 <i class="ph ph-file-csv drop-zone-icon"></i>
                 <p>Kéo thả file CSV vào đây hoặc click để chọn</p>
                 <small class="form-help">File gồm các cột: word, phonetic, translation, status, total_score, review_count</small>
-                <input type="file" id="file-input" style="display: none;" accept=".csv" onchange="handleFileSelect(this.files)">
             </div>
+            <input type="file" id="file-input" style="display: none;" accept=".csv" onchange="handleFileSelect(this.files)">
             
             <!-- File Preview -->
             <div id="file-preview" style="display: none; flex-direction: column; gap: var(--sp-3); align-items: center; text-align: center;">
@@ -813,7 +822,7 @@
 </div>
 
 <!-- MODAL: VIEW HISTORY -->
-<div class="modal-overlay" id="history-modal">
+<div class="modal-overlay" id="history-modal" style="display: none;">
     <div class="modal" style="max-width: 480px;">
         <div class="modal-header">
             <h3>Lịch sử ôn tập</h3>
