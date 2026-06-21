@@ -1,8 +1,9 @@
 // Core client-side state for /words route
 const state = {
     query: '',
-    filter: 'all',
-    status: 'all',
+    selectedStatuses: [],
+    selectedTimeFilters: [],
+    selectedPerfFilters: [],
     sort: 'alpha',
     page: 1,
     perPage: 40
@@ -77,9 +78,10 @@ async function fetchWords() {
     updateBulkActionsBar();
 
     const params = new URLSearchParams({
-        q: state.query,
-        filter: state.filter,
-        status: state.status,
+        q: state.query || '',
+        statuses: state.selectedStatuses.join(','),
+        time_filters: state.selectedTimeFilters.join(','),
+        perf_filters: state.selectedPerfFilters.join(','),
         sort: state.sort,
         page: state.page,
         per_page: state.perPage
@@ -179,7 +181,7 @@ function renderWordList(words) {
                     ${highlightedShortTranslation}
                 </td>
                 <td class="cell-score">
-                    <span class="score-badge">${w.total_score}</span>
+                    <span class="score-badge">${w.knowledge_score}</span>
                 </td>
                 <td class="cell-actions" onclick="event.stopPropagation()">
                     <button class="action-btn" title="Chỉnh sửa" onclick="openEditModal(${w.id}, '${escapeQuote(w.word)}', '${escapeQuote(w.phonetic || '')}', '${escapeQuote(w.translation)}', '${escapeQuote(w.example || '')}')">
@@ -438,10 +440,14 @@ async function updateStatusCounts() {
         if (!res.ok) return;
         const stats = await res.json();
         
-        document.getElementById('count-all').textContent = stats.total || 0;
-        document.getElementById('count-new').textContent = stats.status_distribution?.new || 0;
-        document.getElementById('count-learning').textContent = stats.status_distribution?.learning || 0;
-        document.getElementById('count-learned').textContent = stats.status_distribution?.learned || 0;
+        const countAllEl = document.getElementById('count-all');
+        if (countAllEl) countAllEl.textContent = stats.total || 0;
+        const countNewEl = document.getElementById('count-new');
+        if (countNewEl) countNewEl.textContent = stats.new || 0;
+        const countLearningEl = document.getElementById('count-learning');
+        if (countLearningEl) countLearningEl.textContent = stats.learning || 0;
+        const countLearnedEl = document.getElementById('count-learned');
+        if (countLearnedEl) countLearnedEl.textContent = stats.learned || 0;
         
         // Update sidebar nav badge count
         const sidebarBadge = document.getElementById('nav-word-count');
@@ -919,6 +925,15 @@ window.addEventListener('click', (e) => {
     }
 });
 
+// Reset filters button visibility helper
+function updateResetButtonVisibility() {
+    const hasActiveFilters = state.selectedStatuses.length > 0 || state.selectedTimeFilters.length > 0 || state.selectedPerfFilters.length > 0;
+    const resetBtn = document.getElementById('btn-reset-filters');
+    if (resetBtn) {
+        resetBtn.style.display = hasActiveFilters ? 'flex' : 'none';
+    }
+}
+
 // Dynamic filter loading
 async function loadFilters() {
     try {
@@ -926,21 +941,20 @@ async function loadFilters() {
         const data = await res.json();
         
         const statusLabel = {
-            'all': 'Tất cả',
             'new': 'Từ mới',
             'learning': 'Đang học',
             'learned': 'Đã thuộc'
         };
         
-        // Render status section
+        // Render status section (as checkboxes)
         const statusSection = document.getElementById('status-filter-section');
         if (statusSection) {
             statusSection.innerHTML = `
                 <div class="filter-section-title">Trạng thái</div>
                 <div class="filter-group">
-                    ${['all','new','learning','learned'].map(s => `
-                        <label class="filter-option ${state.status === s ? 'active' : ''}">
-                            <input type="radio" name="status-filter" value="${s}" ${state.status === s ? 'checked' : ''}>
+                    ${['new','learning','learned'].map(s => `
+                        <label class="filter-option ${state.selectedStatuses.includes(s) ? 'active' : ''}">
+                            <input type="checkbox" name="status-filter" value="${s}" ${state.selectedStatuses.includes(s) ? 'checked' : ''}>
                             <span>${statusLabel[s]}</span>
                             <span class="filter-count" id="count-${s}">0</span>
                         </label>
@@ -949,37 +963,26 @@ async function loadFilters() {
             `;
         }
         
-        // Render custom filter sections grouped
+        // Render custom filter sections grouped (as checkboxes, omitting combo and smart)
         const quickWrapper = document.getElementById('quick-filter-sections-wrapper');
         if (quickWrapper) {
             let html = '';
             
-            // Standard default: "Tất cả từ vựng" under a General/Tất cả section
-            html += `
-                <div class="filter-section">
-                    <div class="filter-section-title">Bộ lọc nhanh</div>
-                    <div class="filter-group" style="margin-bottom: var(--sp-4);">
-                        <label class="filter-option ${state.filter === 'all' ? 'active' : ''}">
-                            <input type="radio" name="quick-filter" value="all" ${state.filter === 'all' ? 'checked' : ''}>
-                            <span>Tất cả từ vựng</span>
-                        </label>
-                    </div>
-                </div>
-            `;
-            
             data.groups.forEach(g => {
+                if (g.id === 'combo' || g.id === 'smart') return; // skip combo and smart groups
                 html += `
                     <div class="filter-section">
                         <div class="filter-section-title">${g.label}</div>
                         <div class="filter-group" style="margin-bottom: var(--sp-4);">
                             ${g.filters.map(f => {
                                 const isPool = f.pool_mode ? 'pool-mode' : '';
-                                const activeClass = state.filter === f.id ? 'active' : '';
-                                const checkedAttr = state.filter === f.id ? 'checked' : '';
+                                const isChecked = (g.id === 'time' ? state.selectedTimeFilters : state.selectedPerfFilters).includes(f.id);
+                                const activeClass = isChecked ? 'active' : '';
+                                const checkedAttr = isChecked ? 'checked' : '';
                                 const poolSuffix = f.pool_mode ? ' <small style="opacity:0.6;">(pool)</small>' : '';
                                 return `
                                     <label class="filter-option ${isPool} ${activeClass}" title="${f.description || ''}">
-                                        <input type="radio" name="quick-filter" value="${f.id}" ${checkedAttr}>
+                                        <input type="checkbox" name="quick-filter" value="${f.id}" data-group="${g.id}" ${checkedAttr}>
                                         <span>${f.label}${poolSuffix}</span>
                                     </label>
                                 `;
@@ -991,33 +994,79 @@ async function loadFilters() {
             quickWrapper.innerHTML = html;
         }
         
-        // Attach status filter change listeners
-        document.querySelectorAll('input[name="status-filter"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                document.querySelectorAll('input[name="status-filter"]').forEach(r => {
-                    r.closest('.filter-option').classList.remove('active');
-                });
-                e.target.closest('.filter-option').classList.add('active');
-                
-                state.status = e.target.value;
+        // Attach status filter checkbox change listeners
+        document.querySelectorAll('input[name="status-filter"]').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (e.target.checked) {
+                    if (!state.selectedStatuses.includes(val)) {
+                        state.selectedStatuses.push(val);
+                    }
+                    e.target.closest('.filter-option').classList.add('active');
+                } else {
+                    state.selectedStatuses = state.selectedStatuses.filter(s => s !== val);
+                    e.target.closest('.filter-option').classList.remove('active');
+                }
+                updateResetButtonVisibility();
                 state.page = 1;
                 fetchWords();
             });
         });
         
-        // Attach quick filter change listeners
-        document.querySelectorAll('input[name="quick-filter"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                document.querySelectorAll('input[name="quick-filter"]').forEach(r => {
-                    r.closest('.filter-option').classList.remove('active');
-                });
-                e.target.closest('.filter-option').classList.add('active');
-                
-                state.filter = e.target.value;
+        // Attach quick filter checkbox change listeners
+        document.querySelectorAll('input[name="quick-filter"]').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const val = e.target.value;
+                const grp = e.target.getAttribute('data-group');
+                if (grp === 'time') {
+                    if (e.target.checked) {
+                        if (!state.selectedTimeFilters.includes(val)) {
+                            state.selectedTimeFilters.push(val);
+                        }
+                        e.target.closest('.filter-option').classList.add('active');
+                    } else {
+                        state.selectedTimeFilters = state.selectedTimeFilters.filter(f => f !== val);
+                        e.target.closest('.filter-option').classList.remove('active');
+                    }
+                } else if (grp === 'performance') {
+                    if (e.target.checked) {
+                        if (!state.selectedPerfFilters.includes(val)) {
+                            state.selectedPerfFilters.push(val);
+                        }
+                        e.target.closest('.filter-option').classList.add('active');
+                    } else {
+                        state.selectedPerfFilters = state.selectedPerfFilters.filter(f => f !== val);
+                        e.target.closest('.filter-option').classList.remove('active');
+                    }
+                }
+                updateResetButtonVisibility();
                 state.page = 1;
                 fetchWords();
             });
         });
+
+        // Attach Reset filters button click listener
+        const resetBtn = document.getElementById('btn-reset-filters');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                state.selectedStatuses = [];
+                state.selectedTimeFilters = [];
+                state.selectedPerfFilters = [];
+                
+                document.querySelectorAll('input[name="status-filter"]').forEach(cb => {
+                    cb.checked = false;
+                    cb.closest('.filter-option').classList.remove('active');
+                });
+                document.querySelectorAll('input[name="quick-filter"]').forEach(cb => {
+                    cb.checked = false;
+                    cb.closest('.filter-option').classList.remove('active');
+                });
+                
+                updateResetButtonVisibility();
+                state.page = 1;
+                fetchWords();
+            });
+        }
         
         // Initial totals fetch
         updateStatusCounts();
@@ -1050,7 +1099,12 @@ async function openDetailModal(id) {
         document.getElementById('detail-word-phonetic').textContent = word.phonetic || '';
         document.getElementById('detail-word-status-badge').textContent = getStatusLabel(word.status);
         document.getElementById('detail-word-status-badge').className = `status-badge badge badge-${word.status}`;
-        document.getElementById('detail-word-score').textContent = `${word.total_score || 0} ⭐`;
+        document.getElementById('detail-word-score').textContent = `${word.knowledge_score || 0} ⭐`;
+        
+        const dateAddedEl = document.getElementById('detail-word-date-added');
+        if (dateAddedEl) {
+            dateAddedEl.querySelector('span').textContent = `Ngày thêm: ${word.date_added || 'Chưa rõ'}`;
+        }
         
         // Populate translation
         const translationContainer = document.getElementById('detail-word-translation');

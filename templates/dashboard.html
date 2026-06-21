@@ -921,6 +921,26 @@
                         <option value="10">10 cặp</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label><i class="ph ph-speaker-high"></i> Tốc độ phát âm bình thường</label>
+                    <select id="setting-tts-speed-normal" style="width: 100%; padding: var(--sp-2-5); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-primary);">
+                        <option value="0.8">Chậm vừa (0.8x)</option>
+                        <option value="0.9">Hơi chậm (0.9x)</option>
+                        <option value="1.0">Bình thường (1.0x)</option>
+                        <option value="1.1">Hơi nhanh (1.1x)</option>
+                        <option value="1.2">Nhanh vừa (1.2x)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label><i class="ph ph-speaker-low"></i> Tốc độ phát âm chậm</label>
+                    <select id="setting-tts-speed-slow" style="width: 100%; padding: var(--sp-2-5); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-primary);">
+                        <option value="0.3">Rất chậm (0.3x)</option>
+                        <option value="0.4">Chậm nhiều (0.4x)</option>
+                        <option value="0.5">Chậm (0.5x)</option>
+                        <option value="0.6">Chậm vừa (0.6x)</option>
+                        <option value="0.7">Hơi chậm (0.7x)</option>
+                    </select>
+                </div>
                 <button class="btn btn-primary" onclick="saveSettings()" style="width: 100%;">
                     <i class="ph ph-floppy-disk"></i> Lưu cài đặt
                 </button>
@@ -988,7 +1008,7 @@
                 document.getElementById('seg-learned').style.width = (stats.learned / total * 100) + '%';
             }
             
-            document.getElementById('footer-sum').textContent = stats.total_score_sum;
+            document.getElementById('footer-sum').textContent = stats.knowledge_score_sum;
             document.getElementById('footer-avg').textContent = stats.avg_score;
             
         } catch (err) {
@@ -1421,6 +1441,10 @@
             // Set username from fetched settings user_name (fallback to empty)
             document.getElementById('setting-username').value = settings.user_name || '';
             
+            // Set TTS speeds
+            document.getElementById('setting-tts-speed-normal').value = settings.tts_speed_normal || '1.0';
+            document.getElementById('setting-tts-speed-slow').value = settings.tts_speed_slow || '0.5';
+            
             document.getElementById('settings-modal').style.display = 'flex';
         } catch (err) {
             console.error("Error loading settings:", err);
@@ -1437,6 +1461,8 @@
         const dailyGoal = parseInt(document.getElementById('setting-daily-goal').value);
         const sessionSize = parseInt(document.getElementById('setting-session-size').value);
         const matchingPairs = parseInt(document.getElementById('setting-matching-pairs').value);
+        const ttsSpeedNormal = document.getElementById('setting-tts-speed-normal').value;
+        const ttsSpeedSlow = document.getElementById('setting-tts-speed-slow').value;
         
         if (isNaN(dailyGoal) || dailyGoal < 1 || isNaN(sessionSize) || sessionSize < 1) {
             showToast("Vui lòng nhập giá trị hợp lệ!", "error");
@@ -1451,7 +1477,9 @@
                     user_name: usernameVal,
                     daily_goal: dailyGoal,
                     session_size: sessionSize,
-                    matching_pairs: matchingPairs
+                    matching_pairs: matchingPairs,
+                    tts_speed_normal: ttsSpeedNormal,
+                    tts_speed_slow: ttsSpeedSlow
                 })
             });
             const data = await response.json();

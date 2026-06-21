@@ -224,6 +224,8 @@ def init_db(conn=None):
         ('new_word_ratio', '0.2'),
         ('theme', 'light'),
         ('user_name', ''),
+        ('tts_speed_normal', '1.0'),
+        ('tts_speed_slow', '0.5'),
     ]
     for key, value in defaults:
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
@@ -483,6 +485,11 @@ def get_stats():
     row_score = cursor.fetchone()
     total_score_sum = row_score[0] if (row_score and row_score[0] is not None) else 0
     
+    # Knowledge score sum
+    cursor.execute("SELECT SUM(knowledge_score) FROM words")
+    row_k_score = cursor.fetchone()
+    knowledge_score_sum = row_k_score[0] if (row_k_score and row_k_score[0] is not None) else 0
+    
     # Needs review count
     cursor.execute("SELECT COUNT(*) FROM words WHERE needs_review = 1")
     row_review = cursor.fetchone()
@@ -505,6 +512,7 @@ def get_stats():
         'total': total,
         'reviewed_today': reviewed_today,
         'total_score_sum': total_score_sum,
+        'knowledge_score_sum': knowledge_score_sum,
         'needs_review': needs_review_cnt
     }
 
@@ -604,7 +612,7 @@ FILTERS = {
     'label': 'Điểm thấp nhất',
     'group': 'performance',
     'sql': "status != 'mastered' AND status != 'learned'",
-    'order': 'total_score ASC',
+    'order': 'knowledge_score ASC',
     'pool_size': 20,
     'pool_mode': True,   # ← lấy top N rồi shuffle
   },
@@ -654,58 +662,86 @@ def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
                        limit: int = None, exclude_ids: list = None) -> list[dict]:
     """
     Lấy danh sách từ theo filter. 
-    Pool mode filters: lấy N từ rồi shuffle trước khi trả về.
+    Hỗ trợ chọn nhiều bộ lọc trạng thái và bộ lọc thời gian/hiệu suất (phân tách bằng dấu phẩy).
     """
     import random
     from scoring import get_review_queue
     
     exclude_ids = exclude_ids or []
     
+    filter_keys = [fk.strip() for fk in filter_key.split(',') if fk.strip()] if filter_key else []
+    
     # Smart queue không dùng SQL filter
-    if filter_key != 'all' and FILTERS.get(filter_key, {}).get('use_smart_queue'):
+    if 'smart_priority' in filter_keys:
         return get_review_queue(db, n=limit or 20, status_filter=status, exclude_ids=exclude_ids)
     
     # Build WHERE clause
     conditions = []
     
-    # Status filter
-    if status != 'all':
-        if status == 'learned':
-            conditions.append("status = 'mastered'")
-        elif status == 'learning':
-            conditions.append("status IN ('learning', 'danger', 'familiar')")
-        else:
-            conditions.append(f"status = '{status}'")
-    
-    # Named filter
-    if filter_key != 'all' and filter_key in FILTERS:
-        f = FILTERS[filter_key]
-        if f.get('sql'):
-            conditions.append(f['sql'])
+    # Status filter (OR logic within status group)
+    if status and status != 'all':
+        statuses = [s.strip() for s in status.split(',') if s.strip()]
+        status_clauses = []
+        for s in statuses:
+            if s == 'learned' or s == 'mastered':
+                status_clauses.append("status = 'mastered'")
+            elif s == 'learning':
+                status_clauses.append("status IN ('learning', 'danger', 'familiar')")
+            elif s == 'new':
+                status_clauses.append("status = 'new'")
+        if status_clauses:
+            conditions.append("(" + " OR ".join(status_clauses) + ")")
             
+    # Custom filters
+    time_clauses = []
+    perf_clauses = []
+    pool_mode = False
+    pool_size = 20
+    order_by_clauses = []
+    
+    for fk in filter_keys:
+        if fk == 'all':
+            continue
+        if fk in FILTERS:
+            f = FILTERS[fk]
+            grp = f.get('group')
+            sql_cond = f.get('sql')
+            if sql_cond:
+                if grp == 'time' or grp == 'combo':
+                    time_clauses.append(sql_cond)
+                elif grp == 'performance':
+                    perf_clauses.append(sql_cond)
+            if f.get('pool_mode'):
+                pool_mode = True
+                pool_size = max(pool_size, f.get('pool_size', 20))
+                if f.get('order'):
+                    order_by_clauses.append(f['order'])
+                    
+    if time_clauses:
+        conditions.append("(" + " OR ".join(time_clauses) + ")")
+    if perf_clauses:
+        conditions.append("(" + " OR ".join(perf_clauses) + ")")
+    
     # Exclude IDs
     if exclude_ids:
         placeholders = ','.join(str(int(x)) for x in exclude_ids)
         conditions.append(f"id NOT IN ({placeholders})")
-    
+        
     where_clause = ('WHERE ' + ' AND '.join(conditions)) if conditions else ''
     
     # Pool mode: lấy N từ theo ORDER, rồi shuffle
-    if filter_key in FILTERS and FILTERS[filter_key].get('pool_mode'):
-        f = FILTERS[filter_key]
-        pool_size = f.get('pool_size', 20)
-        order = f.get('order', 'total_score ASC')
-        rows = db.execute(
-            f"SELECT * FROM words {where_clause} ORDER BY {order} LIMIT {pool_size}"
-        ).fetchall()
+    if pool_mode:
+        order = ", ".join(order_by_clauses) if order_by_clauses else 'knowledge_score ASC'
+        query = f"SELECT * FROM words {where_clause} ORDER BY {order} LIMIT {pool_size}"
+        rows = db.execute(query).fetchall()
         result = [dict(r) for r in rows]
         random.shuffle(result)
         return result[:limit] if limit else result
-    
+        
     # Normal mode
-    order = 'RANDOM()'  # mặc định random
-    rows = db.execute(f"SELECT * FROM words {where_clause} ORDER BY {order}" +
-                      (f" LIMIT {limit}" if limit else "")).fetchall()
+    order = 'RANDOM()'
+    query = f"SELECT * FROM words {where_clause} ORDER BY {order}" + (f" LIMIT {limit}" if limit else "")
+    rows = db.execute(query).fetchall()
     return [dict(r) for r in rows]
 
 

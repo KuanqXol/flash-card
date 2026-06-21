@@ -379,18 +379,49 @@
 
 {% block content %}
 <div class="study-container">
-    <!-- Active Game Stage -->
-    <div id="game-stage">
-        <div class="study-header-bar">
-            <div class="progress-section">
-                <div class="progress-text">
-                    <span>Tiến trình</span>
-                    <span id="progress-val">0/10</span>
-                </div>
-                <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" id="progress-fill"></div>
+    <div class="study-header">
+        <a href="/" class="btn btn-ghost btn-sm"><i class="ph ph-arrow-left"></i> Dashboard</a>
+        
+        <div class="filter-bar">
+            <!-- Dropdown filter -->
+            <div class="filter-dropdown" id="filter-dropdown-container">
+                <button class="filter-trigger" onclick="toggleFilterMenu(event)">
+                    <span id="filter-label">Tất cả từ</span>
+                    <i class="ph ph-funnel"></i>
+                </button>
+                <div class="filter-menu" id="filter-menu" hidden>
+                    <!-- Rendered dynamically -->
                 </div>
             </div>
+            
+            <!-- Quick status pills -->
+            <div class="status-pills">
+                <button class="pill active" data-status="all">Tất cả</button>
+                <button class="pill" data-status="new">Mới</button>
+                <button class="pill" data-status="learning">Đang học</button>
+            </div>
+        </div>
+        
+        <!-- Session progress -->
+        <div class="session-progress">
+            <span id="progress-text">0 / 10</span>
+            <div class="progress-track" style="width:120px">
+                <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State (hidden by default) -->
+    <div id="mcq-empty-state" class="empty-state" style="display:none;">
+        <div class="empty-state-icon">📭</div>
+        <p id="empty-state-text">Không có từ nào phù hợp.</p>
+        <small>Không có từ nào trong nhóm này. Thử chọn bộ lọc khác!</small>
+        <a href="/">Về Dashboard</a>
+    </div>
+
+    <!-- Active Game Stage -->
+    <div id="game-stage">
+        <div class="study-header-bar" style="justify-content: flex-end; padding: var(--sp-3) var(--sp-6);">
             <div class="stat-badge-group">
                 <div class="stat-badge correct">
                     <span class="stat-icon"><i class="ph ph-check"></i></span>

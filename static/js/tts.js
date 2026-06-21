@@ -58,6 +58,10 @@ async function playWord(word, speed = 'normal') {
                 const audio = new Audio(audioUrl);
                 
                 audio.addEventListener('play', () => {
+                    const ttsSpeedNormal = parseFloat(localStorage.getItem('tts_speed_normal') || '1.0');
+                    const ttsSpeedSlow = parseFloat(localStorage.getItem('tts_speed_slow') || '0.5');
+                    audio.playbackRate = speed === 'slow' ? ttsSpeedSlow : ttsSpeedNormal;
+                    
                     activeButtons.forEach(btn => {
                         btn.classList.remove('loading');
                         btn.classList.add('playing');
@@ -80,6 +84,9 @@ async function playWord(word, speed = 'normal') {
                 });
                 
                 try {
+                    const ttsSpeedNormal = parseFloat(localStorage.getItem('tts_speed_normal') || '1.0');
+                    const ttsSpeedSlow = parseFloat(localStorage.getItem('tts_speed_slow') || '0.5');
+                    audio.playbackRate = speed === 'slow' ? ttsSpeedSlow : ttsSpeedNormal;
                     await audio.play();
                 } catch (playErr) {
                     console.warn("Audio play rejected, falling back:", playErr);
@@ -129,7 +136,10 @@ function playFallback(word, buttons = null, speed = 'normal') {
         
         const utterance = new SpeechSynthesisUtterance(word);
         utterance.lang = 'en-US';
-        utterance.rate = speed === 'slow' ? 0.7 : 1.0;
+        
+        const ttsSpeedNormal = parseFloat(localStorage.getItem('tts_speed_normal') || '1.0');
+        const ttsSpeedSlow = parseFloat(localStorage.getItem('tts_speed_slow') || '0.5');
+        utterance.rate = speed === 'slow' ? ttsSpeedSlow : ttsSpeedNormal;
         
         // Try to select American English voice
         const voices = window.speechSynthesis.getVoices();

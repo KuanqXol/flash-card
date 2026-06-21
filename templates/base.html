@@ -247,6 +247,10 @@
             const settings = await res.json();
             const displayName = settings.display_name || 'Khách';
             
+            // Store TTS speeds in localStorage for playWord utility
+            localStorage.setItem('tts_speed_normal', settings.tts_speed_normal || '1.0');
+            localStorage.setItem('tts_speed_slow', settings.tts_speed_slow || '0.5');
+            
             const topbarUsername = document.getElementById('topbar-username');
             const topbarAvatar = document.getElementById('topbar-avatar');
             const menuUserName = document.getElementById('menu-user-name');
@@ -490,7 +494,7 @@
       }
     }
 
-    // Global dynamic study header filters setup
+    // Global dynamic study header filters setup (multi-select checkboxes)
     async function initStudyHeaderFilters(onFilterChangeCallback) {
         const filterTrigger = document.querySelector('.filter-trigger');
         const filterMenu = document.getElementById('filter-menu');
@@ -498,10 +502,18 @@
         
         if (!filterMenu) return;
         
-        // Load initial filter selection from sessionStorage or default to smart_priority
+        // Load initial filter selection from sessionStorage
         const saved = JSON.parse(sessionStorage.getItem('lastFilter') || '{}');
-        let currentFilter = saved.filter || 'smart_priority';
-        let currentStatus = saved.status || 'all';
+        let selectedFilters = saved.filters || ['smart_priority']; // array of filter IDs
+        let selectedStatuses = saved.statuses || []; // array: ['new','learning'] etc. empty = all
+        
+        // Backward compat: migrate old single-filter format
+        if (!saved.filters && saved.filter) {
+            selectedFilters = saved.filter === 'all' ? [] : [saved.filter];
+        }
+        if (!saved.statuses && saved.status && saved.status !== 'all') {
+            selectedStatuses = [saved.status];
+        }
         
         // Function to toggle menu
         window.toggleFilterMenu = function(e) {
@@ -516,86 +528,222 @@
             }
         });
         
+        // Helper: build the composite filter string for the API
+        function getFilterString() {
+            if (selectedFilters.length === 0) return 'all';
+            return selectedFilters.join(',');
+        }
+        
+        function getStatusString() {
+            if (selectedStatuses.length === 0) return 'all';
+            return selectedStatuses.join(',');
+        }
+        
+        // Helper: update the trigger label text
+        function updateTriggerLabel() {
+            if (!filterLabel) return;
+            if (selectedFilters.length === 0) {
+                filterLabel.textContent = 'Tất cả từ';
+            } else if (selectedFilters.includes('smart_priority')) {
+                filterLabel.textContent = 'Ưu tiên thông minh';
+            } else if (selectedFilters.length <= 2) {
+                // Show names
+                const names = selectedFilters.map(fid => {
+                    if (window._filterLabelsMap && window._filterLabelsMap[fid]) {
+                        return window._filterLabelsMap[fid];
+                    }
+                    return fid;
+                });
+                filterLabel.textContent = names.join(', ');
+            } else {
+                filterLabel.textContent = `Bộ lọc (${selectedFilters.length})`;
+            }
+        }
+        
         try {
             const res = await fetch('/api/filters/list');
             const data = await res.json();
             
-            // Build the menu options
-            filterMenu.innerHTML = '';
-            
-            // General option
-            const allBtn = document.createElement('button');
-            allBtn.className = `menu-item ${currentFilter === 'all' ? 'active' : ''}`;
-            allBtn.dataset.filter = 'all';
-            allBtn.textContent = '📖 Tất cả từ vựng';
-            allBtn.addEventListener('click', () => selectFilter('all', 'Tất cả từ vựng'));
-            filterMenu.appendChild(allBtn);
-            
-            if (currentFilter === 'all' && filterLabel) {
-                filterLabel.textContent = 'Tất cả từ vựng';
-            }
-            
-            // Group options
+            // Build a lookup map for filter labels
+            window._filterLabelsMap = {};
             data.groups.forEach(g => {
-                const groupTitle = document.createElement('div');
-                groupTitle.className = 'menu-group-title';
-                groupTitle.textContent = g.label;
-                filterMenu.appendChild(groupTitle);
-                
                 g.filters.forEach(f => {
-                    const btn = document.createElement('button');
-                    btn.className = `menu-item ${currentFilter === f.id ? 'active' : ''}`;
-                    btn.dataset.filter = f.id;
-                    let text = f.label;
-                    if (f.pool_mode) text += ' (pool)';
-                    btn.textContent = text;
-                    btn.addEventListener('click', () => selectFilter(f.id, f.label));
-                    filterMenu.appendChild(btn);
-                    
-                    if (currentFilter === f.id && filterLabel) {
-                        filterLabel.textContent = f.label;
-                    }
+                    window._filterLabelsMap[f.id] = f.label;
                 });
             });
             
-            function selectFilter(filterId, labelText) {
-                currentFilter = filterId;
-                if (filterLabel) filterLabel.textContent = labelText;
-                
-                // Update active state in menu
-                filterMenu.querySelectorAll('.menu-item').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.filter === filterId);
-                });
-                
-                filterMenu.hidden = true;
-                saveAndTrigger();
-            }
+            // Build the menu with checkboxes
+            filterMenu.innerHTML = '';
             
-            // Setup Quick status pills
-            const pills = document.querySelectorAll('.status-pills .pill');
-            pills.forEach(pill => {
-                pill.classList.toggle('active', pill.dataset.status === currentStatus);
-                pill.addEventListener('click', function() {
-                    pills.forEach(p => p.classList.remove('active'));
-                    this.classList.add('active');
-                    currentStatus = this.dataset.status;
+            // Status section
+            const statusTitle = document.createElement('div');
+            statusTitle.className = 'filter-section-title';
+            statusTitle.textContent = 'Trạng thái';
+            filterMenu.appendChild(statusTitle);
+            
+            const statusGroup = document.createElement('div');
+            statusGroup.className = 'filter-group';
+            
+            const statusOptions = [
+                { id: 'new', label: 'Từ mới' },
+                { id: 'learning', label: 'Đang học' },
+                { id: 'learned', label: 'Đã thuộc' }
+            ];
+            
+            statusOptions.forEach(opt => {
+                const isChecked = selectedStatuses.includes(opt.id);
+                const label = document.createElement('label');
+                label.className = `filter-option ${isChecked ? 'active' : ''}`;
+                label.innerHTML = `<input type="checkbox" name="study-status-filter" value="${opt.id}" ${isChecked ? 'checked' : ''}> <span>${opt.label}</span>`;
+                statusGroup.appendChild(label);
+            });
+            filterMenu.appendChild(statusGroup);
+            
+            // Filter groups (time, performance, smart — skip combo)
+            data.groups.forEach(g => {
+                if (g.id === 'combo') return; // skip combo group
+                
+                const groupTitle = document.createElement('div');
+                groupTitle.className = 'filter-section-title';
+                groupTitle.textContent = g.label;
+                filterMenu.appendChild(groupTitle);
+                
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'filter-group';
+                
+                g.filters.forEach(f => {
+                    const isChecked = selectedFilters.includes(f.id);
+                    const label = document.createElement('label');
+                    label.className = `filter-option ${isChecked ? 'active' : ''}`;
+                    const poolSuffix = f.pool_mode ? ' <small style="opacity:0.6">(pool)</small>' : '';
+                    label.innerHTML = `<input type="checkbox" name="study-filter" value="${f.id}" data-group="${g.id}" ${isChecked ? 'checked' : ''}> <span>${f.label}${poolSuffix}</span>`;
+                    groupDiv.appendChild(label);
+                });
+                filterMenu.appendChild(groupDiv);
+            });
+            
+            // Attach status checkbox change listeners
+            filterMenu.querySelectorAll('input[name="study-status-filter"]').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const val = this.value;
+                    if (this.checked) {
+                        if (!selectedStatuses.includes(val)) selectedStatuses.push(val);
+                        this.closest('.filter-option').classList.add('active');
+                    } else {
+                        selectedStatuses = selectedStatuses.filter(s => s !== val);
+                        this.closest('.filter-option').classList.remove('active');
+                    }
+                    syncPillsFromCheckboxes();
                     saveAndTrigger();
                 });
             });
             
+            // Attach filter checkbox change listeners
+            filterMenu.querySelectorAll('input[name="study-filter"]').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const val = this.value;
+                    const group = this.dataset.group;
+                    
+                    if (this.checked) {
+                        // Mutual exclusion: smart vs others
+                        if (val === 'smart_priority') {
+                            // Uncheck all non-smart filters
+                            filterMenu.querySelectorAll('input[name="study-filter"]').forEach(other => {
+                                if (other.value !== 'smart_priority') {
+                                    other.checked = false;
+                                    other.closest('.filter-option').classList.remove('active');
+                                }
+                            });
+                            selectedFilters = ['smart_priority'];
+                        } else {
+                            // Uncheck smart if checking a manual filter
+                            const smartCb = filterMenu.querySelector('input[name="study-filter"][value="smart_priority"]');
+                            if (smartCb) {
+                                smartCb.checked = false;
+                                smartCb.closest('.filter-option').classList.remove('active');
+                            }
+                            selectedFilters = selectedFilters.filter(f => f !== 'smart_priority');
+                            if (!selectedFilters.includes(val)) selectedFilters.push(val);
+                        }
+                        this.closest('.filter-option').classList.add('active');
+                    } else {
+                        selectedFilters = selectedFilters.filter(f => f !== val);
+                        this.closest('.filter-option').classList.remove('active');
+                    }
+                    updateTriggerLabel();
+                    saveAndTrigger();
+                });
+            });
+            
+            // Setup Quick status pills (toggle mode — allow multiple)
+            const pills = document.querySelectorAll('.status-pills .pill');
+            
+            function syncPillsFromCheckboxes() {
+                pills.forEach(pill => {
+                    const st = pill.dataset.status;
+                    if (st === 'all') {
+                        pill.classList.toggle('active', selectedStatuses.length === 0);
+                    } else {
+                        pill.classList.toggle('active', selectedStatuses.includes(st));
+                    }
+                });
+            }
+            
+            function syncCheckboxesFromPills() {
+                filterMenu.querySelectorAll('input[name="study-status-filter"]').forEach(cb => {
+                    const isSelected = selectedStatuses.includes(cb.value);
+                    cb.checked = isSelected;
+                    cb.closest('.filter-option').classList.toggle('active', isSelected);
+                });
+            }
+            
+            pills.forEach(pill => {
+                const st = pill.dataset.status;
+                if (st === 'all') {
+                    pill.classList.toggle('active', selectedStatuses.length === 0);
+                } else {
+                    pill.classList.toggle('active', selectedStatuses.includes(st));
+                }
+                
+                pill.addEventListener('click', function() {
+                    const clickedStatus = this.dataset.status;
+                    
+                    if (clickedStatus === 'all') {
+                        // Clear all status selections
+                        selectedStatuses = [];
+                    } else {
+                        // Toggle this status
+                        if (selectedStatuses.includes(clickedStatus)) {
+                            selectedStatuses = selectedStatuses.filter(s => s !== clickedStatus);
+                        } else {
+                            selectedStatuses.push(clickedStatus);
+                        }
+                    }
+                    
+                    syncPillsFromCheckboxes();
+                    syncCheckboxesFromPills();
+                    saveAndTrigger();
+                });
+            });
+            
+            // Initial sync
+            syncPillsFromCheckboxes();
+            updateTriggerLabel();
+            
             function saveAndTrigger() {
-                // Save to sessionStorage
-                sessionStorage.setItem('lastFilter', JSON.stringify({ filter: currentFilter, status: currentStatus }));
-                onFilterChangeCallback(currentFilter, currentStatus);
+                sessionStorage.setItem('lastFilter', JSON.stringify({ 
+                    filters: selectedFilters, 
+                    statuses: selectedStatuses 
+                }));
+                onFilterChangeCallback(getFilterString(), getStatusString());
             }
             
             // Initial call to let JS load the queue
-            onFilterChangeCallback(currentFilter, currentStatus);
+            onFilterChangeCallback(getFilterString(), getStatusString());
             
         } catch (err) {
             console.error("Error setting up study header filters:", err);
-            // Fallback: trigger callback with defaults anyway
-            onFilterChangeCallback(currentFilter, currentStatus);
+            onFilterChangeCallback(getFilterString(), getStatusString());
         }
     }
 

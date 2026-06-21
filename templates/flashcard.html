@@ -337,10 +337,10 @@
                 <!-- Binary rating buttons -->
                 <div class="rating-bar" id="rating-bar" style="display: flex; gap: var(--sp-3); border: none; background: transparent; padding: 0; box-shadow: none;">
                     <button class="btn btn-danger btn-lg" onclick="rateWord(false)">
-                        <i class="ph ph-x"></i> Chưa biết
+                        <i class="ph ph-x"></i> Chưa thuộc
                     </button>
                     <button class="btn btn-success btn-lg" onclick="rateWord(true)">
-                        <i class="ph ph-check"></i> Đã xem / Biết
+                        <i class="ph ph-check"></i> Tạm nhớ
                     </button>
                 </div>
 
@@ -359,12 +359,4 @@
 
 {% block scripts %}
 <script src="/static/js/flashcard.js"></script>
-<script>
-    function markLearned(event) {
-        event.stopPropagation();
-        if (typeof window.markLearned === 'function') {
-            window.markLearned();
-        }
-    }
-</script>
 {% endblock %}

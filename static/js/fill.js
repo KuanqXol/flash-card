@@ -206,7 +206,7 @@ function displayWord(word) {
         statusBadgeEl.className = `status-badge badge-${word.status}`;
     }
     if (wordScoreEl) {
-        wordScoreEl.textContent = `Điểm: ${word.total_score || 0} ⭐`;
+        wordScoreEl.textContent = `Điểm: ${word.knowledge_score || 0} ⭐`;
     }
 
     const fillPromptGroup = document.getElementById('fill-prompt-tts-group');

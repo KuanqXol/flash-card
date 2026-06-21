@@ -4,22 +4,40 @@ let session = {
     currentIndex: 0,
     correctAnswers: 0,
     results: [],
-    hasAnsweredCurrent: false
+    hasAnsweredCurrent: false,
+    filter: 'smart_priority',
+    status: 'all',
+    streak: 0,
+    startedAt: null
 };
 
 // Initialize session when DOM loads
-document.addEventListener('DOMContentLoaded', () => {
-    startNewSession();
-    
+document.addEventListener('DOMContentLoaded', async () => {
+    // Store original HTML of game stage to restore later
+    window.originalGameStageHTML = document.getElementById('game-stage').innerHTML;
+
     // Keyboard shortcuts listener
     document.addEventListener('keydown', handleKeyPress);
+    
+    // Initialize Study Header Filters
+    await initStudyHeaderFilters(async (filter, status) => {
+        session.filter = filter;
+        session.status = status;
+        await startNewSession();
+    });
 });
 
 // Start / Fetch MCQ queue
 async function startNewSession() {
+    // Restore game-stage HTML if it was overwritten by empty state
+    if (window.originalGameStageHTML) {
+        document.getElementById('game-stage').innerHTML = window.originalGameStageHTML;
+    }
+
     // Show loading or reset UI
     document.getElementById('game-stage').style.display = 'block';
     document.getElementById('completion-stage').style.display = 'none';
+    document.getElementById('mcq-empty-state').style.display = 'none';
     
     session = {
         queue: [],
@@ -28,18 +46,23 @@ async function startNewSession() {
         results: [],
         hasAnsweredCurrent: false,
         streak: 0,
-        startedAt: Date.now()
+        startedAt: Date.now(),
+        filter: session.filter || 'smart_priority',
+        status: session.status || 'all'
     };
     
     document.getElementById('correct-count').textContent = '0';
-    document.getElementById('progress-val').textContent = '0/10';
-    document.getElementById('progress-fill').style.width = '0%';
+    
+    const progressTextEl = document.getElementById('progress-text');
+    const progressFillEl = document.getElementById('progress-fill');
+    if (progressTextEl) progressTextEl.textContent = '0 / 10';
+    if (progressFillEl) progressFillEl.style.width = '0%';
     
     const streakBadge = document.getElementById('mcq-streak-badge');
     if (streakBadge) streakBadge.style.display = 'none';
     
     try {
-        const response = await fetch('/api/mcq/queue');
+        const response = await fetch(`/api/mcq/queue?filter=${session.filter}&status=${session.status}&n=10`);
         if (!response.ok) {
             throw new Error("Failed to fetch MCQ queue");
         }
@@ -47,9 +70,15 @@ async function startNewSession() {
         const data = await response.json();
         session.queue = data.queue || [];
         
+        // Show summary info
+        const infoEl = document.getElementById('session-summary-info');
+        if (infoEl) {
+            infoEl.textContent = data.summary || `Phiên học: ${session.queue.length} từ`;
+        }
+        
         if (session.queue.length === 0) {
             // Handle empty state
-            showEmptyState();
+            showEmptyState(data.filter_label);
             return;
         }
         
@@ -60,16 +89,16 @@ async function startNewSession() {
     }
 }
 
-function showEmptyState() {
-    const stage = document.getElementById('game-stage');
-    stage.innerHTML = `
-        <div class="prompt-card" style="padding: var(--sp-12);">
-            <div style="font-size: 3rem; margin-bottom: var(--sp-4);">🔍</div>
-            <h2 style="font-family: var(--font-display); font-weight: 700; margin-bottom: var(--sp-2);">Không có từ cần ôn trắc nghiệm!</h2>
-            <p style="color: var(--text-secondary); margin-bottom: var(--sp-6);">Tất cả từ đã thuộc (mastered) hoặc chưa có từ nào được thêm.</p>
-            <a href="/" class="btn btn-primary" style="display: inline-block;">Quay lại Dashboard</a>
-        </div>
-    `;
+function showEmptyState(filterLabel) {
+    document.getElementById('game-stage').style.display = 'none';
+    const emptyState = document.getElementById('mcq-empty-state');
+    emptyState.style.display = 'flex';
+    document.getElementById('empty-state-text').textContent = `Không có từ nào phù hợp với bộ lọc "${filterLabel || 'đã chọn'}"`;
+    
+    const progressTextEl = document.getElementById('progress-text');
+    const progressFillEl = document.getElementById('progress-fill');
+    if (progressTextEl) progressTextEl.textContent = "0 / 0";
+    if (progressFillEl) progressFillEl.style.width = "0%";
 }
 
 // Render the current question
@@ -85,11 +114,13 @@ function renderQuestion() {
     
     // Progress
     const total = session.queue.length;
-    const progressText = `${session.currentIndex + 1}/${total}`;
-    document.getElementById('progress-val').textContent = progressText;
+    const progressText = `${session.currentIndex} / ${total}`;
+    const progressTextEl = document.getElementById('progress-text');
+    if (progressTextEl) progressTextEl.textContent = progressText;
     
-    const percent = ((session.currentIndex) / total) * 100;
-    document.getElementById('progress-fill').style.width = `${percent}%`;
+    const percent = total > 0 ? (session.currentIndex / total) * 100 : 0;
+    const progressFillEl = document.getElementById('progress-fill');
+    if (progressFillEl) progressFillEl.style.width = `${percent}%`;
     
     // Prompt
     document.getElementById('word-prompt').textContent = word.word;
@@ -278,8 +309,10 @@ function nextQuestion() {
         renderQuestion();
     } else {
         // Complete the progress fill bar to 100%
-        document.getElementById('progress-fill').style.width = '100%';
-        document.getElementById('progress-val').textContent = `${session.queue.length}/${session.queue.length}`;
+        const progressFillEl = document.getElementById('progress-fill');
+        if (progressFillEl) progressFillEl.style.width = '100%';
+        const progressTextEl = document.getElementById('progress-text');
+        if (progressTextEl) progressTextEl.textContent = `${session.queue.length} / ${session.queue.length}`;
         showCompletionScreen();
     }
 }

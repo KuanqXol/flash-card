@@ -256,7 +256,7 @@ function displayWord(word) {
     if (translationEl) {
         translationEl.innerHTML = renderPosEntries(word.pos_entries, word.translation || 'Không có nghĩa');
     }
-    if (cardScoreEl) cardScoreEl.textContent = `Điểm: ${word.total_score || 0} ⭐`;
+    if (cardScoreEl) cardScoreEl.textContent = `Điểm: ${word.knowledge_score || 0} ⭐`;
     if (cardReviewsEl) cardReviewsEl.textContent = `Đã ôn: ${word.review_count || 0} lần`;
 }
 
@@ -322,7 +322,7 @@ async function rateWord(isCorrect) {
                 if (cardEl) cardEl.className = 'flashcard flipped card-slide-right';
             } else {
                 session.sessionWrong++;
-                showToast(`Ghi nhận đã xem`, "info");
+                showToast(`Ghi nhận chưa thuộc`, "info");
                 if (cardEl) cardEl.className = 'flashcard flipped card-shake';
             }
             
@@ -464,4 +464,5 @@ function renderPosEntries(posEntries, fullTranslation) {
 // Bind load hooks
 document.addEventListener('DOMContentLoaded', () => {
     init();
+    window.markLearned = markLearned;
 });

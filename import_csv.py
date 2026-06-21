@@ -136,8 +136,8 @@ def import_from_csv(csv_path: str) -> dict:
         else:
             # Insert new word record
             cursor.execute('''
-                INSERT INTO words (word, phonetic, translation, short_translation, date_added, status, total_score, review_count, has_been_rated_five, last_reviewed)
-                VALUES (?, ?, ?, ?, ?, 'new', 0, 0, 0, NULL)
+                INSERT INTO words (word, phonetic, translation, short_translation, date_added, status, total_score, review_count, has_been_rated_five, last_reviewed, knowledge_score)
+                VALUES (?, ?, ?, ?, ?, 'new', 0, 0, 0, NULL, 30)
             ''', (word, phonetic, translation, short_translation, date_added))
             new_count += 1
             word_id = cursor.lastrowid

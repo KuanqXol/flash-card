@@ -201,6 +201,7 @@ def api_flashcard_next():
         'short_translation': word['short_translation'],
         'status': word['status'],
         'total_score': word['total_score'],
+        'knowledge_score': word['knowledge_score'],
         'review_count': word['review_count'],
         'pos_entries': pos_entries,
         'mastery_score': calculate_mastery_score(word)
@@ -308,7 +309,7 @@ def api_flashcard_rate():
             
         new_score = update_score(int(word_id), 'flashcard', bool(is_correct), db=conn)
         word = conn.execute("SELECT status, total_score FROM words WHERE id = ?", (word_id,)).fetchone()
-        
+        conn.commit()
         return jsonify({
             'success': True,
             'new_score': new_score,
@@ -425,6 +426,7 @@ def api_matching_result():
                 })
             except Exception as e:
                 print(f"Error updating word {word_id} in matching result: {e}")
+        conn.commit()
     finally:
         conn.close()
             
@@ -466,6 +468,7 @@ def api_fill_next():
         'short_translation': word['short_translation'],
         'status': word['status'],
         'total_score': word['total_score'],
+        'knowledge_score': word['knowledge_score'],
         'mastery_score': calculate_mastery_score(word)
     })
 
@@ -485,7 +488,7 @@ def api_fill_evaluate():
     try:
         new_score = update_score(int(word_id), 'typing', bool(is_correct), db=conn)
         word = conn.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
-        
+        conn.commit()
         return jsonify({
             'success': True,
             'new_score': new_score,
@@ -562,14 +565,28 @@ def session_queue():
         
     db = get_db()
     try:
-        # Gọi get_filtered_words(db, filter_key=filter, status=status, limit=n*3)
         words = get_filtered_words(db, filter_key=filter_key, status=status, limit=n*3)
         
-        f = FILTERS.get(filter_key, {})
-        pool_mode = f.get('pool_mode', False)
-        use_smart = f.get('use_smart_queue', False)
+        # Build composite filter labels, pool mode, use smart
+        filter_keys = [fk.strip() for fk in filter_key.split(',') if fk.strip()] if filter_key else []
+        labels = []
+        pool_mode = False
+        use_smart = False
+        pool_size = 20
         
-        # Shuffle nếu không phải pool_mode và không phải smart priority
+        for fk in filter_keys:
+            if fk in FILTERS:
+                f_obj = FILTERS[fk]
+                labels.append(f_obj.get('label', fk))
+                if f_obj.get('pool_mode'):
+                    pool_mode = True
+                    pool_size = max(pool_size, f_obj.get('pool_size', 20))
+                if f_obj.get('use_smart_queue'):
+                    use_smart = True
+                    
+        filter_label = ", ".join(labels) if labels else "Tất cả từ"
+        
+        # Shuffle if not pool_mode and not smart
         if not pool_mode and not use_smart:
             random.shuffle(words)
             
@@ -585,8 +602,6 @@ def session_queue():
             word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
             word['mastery_score'] = calculate_mastery_score(word)
             
-        filter_label = f.get('label', 'Tất cả từ') if filter_key != 'all' else 'Tất cả từ'
-        pool_size = f.get('pool_size', 20)
         actual_count = len(queue_words)
         
         if pool_mode:
@@ -862,11 +877,31 @@ def api_words_search():
     start_time = time.time()
     
     q = request.args.get('q', '').strip()
-    filter_type = request.args.get('filter', 'all')
-    status = request.args.get('status', 'all')
+    statuses_str = request.args.get('statuses', '').strip()
+    time_filters_str = request.args.get('time_filters', '').strip()
+    perf_filters_str = request.args.get('perf_filters', '').strip()
     sort = request.args.get('sort', 'alpha')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 40, type=int)
+    
+    statuses = [s.strip() for s in statuses_str.split(',') if s.strip()] if statuses_str else []
+    time_filters = [f.strip() for f in time_filters_str.split(',') if f.strip()] if time_filters_str else []
+    perf_filters = [f.strip() for f in perf_filters_str.split(',') if f.strip()] if perf_filters_str else []
+    
+    # Backward compatibility with single status and filter params
+    status_param = request.args.get('status', 'all')
+    filter_param = request.args.get('filter', 'all')
+    
+    if not statuses and status_param != 'all':
+        statuses = [status_param]
+        
+    if not time_filters and not perf_filters and filter_param != 'all':
+        if filter_param in FILTERS:
+            grp = FILTERS[filter_param].get('group')
+            if grp == 'time':
+                time_filters = [filter_param]
+            elif grp == 'performance':
+                perf_filters = [filter_param]
     
     if page < 1:
         page = 1
@@ -883,15 +918,40 @@ def api_words_search():
         params.append(f"%{q}%")
         params.append(f"%{q}%")
         
-    if status != 'all':
-        sf = 'mastered' if status == 'learned' else status
-        where_clauses.append("status = ?")
-        params.append(sf)
-        
-    if filter_type != 'all' and filter_type in FILTERS:
-        sql_cond = FILTERS[filter_type].get('sql')
-        if sql_cond:
-            where_clauses.append(sql_cond)
+    # Status filter (OR logic within status group)
+    if statuses:
+        status_clauses = []
+        for s in statuses:
+            if s == 'learned':
+                status_clauses.append("status = 'mastered'")
+            elif s == 'learning':
+                status_clauses.append("status IN ('learning', 'danger', 'familiar')")
+            elif s == 'new':
+                status_clauses.append("status = 'new'")
+        if status_clauses:
+            where_clauses.append("(" + " OR ".join(status_clauses) + ")")
+            
+    # Time filters (OR logic within time group)
+    if time_filters:
+        time_clauses = []
+        for tf in time_filters:
+            if tf in FILTERS:
+                sql_cond = FILTERS[tf].get('sql')
+                if sql_cond:
+                    time_clauses.append(sql_cond)
+        if time_clauses:
+            where_clauses.append("(" + " OR ".join(time_clauses) + ")")
+            
+    # Performance filters (OR logic within performance group)
+    if perf_filters:
+        perf_clauses = []
+        for pf in perf_filters:
+            if pf in FILTERS:
+                sql_cond = FILTERS[pf].get('sql')
+                if sql_cond:
+                    perf_clauses.append(sql_cond)
+        if perf_clauses:
+            where_clauses.append("(" + " OR ".join(perf_clauses) + ")")
         
     where_clause_str = ""
     if where_clauses:
@@ -899,8 +959,8 @@ def api_words_search():
         
     sort_clauses = {
         'alpha': 'word COLLATE NOCASE ASC',
-        'score_desc': 'total_score DESC, id DESC',
-        'score_asc': 'total_score ASC, id ASC',
+        'score_desc': 'knowledge_score DESC, id DESC',
+        'score_asc': 'knowledge_score ASC, id ASC',
         'recent': 'date_added DESC, id DESC',
         'oldest_review': 'last_reviewed ASC NULLS FIRST, id ASC'
     }
@@ -1167,7 +1227,7 @@ def get_settings():
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     data = request.get_json() or {}
-    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme', 'user_name'}
+    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme', 'user_name', 'tts_speed_normal', 'tts_speed_slow'}
     conn = get_db()
     try:
         for key, value in data.items():
@@ -1185,11 +1245,11 @@ def api_stats():
     try:
         stats = get_stats()
         total = stats.get('total', 0)
-        total_score_sum = stats.get('total_score_sum', 0)
+        knowledge_score_sum = stats.get('knowledge_score_sum', 0)
         
         avg_score = 0.0
         if total > 0:
-            avg_score = round(total_score_sum / total, 2)
+            avg_score = round(knowledge_score_sum / total, 2)
             
         stats['avg_score'] = avg_score
         return jsonify(stats)
@@ -1225,8 +1285,8 @@ def api_words_list():
     total = cursor.fetchone()[0]
     
     sort_orders = {
-        'score_desc': 'total_score DESC, id DESC',
-        'score_asc': 'total_score ASC, id ASC',
+        'score_desc': 'knowledge_score DESC, id DESC',
+        'score_asc': 'knowledge_score ASC, id ASC',
         'alpha': 'word COLLATE NOCASE ASC',
         'date_added': 'date_added DESC, id DESC',
         'last_reviewed': 'last_reviewed DESC, id DESC'
@@ -1280,7 +1340,7 @@ def api_words_top():
     cursor.execute("""
         SELECT * 
         FROM words 
-        ORDER BY total_score DESC, id DESC 
+        ORDER BY knowledge_score DESC, id DESC 
         LIMIT ?
     """, (n,))
     rows = cursor.fetchall()
@@ -1559,38 +1619,75 @@ def mcq():
 
 @app.route('/api/mcq/queue', methods=['GET'])
 def api_mcq_queue():
+    import random
+    filter_key = request.args.get('filter', 'smart_priority')
+    status = request.args.get('status', 'all')
+    n = request.args.get('n', 10, type=int)
+    
+    if n < 1:
+        n = 10
+        
     db = get_db()
     try:
-        word_ids = get_practice_queue('mcq', limit=10, db=db)
+        words = get_filtered_words(db, filter_key=filter_key, status=status, limit=n*3)
+        
+        # Build composite filter labels, pool mode, use smart
+        filter_keys = [fk.strip() for fk in filter_key.split(',') if fk.strip()] if filter_key else []
+        labels = []
+        pool_mode = False
+        use_smart = False
+        pool_size = 20
+        
+        for fk in filter_keys:
+            if fk in FILTERS:
+                f_obj = FILTERS[fk]
+                labels.append(f_obj.get('label', fk))
+                if f_obj.get('pool_mode'):
+                    pool_mode = True
+                    pool_size = max(pool_size, f_obj.get('pool_size', 20))
+                if f_obj.get('use_smart_queue'):
+                    use_smart = True
+                    
+        filter_label = ", ".join(labels) if labels else "Tất cả từ"
+        
+        # Shuffle if not pool_mode and not smart
+        if not pool_mode and not use_smart:
+            random.shuffle(words)
+            
+        queue_words = words[:n]
         
         queue = []
-        for wid in word_ids:
-            row = db.execute("SELECT * FROM words WHERE id = ?", (wid,)).fetchone()
-            if row:
-                word = dict(row)
-                pos_rows = db.execute("SELECT pos, meaning FROM word_pos WHERE word_id = ? ORDER BY sort_order", (wid,)).fetchall()
-                word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
-                word['mastery_score'] = calculate_mastery_score(word)
-                
-                choices, correct_answer = get_mcq_options(db, word, queue)
-                
-                queue.append({
-                    'id': word['id'],
-                    'word': word['word'],
-                    'phonetic': word['phonetic'],
-                    'translation': word['translation'],
-                    'short_translation': word['short_translation'],
-                    'status': word['status'],
-                    'knowledge_score': word['knowledge_score'],
-                    'pos_entries': word['pos_entries'],
-                    'mastery_score': word['mastery_score'],
-                    'choices': choices,
-                    'correct_answer': correct_answer
-                })
-                
+        for word in queue_words:
+            wid = word['id']
+            pos_rows = db.execute(
+                "SELECT pos, meaning FROM word_pos WHERE word_id = ? ORDER BY sort_order", 
+                (wid,)
+            ).fetchall()
+            word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
+            word['mastery_score'] = calculate_mastery_score(word)
+            
+            choices, correct_answer = get_mcq_options(db, word, queue)
+            
+            queue.append({
+                'id': word['id'],
+                'word': word['word'],
+                'phonetic': word['phonetic'],
+                'translation': word['translation'],
+                'short_translation': word['short_translation'],
+                'status': word['status'],
+                'knowledge_score': word['knowledge_score'],
+                'pos_entries': word['pos_entries'],
+                'mastery_score': word['mastery_score'],
+                'choices': choices,
+                'correct_answer': correct_answer
+            })
+            
         return jsonify({
             'queue': queue,
-            'total': len(queue)
+            'total': len(queue),
+            'filter': filter_key,
+            'filter_label': filter_label,
+            'summary': f"Phiên trắc nghiệm: {len(queue)} từ"
         })
     finally:
         db.close()
@@ -1618,7 +1715,7 @@ def api_mcq_evaluate():
             
         new_score = update_score(int(word_id), 'mcq', bool(is_correct), db=conn)
         word = conn.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
-        
+        conn.commit()
         return jsonify({
             'success': True,
             'new_score': new_score,
