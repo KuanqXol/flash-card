@@ -133,6 +133,13 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
         
         # 5. Calculate other metrics
         now_str = datetime.now().isoformat()
+        
+        # Check if status is transitioning to mastered
+        if new_status == 'mastered' and word['status'] != 'mastered':
+            cursor.execute("""
+                INSERT INTO word_events (word_id, event, timestamp)
+                VALUES (?, 'auto_mastered', ?)
+            """, (word_id, now_str))
         c_count_inc = 1 if is_correct else 0
         w_count_inc = 0 if not is_correct else 1
         new_streak = (word['correct_streak'] or 0) + 1 if is_correct else 0

@@ -646,6 +646,72 @@
         .stats-grid { grid-template-columns: 1fr; }
         .actions-grid { grid-template-columns: 1fr; }
     }
+
+    /* Heatmap Years Sidebar Style */
+    .heatmap-years-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-1);
+        width: 80px;
+        flex-shrink: 0;
+        padding-top: 20px;
+    }
+    .year-btn {
+        display: block;
+        width: 100%;
+        padding: var(--sp-1-5) var(--sp-3);
+        font-size: var(--text-xs);
+        font-weight: var(--weight-semibold);
+        color: var(--text-secondary);
+        background: transparent;
+        border: none;
+        border-radius: var(--radius-md);
+        text-align: left;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        font-family: var(--font-display);
+    }
+    .year-btn:hover {
+        background: var(--surface-hover);
+        color: var(--text-primary);
+    }
+    .year-btn.active {
+        background: var(--color-primary-subtle);
+        color: var(--color-primary);
+        font-weight: var(--weight-bold);
+    }
+
+    /* Stat Card Badges Style */
+    .stat-badge {
+        position: absolute;
+        top: var(--sp-4);
+        right: var(--sp-4);
+        background: rgba(16, 185, 129, 0.12);
+        color: #059669;
+        font-size: 10px;
+        font-weight: var(--weight-bold);
+        padding: var(--sp-0-5) var(--sp-2);
+        border-radius: var(--radius-full);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        font-family: var(--font-display);
+        line-height: 1;
+        animation: fadeIn 0.4s ease-out;
+    }
+    [data-theme="dark"] .stat-badge {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+        border-color: rgba(16, 185, 129, 0.35);
+    }
+    .card-today .stat-badge {
+        background: rgba(79, 70, 229, 0.12);
+        color: var(--color-primary);
+        border-color: rgba(79, 70, 229, 0.25);
+    }
+    [data-theme="dark"] .card-today .stat-badge {
+        background: rgba(129, 140, 248, 0.2);
+        color: #a5b4fc;
+        border-color: rgba(129, 140, 248, 0.35);
+    }
 </style>
 {% endblock %}
 
@@ -684,12 +750,14 @@
     </div>
     
     <div class="stat-card card-learned animate-fade-in delay-3">
+        <div class="stat-badge" id="stat-learned-badge" style="display: none;">+0 tuần này</div>
         <div class="stat-icon"><i class="ph ph-check-circle"></i></div>
         <div class="stat-title">Đã thuộc</div>
         <div class="stat-value" id="stat-learned">0</div>
     </div>
     
     <div class="stat-card card-today animate-fade-in delay-4">
+        <div class="stat-badge" id="stat-today-badge" style="display: none;">0% Acc</div>
         <div class="stat-icon"><i class="ph ph-clock-clockwise"></i></div>
         <div class="stat-title">Ôn hôm nay</div>
         <div class="stat-value" id="stat-today">0</div>
@@ -714,30 +782,70 @@
     </div>
 </section>
 
-<!-- Quick Actions -->
+<!-- Quick Actions & Mode-specific stats -->
 <section class="actions-grid">
     <a href="/flashcard" class="action-card" data-variant="flashcard">
-        <div class="action-icon-wrap"><i class="ph ph-cards-three"></i></div>
-        <div class="action-title">Flash Card</div>
-        <div class="action-desc">Lật thẻ từ vựng cổ điển</div>
+        <div class="action-card-header">
+            <div class="title-group" style="display: flex; align-items: center; gap: var(--sp-2);">
+                <div class="action-icon-wrap" style="width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--text-base);"><i class="ph ph-cards-three"></i></div>
+                <span class="action-title" style="font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-sm);">Flash Card</span>
+            </div>
+        </div>
+        <div class="action-card-stats" style="margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-1);">
+            <div class="acc-value" id="stats-fc-acc" style="font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); line-height: 1.1; margin-bottom: 2px;">0% Acc</div>
+            <div class="detail-row" style="display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-medium);">
+                <span>Hôm nay: <strong id="stats-fc-today">0</strong></span>
+                <span>Tổng: <strong id="stats-fc-total">0</strong></span>
+            </div>
+        </div>
     </a>
     
     <a href="/mcq" class="action-card" data-variant="mcq">
-        <div class="action-icon-wrap"><i class="ph ph-list-checks"></i></div>
-        <div class="action-title">Trắc Nghiệm</div>
-        <div class="action-desc">Chọn đáp án đúng từ 4 lựa chọn</div>
+        <div class="action-card-header">
+            <div class="title-group" style="display: flex; align-items: center; gap: var(--sp-2);">
+                <div class="action-icon-wrap" style="width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--text-base);"><i class="ph ph-list-checks"></i></div>
+                <span class="action-title" style="font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-sm);">Trắc Nghiệm</span>
+            </div>
+        </div>
+        <div class="action-card-stats" style="margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-1);">
+            <div class="acc-value" id="stats-mcq-acc" style="font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); line-height: 1.1; margin-bottom: 2px;">0% Acc</div>
+            <div class="detail-row" style="display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-medium);">
+                <span>Hôm nay: <strong id="stats-mcq-today">0</strong></span>
+                <span>Tổng: <strong id="stats-mcq-total">0</strong></span>
+            </div>
+        </div>
     </a>
     
     <a href="/matching" class="action-card" data-variant="matching">
-        <div class="action-icon-wrap"><i class="ph ph-link-simple"></i></div>
-        <div class="action-title">Nối Từ</div>
-        <div class="action-desc">Nối từ Anh - Việt siêu tốc</div>
+        <div class="action-card-header">
+            <div class="title-group" style="display: flex; align-items: center; gap: var(--sp-2);">
+                <div class="action-icon-wrap" style="width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--text-base);"><i class="ph ph-link-simple"></i></div>
+                <span class="action-title" style="font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-sm);">Nối Từ</span>
+            </div>
+        </div>
+        <div class="action-card-stats" style="margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-1);">
+            <div class="acc-value" id="stats-matching-acc" style="font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); line-height: 1.1; margin-bottom: 2px;">0% Acc</div>
+            <div class="detail-row" style="display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-medium);">
+                <span>Hôm nay: <strong id="stats-matching-today">0</strong></span>
+                <span>Tổng: <strong id="stats-matching-total">0</strong></span>
+            </div>
+        </div>
     </a>
     
     <a href="/fill" class="action-card" data-variant="fill">
-        <div class="action-icon-wrap"><i class="ph ph-pencil-simple-line"></i></div>
-        <div class="action-title">Điền Nghĩa</div>
-        <div class="action-desc">Kiểm tra chính tả phản xạ</div>
+        <div class="action-card-header">
+            <div class="title-group" style="display: flex; align-items: center; gap: var(--sp-2);">
+                <div class="action-icon-wrap" style="width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--text-base);"><i class="ph ph-pencil-simple-line"></i></div>
+                <span class="action-title" style="font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-sm);">Điền Nghĩa</span>
+            </div>
+        </div>
+        <div class="action-card-stats" style="margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-1);">
+            <div class="acc-value" id="stats-fill-acc" style="font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); line-height: 1.1; margin-bottom: 2px;">0% Acc</div>
+            <div class="detail-row" style="display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-medium);">
+                <span>Hôm nay: <strong id="stats-fill-today">0</strong></span>
+                <span>Tổng: <strong id="stats-fill-total">0</strong></span>
+            </div>
+        </div>
     </a>
 </section>
 
@@ -792,9 +900,15 @@
         <div class="goal-container">
             <div class="goal-ring-wrap">
                 <svg width="88" height="88" viewBox="0 0 88 88">
+                    <!-- Background circle -->
                     <circle cx="44" cy="44" r="37" stroke="var(--surface-sunken)" stroke-width="7" fill="transparent"/>
-                    <circle cx="44" cy="44" r="37" stroke="var(--color-primary)" stroke-width="7" fill="transparent"
-                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-ring"
+                    <!-- Red (Wrong reviews) ring -->
+                    <circle cx="44" cy="44" r="37" stroke="var(--color-danger)" stroke-width="7" fill="transparent"
+                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-ring-wrong"
+                            stroke-linecap="round" transform="rotate(-90 44 44)" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);"/>
+                    <!-- Green (Correct reviews) ring -->
+                    <circle cx="44" cy="44" r="37" stroke="var(--color-success)" stroke-width="7" fill="transparent"
+                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-ring-correct"
                             stroke-linecap="round" transform="rotate(-90 44 44)" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);"/>
                 </svg>
                 <div class="goal-percent-display" id="goal-percent-text">0%</div>
@@ -813,30 +927,58 @@
 <!-- Study Heatmap Section -->
 <section class="card animate-fade-in delay-4" style="margin-bottom: var(--sp-8); padding: var(--sp-5) var(--sp-6);">
     <div class="analytics-card-header" style="margin-bottom: var(--sp-4);">
-        <span><i class="ph ph-calendar" style="color: var(--color-success);"></i> Lịch sử học tập (12 tuần)</span>
+        <span><i class="ph ph-calendar" style="color: var(--color-success);"></i> Lịch sử học tập</span>
         <span style="font-size: var(--text-xs); color: var(--text-tertiary);">Hoạt động ôn tập mỗi ngày</span>
     </div>
     
-    <div class="heatmap-container" id="heatmap-container" style="display: flex; flex-direction: column; gap: var(--sp-3); overflow-x: auto; padding-bottom: var(--sp-2);">
-        <div id="study-heatmap-grid" class="study-heatmap-grid" style="display: grid; grid-template-rows: repeat(7, 12px); grid-auto-flow: column; gap: 4px; justify-content: start;">
-            <!-- Day labels and columns populated dynamically -->
-        </div>
-        
-        <div id="heatmap-footer-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-top: 1px solid var(--border-subtle); padding-top: var(--sp-3); margin-top: var(--sp-1);">
-            <div style="display: flex; gap: var(--sp-4); font-size: var(--text-xs); color: var(--text-secondary);">
-                <span>🔥 Chuỗi streak: <strong id="heatmap-streak" style="color: var(--color-warning);">0 ngày</strong></span>
-                <span>⭐ Hoạt động hôm nay: <strong id="heatmap-today" style="color: var(--color-primary);">0 từ</strong></span>
+    <div class="heatmap-section-wrapper" style="display: flex; gap: var(--sp-6); align-items: start; width: 100%;">
+        <div class="heatmap-container" id="heatmap-container" style="display: flex; flex-direction: column; gap: var(--sp-3); overflow-x: auto; padding-bottom: var(--sp-2); flex: 1; min-width: 0;">
+            <div class="github-heatmap-wrapper" style="display: flex; gap: var(--sp-3); padding: var(--sp-1) 0; align-items: start; min-width: max-content;">
+                <!-- Day labels on the left (Mon, Wed, Fri) -->
+                <div class="heatmap-day-labels" style="display: grid; grid-template-rows: repeat(7, 14px); gap: 4px; padding-top: 20px; font-size: 10px; color: var(--text-tertiary); text-align: right; justify-content: end; width: 28px; font-family: var(--font-display); font-weight: var(--weight-medium); user-select: none;">
+                    <div></div> <!-- Sun -->
+                    <div>Mon</div>
+                    <div></div> <!-- Tue -->
+                    <div>Wed</div>
+                    <div></div> <!-- Thu -->
+                    <div>Fri</div>
+                    <div></div> <!-- Sat -->
+                </div>
+                
+                <div class="heatmap-scrollable" style="display: flex; flex-direction: column; gap: 4px;">
+                    <!-- Month Labels at the top -->
+                    <div id="heatmap-month-labels" style="display: grid; gap: 4px; font-size: 10px; color: var(--text-tertiary); height: 16px; font-family: var(--font-display); font-weight: var(--weight-medium); user-select: none;">
+                        <!-- Dynamic Month Labels -->
+                    </div>
+                    <!-- Heatmap Grid -->
+                    <div id="study-heatmap-grid" class="study-heatmap-grid" style="display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; gap: 4px; justify-content: start;">
+                        <!-- Day cells populated dynamically -->
+                    </div>
+                </div>
             </div>
             
-            <div class="heatmap-legend" style="display: flex; align-items: center; gap: var(--sp-1-5); font-size: var(--text-xs); color: var(--text-secondary);">
-                <span>Ít</span>
-                <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: var(--border-subtle);"></div>
-                <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: rgba(79, 70, 229, 0.2);"></div>
-                <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: rgba(79, 70, 229, 0.5);"></div>
-                <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: rgba(79, 70, 229, 0.8);"></div>
-                <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: var(--color-primary);"></div>
-                <span>Nhiều</span>
+            <div id="heatmap-footer-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-top: 1px solid var(--border-subtle); padding-top: var(--sp-3); margin-top: var(--sp-1);">
+                <div style="display: flex; gap: var(--sp-5); font-size: var(--text-xs); color: var(--text-secondary);">
+                    <span>🔥 Chuỗi streak: <strong id="heatmap-streak" style="color: var(--color-warning);">0 ngày</strong></span>
+                    <span>⭐ Hoạt động hôm nay: <strong id="heatmap-today" style="color: var(--color-primary);">0 từ</strong></span>
+                    <span>📅 Hoạt động trong năm: <strong id="heatmap-active-days" style="color: var(--color-success);">0 ngày</strong></span>
+                </div>
+                
+                <div class="heatmap-legend" style="display: flex; align-items: center; gap: var(--sp-1-5); font-size: var(--text-xs); color: var(--text-secondary);">
+                    <span>Ít</span>
+                    <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: var(--border-subtle);"></div>
+                    <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: rgba(79, 70, 229, 0.2);"></div>
+                    <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: rgba(79, 70, 229, 0.5);"></div>
+                    <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: rgba(79, 70, 229, 0.8);"></div>
+                    <div class="legend-cell" style="width: 12px; height: 12px; border-radius: 2px; background: var(--color-primary);"></div>
+                    <span>Nhiều</span>
+                </div>
             </div>
+        </div>
+        
+        <!-- Year Selector Sidebar -->
+        <div class="heatmap-years-sidebar" id="heatmap-years">
+            <!-- Year buttons populated dynamically -->
         </div>
     </div>
 </section>
@@ -994,8 +1136,19 @@
             
             animateCount(document.getElementById('stat-new'), stats.new);
             animateCount(document.getElementById('stat-learning'), stats.learning);
-            animateCount(document.getElementById('stat-learned'), stats.learned);
+            
+            const learnedEl = document.getElementById('stat-learned');
+            if (learnedEl) {
+                learnedEl.innerHTML = `<span style="font-size: var(--text-3xl); font-weight: var(--weight-extrabold);">${stats.learned}</span><span style="font-size: var(--text-lg); font-weight: var(--weight-semibold); opacity: 0.7; margin-left: 2px;">/${stats.total}</span>`;
+            }
+            
             animateCount(document.getElementById('stat-today'), stats.reviewed_today);
+            
+            const badgeEl = document.getElementById('stat-learned-badge');
+            if (badgeEl && stats.mastered_this_week !== undefined) {
+                badgeEl.textContent = `+${stats.mastered_this_week} tuần này`;
+                badgeEl.style.display = 'block';
+            }
             
             const total = stats.total;
             const learnedPct = total > 0 ? Math.round((stats.learned / total) * 100) : 0;
@@ -1011,20 +1164,78 @@
             document.getElementById('footer-sum').textContent = stats.knowledge_score_sum;
             document.getElementById('footer-avg').textContent = stats.avg_score;
             
+            // Update mode-specific stats
+            const pStats = stats.practice_stats || {};
+            
+            // Flashcard
+            const fc = pStats.flashcard || { accuracy: 0.0, today_reviews: 0, total_reviews: 0 };
+            document.getElementById('stats-fc-acc').textContent = `${fc.accuracy}% Acc`;
+            document.getElementById('stats-fc-today').textContent = fc.today_reviews;
+            document.getElementById('stats-fc-total').textContent = fc.total_reviews;
+            
+            // MCQ
+            const mcq = pStats.mcq || { accuracy: 0.0, today_reviews: 0, total_reviews: 0 };
+            document.getElementById('stats-mcq-acc').textContent = `${mcq.accuracy}% Acc`;
+            document.getElementById('stats-mcq-today').textContent = mcq.today_reviews;
+            document.getElementById('stats-mcq-total').textContent = mcq.total_reviews;
+            
+            // Matching
+            const mat = pStats.matching || { accuracy: 0.0, today_reviews: 0, total_reviews: 0 };
+            document.getElementById('stats-matching-acc').textContent = `${mat.accuracy}% Acc`;
+            document.getElementById('stats-matching-today').textContent = mat.today_reviews;
+            document.getElementById('stats-matching-total').textContent = mat.total_reviews;
+            
+            // Fill
+            const fill = pStats.typing || { accuracy: 0.0, today_reviews: 0, total_reviews: 0 };
+            document.getElementById('stats-fill-acc').textContent = `${fill.accuracy}% Acc`;
+            document.getElementById('stats-fill-today').textContent = fill.today_reviews;
+            document.getElementById('stats-fill-total').textContent = fill.total_reviews;
+            
         } catch (err) {
             console.error("Error loading stats:", err);
+        }
+    }
+
+    // ═══ YEAR SELECTOR LOGIC ═══
+    let activeHeatmapYear = new Date().getFullYear();
+    const START_YEAR = 2026;
+
+    function renderYearSelector() {
+        const sidebar = document.getElementById('heatmap-years');
+        if (!sidebar) return;
+        sidebar.innerHTML = '';
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear; y >= START_YEAR; y--) {
+            const btn = document.createElement('button');
+            btn.className = `year-btn${y === activeHeatmapYear ? ' active' : ''}`;
+            btn.textContent = y;
+            btn.onclick = () => changeHeatmapYear(y);
+            sidebar.appendChild(btn);
+        }
+    }
+
+    async function changeHeatmapYear(year) {
+        activeHeatmapYear = year;
+        renderYearSelector();
+        try {
+            const response = await fetch(`/api/analytics/daily-progress?year=${year}`);
+            const data = await response.json();
+            renderHeatmap(data.heatmap, data.today.reviewed_today);
+        } catch (err) {
+            console.error("Error changing heatmap year:", err);
         }
     }
 
     // ═══ ANALYTICS ═══
     async function fetchAnalytics() {
         try {
+            renderYearSelector();
             const [dangerRes, weakRes, forgottenRes, recentRes, progressRes] = await Promise.all([
                 fetch('/api/analytics/danger?n=5'),
                 fetch('/api/analytics/weak-words?n=5'),
                 fetch('/api/analytics/forgotten?n=5'),
                 fetch('/api/analytics/recent-fails?hours=24'),
-                fetch('/api/analytics/daily-progress')
+                fetch(`/api/analytics/daily-progress?year=${activeHeatmapYear}`)
             ]);
 
             renderDangerWords(await dangerRes.json());
@@ -1035,7 +1246,7 @@
             renderDailyProgress(progressData);
             renderWeeklyChart(progressData.weekly);
             renderStreak(progressData.weekly);
-            renderHeatmap(progressData.heatmap);
+            renderHeatmap(progressData.heatmap, progressData.today.reviewed_today);
         } catch (err) {
             console.error("Error fetching analytics:", err);
         }
@@ -1205,21 +1416,58 @@
             goalSubtext.textContent = `Đúng ${today.correct_today}, sai ${today.wrong_today} (${today.accuracy_today}%)`;
         }
         
-        const ring = document.getElementById('goal-ring');
+        // Update today's accuracy badge in the "Ôn hôm nay" stat card
+        const todayBadge = document.getElementById('stat-today-badge');
+        if (todayBadge) {
+            todayBadge.textContent = `${today.accuracy_today}% Acc`;
+            todayBadge.style.display = 'block';
+        }
+        
+        const ringCorrect = document.getElementById('goal-ring-correct');
+        const ringWrong = document.getElementById('goal-ring-wrong');
         const text = document.getElementById('goal-percent-text');
-        if (ring && text) {
-            const percent = today.goal_percent;
-            text.textContent = `${percent}%`;
-            const circumference = 232.5;
-            const offset = circumference - (circumference * percent / 100);
-            ring.style.strokeDashoffset = offset;
-
+        
+        if (text) {
+            text.textContent = `${today.goal_percent}%`;
+            
             // Confetti on 100%
-            if (percent >= 100 && typeof confetti === 'function') {
+            if (today.goal_percent >= 100 && typeof confetti === 'function') {
                 setTimeout(() => {
                     confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
                 }, 500);
             }
+        }
+        
+        const circumference = 232.5;
+        const goal = today.goal;
+        const correct = today.correct_today;
+        const wrong = today.wrong_today;
+        const reviewed = today.reviewed_today;
+        
+        let displayCorrect = correct;
+        let displayWrong = wrong;
+        
+        // If reviewed count exceeds daily goal, scale down values to fit a single 100% circle
+        if (reviewed > goal && goal > 0) {
+            const scale = goal / reviewed;
+            displayCorrect = correct * scale;
+            displayWrong = wrong * scale;
+        }
+        
+        const correctPercent = goal > 0 ? (displayCorrect / goal * 100) : 0;
+        const wrongPercent = goal > 0 ? (displayWrong / goal * 100) : 0;
+        
+        if (ringCorrect) {
+            const offsetCorrect = circumference - (circumference * correctPercent / 100);
+            ringCorrect.style.strokeDashoffset = offsetCorrect;
+        }
+        
+        if (ringWrong) {
+            const offsetWrong = circumference - (circumference * wrongPercent / 100);
+            ringWrong.style.strokeDashoffset = offsetWrong;
+            // Rotate the wrong ring so it starts exactly where correct ring ends
+            const angle = -90 + (correctPercent * 3.6);
+            ringWrong.setAttribute('transform', `rotate(${angle} 44 44)`);
         }
     }
 
@@ -1239,43 +1487,54 @@
     }
 
     // ═══ STUDY HEATMAP ═══
-    function renderHeatmap(heatmapData) {
+    function renderHeatmap(heatmapData, todayCount) {
         const grid = document.getElementById('study-heatmap-grid');
         const container = document.getElementById('heatmap-container');
         const footerRow = document.getElementById('heatmap-footer-row');
+        const monthLabelsContainer = document.getElementById('heatmap-month-labels');
         if (!container) return;
         
-        const totalReviews = heatmapData ? heatmapData.reduce((acc, curr) => acc + curr.review_count, 0) : 0;
-        if (totalReviews === 0) {
-            if (grid) grid.style.display = 'none';
-            if (footerRow) footerRow.style.display = 'none';
-            
-            if (!document.getElementById('heatmap-empty-state')) {
-                const emptyDiv = document.createElement('div');
-                emptyDiv.id = 'heatmap-empty-state';
-                emptyDiv.style.width = '100%';
-                emptyDiv.innerHTML = `
-<div class="empty-state heatmap-empty" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--sp-8) var(--sp-6); text-align: center; background: linear-gradient(135deg, var(--surface-card) 0%, rgba(79, 70, 229, 0.05) 100%); border: 1px dashed var(--border-default); border-radius: var(--radius-xl); animation: fadeIn var(--duration-normal) var(--ease-out); width: 100%;">
-    <div style="font-size: var(--text-4xl); margin-bottom: var(--sp-3); filter: drop-shadow(0 4px 6px rgba(79,70,229,0.15));">📅</div>
-    <h4 style="font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-base); color: var(--text-primary); margin-bottom: var(--sp-1);">Chưa có hoạt động ôn tập</h4>
-    <p style="font-size: var(--text-xs); color: var(--text-secondary); max-width: 320px; margin-bottom: var(--sp-4);">Hãy bắt đầu phiên học đầu tiên của bạn để thắp sáng bản đồ nhiệt lịch sử!</p>
-    <a href="/flashcard" class="btn btn-primary btn-sm" style="box-shadow: var(--shadow-sm);"><i class="ph ph-play"></i> Học ngay</a>
-</div>
-                `;
-                container.appendChild(emptyDiv);
-            }
-            return;
-        }
+        const data = heatmapData || [];
         
         if (grid) grid.style.display = 'grid';
         if (footerRow) footerRow.style.display = 'flex';
+        if (monthLabelsContainer) monthLabelsContainer.style.display = 'grid';
+        
+        const dayLabels = document.querySelector('.heatmap-day-labels');
+        if (dayLabels) dayLabels.style.display = 'grid';
+        
         const emptyState = document.getElementById('heatmap-empty-state');
         if (emptyState) emptyState.remove();
         
         grid.innerHTML = '';
+        if (monthLabelsContainer) monthLabelsContainer.innerHTML = '';
         
-        const daysCount = 84;
         const today = new Date();
+        const year = activeHeatmapYear;
+        
+        // Calculate Jan 1st of selected year
+        const jan1 = new Date(year, 0, 1);
+        // Find Sunday of the week containing Jan 1st
+        const startOffset = jan1.getDay(); // 0: Sunday, 1: Monday, etc.
+        const startDate = new Date(jan1.getTime() - startOffset * 24 * 60 * 60 * 1000);
+        startDate.setHours(0, 0, 0, 0);
+        
+        // Calculate Dec 31st of selected year
+        const dec31 = new Date(year, 11, 31);
+        // Find Saturday of the week containing Dec 31st
+        const endOffset = 6 - dec31.getDay();
+        const endDate = new Date(dec31.getTime() + endOffset * 24 * 60 * 60 * 1000);
+        endDate.setHours(0, 0, 0, 0);
+        
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        const daysCount = Math.round((endDate.getTime() - startDate.getTime()) / oneDayMs) + 1;
+        const colsCount = daysCount / 7;
+        
+        // Set dynamic grid columns count on month label and grid containers
+        grid.style.gridTemplateColumns = `repeat(${colsCount}, 14px)`;
+        if (monthLabelsContainer) {
+            monthLabelsContainer.style.gridTemplateColumns = `repeat(${colsCount}, 14px)`;
+        }
         
         let tooltip = document.getElementById('heatmap-tooltip-box');
         if (!tooltip) {
@@ -1285,60 +1544,111 @@
             document.body.appendChild(tooltip);
         }
         
-        const oneDayMs = 24 * 60 * 60 * 1000;
         const realReviewsMap = {};
-        if (heatmapData) {
-            heatmapData.forEach(d => {
-                realReviewsMap[d.date] = d.review_count;
-            });
+        let activeDaysCount = 0;
+        data.forEach(d => {
+            realReviewsMap[d.date] = d.review_count;
+        });
+        
+        // Generate Month Labels dynamically
+        if (monthLabelsContainer) {
+            const monthNames = ['Thg 1', 'Thg 2', 'Thg 3', 'Thg 4', 'Thg 5', 'Thg 6', 'Thg 7', 'Thg 8', 'Thg 9', 'Thg 10', 'Thg 11', 'Thg 12'];
+            let lastMonth = -1;
+            for (let w = 0; w < colsCount; w++) {
+                const weekDate = new Date(startDate.getTime() + w * 7 * oneDayMs);
+                const currentMonth = weekDate.getMonth();
+                
+                // Show label on the first column or when month changes
+                if (currentMonth !== lastMonth) {
+                    const labelDiv = document.createElement('div');
+                    labelDiv.style.gridColumnStart = w + 1;
+                    labelDiv.style.gridColumnEnd = 'span 4';
+                    labelDiv.style.whiteSpace = 'nowrap';
+                    labelDiv.textContent = monthNames[currentMonth];
+                    monthLabelsContainer.appendChild(labelDiv);
+                    lastMonth = currentMonth;
+                }
+            }
         }
         
-        for (let i = daysCount - 1; i >= 0; i--) {
-            const date = new Date(today.getTime() - i * oneDayMs);
-            const dateStr = date.toISOString().split('T')[0];
+        // Generate cells for the calculated days
+        for (let i = 0; i < daysCount; i++) {
+            const date = new Date(startDate.getTime() + i * oneDayMs);
             
-            // Only use real reviews
+            const cellYear = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const dayVal = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${cellYear}-${month}-${dayVal}`;
+            
+            // Compare timestamps ignoring hours to determine future
+            const compDate = new Date(date);
+            compDate.setHours(0, 0, 0, 0);
+            const compToday = new Date(today);
+            compToday.setHours(0, 0, 0, 0);
+            
+            const isFuture = compDate.getTime() > compToday.getTime();
+            const isPaddingCell = cellYear !== year;
+            
             let count = 0;
-            if (realReviewsMap[dateStr] !== undefined) {
+            if (!isFuture && !isPaddingCell && realReviewsMap[dateStr] !== undefined) {
                 count = realReviewsMap[dateStr];
+                if (count > 0) {
+                    activeDaysCount++;
+                }
             }
             
             const cell = document.createElement('div');
             cell.className = 'heatmap-cell';
             
             let bg = 'var(--border-subtle)';
-            if (count > 0 && count <= 3) bg = 'rgba(79, 70, 229, 0.2)';
-            else if (count > 3 && count <= 7) bg = 'rgba(79, 70, 229, 0.45)';
-            else if (count > 7 && count <= 12) bg = 'rgba(79, 70, 229, 0.75)';
-            else if (count > 12) bg = 'var(--color-primary)';
+            if (isPaddingCell) {
+                bg = 'transparent';
+                cell.style.border = '1px solid transparent';
+                cell.style.pointerEvents = 'none';
+            } else {
+                if (count > 0 && count <= 3) bg = 'rgba(79, 70, 229, 0.2)';
+                else if (count > 3 && count <= 7) bg = 'rgba(79, 70, 229, 0.45)';
+                else if (count > 7 && count <= 12) bg = 'rgba(79, 70, 229, 0.75)';
+                else if (count > 12) bg = 'var(--color-primary)';
+            }
             
             cell.style.backgroundColor = bg;
             
-            cell.addEventListener('mouseenter', (e) => {
-                const rect = cell.getBoundingClientRect();
-                const dateText = date.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                tooltip.textContent = `${count} từ đã ôn ngày ${dateText}`;
-                tooltip.classList.add('visible');
+            if (!isPaddingCell) {
+                cell.addEventListener('mouseenter', (e) => {
+                    const rect = cell.getBoundingClientRect();
+                    const dateText = date.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    tooltip.textContent = `${count} từ đã ôn ngày ${dateText}`;
+                    tooltip.classList.add('visible');
+                    
+                    tooltip.style.left = `${rect.left + 16}px`;
+                    tooltip.style.top = `${rect.top - 36}px`;
+                });
                 
-                tooltip.style.left = `${rect.left + 16}px`;
-                tooltip.style.top = `${rect.top - 36}px`;
-            });
-            
-            cell.addEventListener('mouseleave', () => {
-                tooltip.classList.remove('visible');
-            });
+                cell.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            }
             
             grid.appendChild(cell);
         }
         
         const streakEl = document.getElementById('heatmap-streak');
         const todayEl = document.getElementById('heatmap-today');
+        const activeDaysEl = document.getElementById('heatmap-active-days');
         
         const streakCount = document.getElementById('sidebar-streak')?.textContent || '0';
-        const todayCount = document.getElementById('stat-today')?.textContent || '0';
         
         if (streakEl) streakEl.textContent = `${streakCount} ngày`;
-        if (todayEl) todayEl.textContent = `${todayCount} từ`;
+        if (activeDaysEl) activeDaysEl.textContent = `${activeDaysCount} ngày`;
+        if (todayEl) {
+            if (todayCount !== undefined) {
+                todayEl.textContent = `${todayCount} từ`;
+            } else {
+                const todayCountFallback = document.getElementById('stat-today')?.textContent || '0';
+                todayEl.textContent = `${todayCountFallback} từ`;
+            }
+        }
     }
 
     // ═══ WEEKLY CHART (Chart.js) ═══

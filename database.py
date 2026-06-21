@@ -476,7 +476,8 @@ def get_stats():
     total = row_count[0] if row_count else 0
     
     # Reviewed today count
-    cursor.execute("SELECT COUNT(*) FROM words WHERE DATE(last_reviewed) = DATE('now', 'localtime')")
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    cursor.execute("SELECT COUNT(*) FROM words WHERE substr(last_reviewed, 1, 10) = ?", (today_str,))
     row_today = cursor.fetchone()
     reviewed_today = row_today[0] if row_today else 0
     
@@ -495,6 +496,53 @@ def get_stats():
     row_review = cursor.fetchone()
     needs_review_cnt = row_review[0] if row_review else 0
     
+    # Count of words mastered this week (last 7 days)
+    cursor.execute("""
+        SELECT COUNT(DISTINCT word_id) 
+        FROM word_events 
+        WHERE event IN ('auto_mastered', 'manual_mastered') 
+          AND timestamp >= datetime('now', '-7 days', 'localtime')
+    """)
+    mastered_this_week = cursor.fetchone()[0] or 0
+
+    # Practice stats by mode
+    cursor.execute("""
+        SELECT 
+            mode,
+            COUNT(*) as total_reviews,
+            SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as total_correct,
+            SUM(CASE WHEN substr(reviewed_at, 1, 10) = ? THEN 1 ELSE 0 END) as today_reviews,
+            SUM(CASE WHEN substr(reviewed_at, 1, 10) = ? AND is_correct = 1 THEN 1 ELSE 0 END) as today_correct
+        FROM review_history
+        GROUP BY mode
+    """, (today_str, today_str))
+    mode_rows = cursor.fetchall()
+    
+    practice_stats = {
+        'flashcard': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0},
+        'mcq': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0},
+        'matching': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0},
+        'typing': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0}
+    }
+    
+    for r in mode_rows:
+        m = r['mode']
+        if m == 'fill':
+            m = 'typing'
+        if m in practice_stats:
+            tot_rev = r['total_reviews'] or 0
+            tot_corr = r['total_correct'] or 0
+            tod_rev = r['today_reviews'] or 0
+            tod_corr = r['today_correct'] or 0
+            acc = round(tot_corr / tot_rev * 100, 1) if tot_rev > 0 else 0.0
+            practice_stats[m] = {
+                'total_reviews': tot_rev,
+                'total_correct': tot_corr,
+                'today_reviews': tod_rev,
+                'today_correct': tod_corr,
+                'accuracy': acc
+            }
+            
     conn.close()
     
     # Map legacy categories
@@ -513,7 +561,9 @@ def get_stats():
         'reviewed_today': reviewed_today,
         'total_score_sum': total_score_sum,
         'knowledge_score_sum': knowledge_score_sum,
-        'needs_review': needs_review_cnt
+        'needs_review': needs_review_cnt,
+        'mastered_this_week': mastered_this_week,
+        'practice_stats': practice_stats
     }
 
 def get_setting(db, key: str, default: str = '') -> str:

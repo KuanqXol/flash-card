@@ -777,19 +777,27 @@ def api_daily_progress():
                 'accuracy': day_accuracy
             })
             
-        # Fetch all review counts for the last 84 days grouped by date
-        min_date = (datetime.now() - timedelta(days=83)).strftime('%Y-%m-%d')
+        # Get requested year, default to current year
+        year = request.args.get('year', datetime.now().year, type=int)
+        start_date = f"{year}-01-01"
+        end_date = f"{year}-12-31T23:59:59"
+        
         rows = conn.execute("""
             SELECT substr(reviewed_at, 1, 10) as day_str, COUNT(*) as count
             FROM review_history
-            WHERE reviewed_at >= ?
+            WHERE reviewed_at >= ? AND reviewed_at <= ?
             GROUP BY day_str
-        """, (min_date,)).fetchall()
+        """, (start_date, end_date)).fetchall()
         counts_by_day = {r['day_str']: r['count'] for r in rows}
         
+        import calendar
+        is_leap = calendar.isleap(year)
+        days_in_year = 366 if is_leap else 365
+        
         heatmap = []
-        for i in range(83, -1, -1):
-            day_date = datetime.now() - timedelta(days=i)
+        year_start = datetime(year, 1, 1)
+        for i in range(days_in_year):
+            day_date = year_start + timedelta(days=i)
             day_str = day_date.strftime('%Y-%m-%d')
             heatmap.append({
                 'date': day_str,
