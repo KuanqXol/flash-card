@@ -261,3 +261,43 @@ def test_wrong_questions_filtering(db):
     wrong_qs = get_toeic_questions(db, topic="wrong_questions")
     assert len(wrong_qs) == 1
     assert wrong_qs[0]['id'] == 3
+
+def test_unanswered_questions_filtering(db):
+    from database import get_toeic_questions, insert_toeic_session
+    import json
+    
+    cursor = db.cursor()
+    # Insert 3 questions
+    cursor.execute("""
+        INSERT INTO toeic_questions (id, topic, question, option_a, option_b, option_c, option_d, correct_option, explanation, translation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (101, "Giới từ", "Q101", "A", "B", "C", "D", "A", "E1", "T1"))
+    cursor.execute("""
+        INSERT INTO toeic_questions (id, topic, question, option_a, option_b, option_c, option_d, correct_option, explanation, translation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (102, "Giới từ", "Q102", "A", "B", "C", "D", "B", "E2", "T2"))
+    cursor.execute("""
+        INSERT INTO toeic_questions (id, topic, question, option_a, option_b, option_c, option_d, correct_option, explanation, translation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (103, "Giới từ", "Q103", "A", "B", "C", "D", "C", "E3", "T3"))
+    db.commit()
+    
+    # 1. Fetch unanswered_only=False -> returns all questions
+    qs_all = get_toeic_questions(db, topic="Giới từ", unanswered_only=False)
+    assert len([q for q in qs_all if q['id'] in (101, 102, 103)]) == 3
+    
+    # 2. Fetch unanswered_only=True when no sessions exist -> still returns all 3
+    qs_unanswered = get_toeic_questions(db, topic="Giới từ", unanswered_only=True)
+    assert len([q for q in qs_unanswered if q['id'] in (101, 102, 103)]) == 3
+    
+    # 3. Complete a session containing Q101 and Q102
+    details = [
+        {"question_id": 101, "is_correct": True},
+        {"question_id": 102, "is_correct": False}
+    ]
+    insert_toeic_session(db, "Giới từ", 2, 1, 50.0, 60, json.dumps(details))
+    
+    # 4. Fetch unanswered_only=True -> should exclude Q101 and Q102, returning only Q103
+    qs_unanswered_after = get_toeic_questions(db, topic="Giới từ", unanswered_only=True)
+    relevant_ids = [q['id'] for q in qs_unanswered_after if q['id'] in (101, 102, 103)]
+    assert relevant_ids == [103]

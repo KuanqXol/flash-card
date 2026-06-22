@@ -4,6 +4,7 @@ const session = {
     index: 0,
     filter: 'smart_priority',
     status: 'all',
+    direction: 'en_vi',
     sessionScore: 0,
     sessionCorrect: 0,
     sessionWrong: 0,
@@ -80,6 +81,51 @@ function handleKeyDown(e) {
     }
 }
 
+// Direction toggle and selection
+function toggleDirectionMenu(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('direction-menu');
+    if (menu) menu.hidden = !menu.hidden;
+}
+
+function selectDirection(dir) {
+    session.direction = dir;
+    
+    // Update active class on buttons
+    const items = document.querySelectorAll('#direction-menu .menu-item');
+    items.forEach(item => {
+        if (item.dataset.direction === dir) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+    
+    // Update label text
+    const label = document.getElementById('direction-label');
+    if (label) {
+        if (dir === 'en_vi') label.textContent = 'Chiều học: En ➔ Vi';
+        else if (dir === 'vi_en') label.textContent = 'Chiều học: Vi ➔ En';
+        else if (dir === 'random') label.textContent = 'Chiều học: Ngẫu nhiên';
+    }
+    
+    // Close menu
+    const menu = document.getElementById('direction-menu');
+    if (menu) menu.hidden = true;
+    
+    // Restart session
+    startSession();
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', (e) => {
+    const dirMenu = document.getElementById('direction-menu');
+    const dirContainer = document.getElementById('direction-dropdown-container');
+    if (dirMenu && !dirMenu.hidden && dirContainer && !dirContainer.contains(e.target)) {
+        dirMenu.hidden = true;
+    }
+});
+
 // Khởi tạo session mới
 async function startSession() {
     // Restore stage container HTML
@@ -90,7 +136,8 @@ async function startSession() {
     document.getElementById('flashcard-empty-state').style.display = 'none';
 
     try {
-        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=20`);
+        const dir = session.direction || 'en_vi';
+        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=20&direction=${dir}`);
         const data = await res.json();
         
         if (!data.queue || data.queue.length === 0) {
@@ -212,7 +259,59 @@ function updateProgressFill(percent) {
 
 function displayWord(word) {
     session.hasLoggedFlip = false;
-    if (wordEl) wordEl.textContent = word.word;
+    
+    const ttsGroup = document.querySelector('.card-tts-group');
+    
+    if (word.direction === 'vi_en') {
+        // Front displays Vietnamese translation
+        if (wordEl) wordEl.textContent = word.short_translation || word.translation || 'Không có nghĩa';
+        if (phoneticEl) phoneticEl.style.display = 'none';
+        if (ttsGroup) ttsGroup.style.opacity = '0';
+        
+        // Back displays English spelling, phonetics and TTS buttons
+        if (translationEl) {
+            translationEl.innerHTML = `
+                <div style="text-align: center; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-2);">
+                    <div style="font-family: var(--font-display); font-size: var(--text-3xl); font-weight: var(--weight-extrabold); color: var(--text-primary);">${word.word}</div>
+                    <div style="font-size: var(--text-base); color: var(--color-primary); font-weight: var(--weight-medium);">${word.phonetic || ''}</div>
+                    <div style="display: flex; gap: var(--sp-4); justify-content: center; align-items: center; margin-top: var(--sp-2);">
+                        <button class="btn btn-sm btn-ghost" onclick="event.stopPropagation(); playWord('${word.word.replace(/'/g, "\\'")}', 'normal')" style="padding: var(--sp-1) var(--sp-3); font-size: var(--text-sm);">
+                            <i class="ph ph-speaker-high"></i> Đọc
+                        </button>
+                        <button class="btn btn-sm btn-ghost" onclick="event.stopPropagation(); playWord('${word.word.replace(/'/g, "\\'")}', 'slow')" style="padding: var(--sp-1) var(--sp-3); font-size: var(--text-sm);">
+                            <i class="ph ph-speaker-low"></i> Chậm
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    } else {
+        // Front displays English word
+        if (wordEl) wordEl.textContent = word.word;
+        if (ttsGroup) ttsGroup.style.opacity = '1';
+        
+        // Autoplay pronunciation after 300ms if soundAutoplay is true (only for En-Vi)
+        setTimeout(() => {
+            if (session.currentWord && session.currentWord.word === word.word && session.currentWord.direction === 'en_vi' && localStorage.getItem('soundAutoplay') !== 'false') {
+                playWord(word.word, 'normal');
+            }
+        }, 300);
+        
+        // Phonetic handling on front
+        if (phoneticEl) {
+            if (word.phonetic && word.phonetic !== '--' && word.phonetic.trim() !== '') {
+                phoneticEl.textContent = word.phonetic;
+                phoneticEl.style.display = 'block';
+            } else {
+                phoneticEl.style.display = 'none';
+            }
+        }
+        
+        // Back displays Vietnamese meanings
+        if (translationEl) {
+            translationEl.innerHTML = renderPosEntries(word.pos_entries, word.translation || 'Không có nghĩa');
+        }
+    }
     
     // Set data-word attributes for TTS
     const cardContainer = document.getElementById('flashcard');
@@ -223,23 +322,6 @@ function displayWord(word) {
     if (btnTts) btnTts.setAttribute('data-word', word.word);
     if (btnTtsSlow) btnTtsSlow.setAttribute('data-word', word.word);
     
-    // Autoplay pronunciation after 300ms if soundAutoplay is true
-    setTimeout(() => {
-        if (session.currentWord && session.currentWord.word === word.word && localStorage.getItem('soundAutoplay') !== 'false') {
-            playWord(word.word, 'normal');
-        }
-    }, 300);
-    
-    // Phonetic handling
-    if (phoneticEl) {
-        if (word.phonetic && word.phonetic !== '--' && word.phonetic.trim() !== '') {
-            phoneticEl.textContent = word.phonetic;
-            phoneticEl.style.display = 'block';
-        } else {
-            phoneticEl.style.display = 'none';
-        }
-    }
-
     // Status Badge
     if (statusBadgeEl) {
         statusBadgeEl.textContent = getStatusText(word.status);
@@ -252,10 +334,6 @@ function displayWord(word) {
         warningBadgeEl.style.display = word.needs_review === 1 ? 'inline-block' : 'none';
     }
 
-    // Back card content
-    if (translationEl) {
-        translationEl.innerHTML = renderPosEntries(word.pos_entries, word.translation || 'Không có nghĩa');
-    }
     if (cardScoreEl) cardScoreEl.textContent = `Điểm: ${word.knowledge_score || 0} ⭐`;
     if (cardReviewsEl) cardReviewsEl.textContent = `Đã ôn: ${word.review_count || 0} lần`;
 }
@@ -289,7 +367,10 @@ function flipCard() {
             fetch('/api/flashcard/flip', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word_id: session.currentWord.id })
+                body: JSON.stringify({ 
+                    word_id: session.currentWord.id,
+                    direction: session.currentWord.direction || 'en_vi'
+                })
             }).catch(err => console.error("Error logging flip:", err));
         }
     } else {
@@ -308,7 +389,8 @@ async function rateWord(isCorrect) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 word_id: session.currentWord.id,
-                is_correct: isCorrect
+                is_correct: isCorrect,
+                direction: session.currentWord.direction || 'en_vi'
             })
         });
         
@@ -465,4 +547,6 @@ function renderPosEntries(posEntries, fullTranslation) {
 document.addEventListener('DOMContentLoaded', () => {
     init();
     window.markLearned = markLearned;
+    window.toggleDirectionMenu = toggleDirectionMenu;
+    window.selectDirection = selectDirection;
 });

@@ -1101,6 +1101,11 @@ async function openDetailModal(id) {
         document.getElementById('detail-word-status-badge').className = `status-badge badge badge-${word.status}`;
         document.getElementById('detail-word-score').textContent = `${word.knowledge_score || 0} ⭐`;
         
+        const splitScoresEl = document.getElementById('detail-word-split-scores');
+        if (splitScoresEl) {
+            splitScoresEl.textContent = `En-Vi: ${word.en_vi_score || 0} | Vi-En: ${word.vi_en_score || 0}`;
+        }
+        
         const dateAddedEl = document.getElementById('detail-word-date-added');
         if (dateAddedEl) {
             dateAddedEl.querySelector('span').textContent = `Ngày thêm: ${word.date_added || 'Chưa rõ'}`;
@@ -1138,11 +1143,13 @@ async function openDetailModal(id) {
         tbody.innerHTML = '';
         
         const modes = [
-            { key: 'flashcard', name: 'Thẻ ghi nhớ (Flashcard)' },
-            { key: 'mcq', name: 'Trắc nghiệm (MCQ)' },
-            { key: 'matching', name: 'Nối từ (Matching)' },
-            { key: 'fill', name: 'Điền nghĩa (Fill in Blank)' },
-            { key: 'total', name: 'Tổng cộng (Total)' }
+            { key: 'flashcard_en_vi', name: 'Flashcard (En ➔ Vi)' },
+            { key: 'flashcard_vi_en', name: 'Flashcard (Vi ➔ En)' },
+            { key: 'mcq_en_vi', name: 'Trắc nghiệm (En ➔ Vi)' },
+            { key: 'mcq_vi_en', name: 'Trắc nghiệm (Vi ➔ En)' },
+            { key: 'matching', name: 'Nối từ (En ➔ Vi)' },
+            { key: 'fill', name: 'Điền nghĩa (Vi ➔ En)' },
+            { key: 'total', name: 'Tổng cộng' }
         ];
         
         modes.forEach(m => {

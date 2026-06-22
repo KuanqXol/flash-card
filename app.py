@@ -36,7 +36,8 @@ from scoring import (
     calculate_mastery_score,
     update_score,
     get_practice_queue,
-    apply_forgetting_decay
+    apply_forgetting_decay,
+    calculate_knowledge_score
 )
 
 app = Flask(__name__)
@@ -220,6 +221,10 @@ def api_flashcard_next():
 def api_flashcard_flip():
     data = request.get_json() or {}
     word_id = data.get('word_id')
+    direction = data.get('direction', 'en_vi').lower().replace('-', '_')
+    if direction not in ['en_vi', 'vi_en']:
+        direction = 'en_vi'
+        
     if word_id is None:
         return jsonify({'success': False, 'message': 'Missing word_id'}), 400
         
@@ -234,18 +239,30 @@ def api_flashcard_flip():
             ON CONFLICT(word_id, exercise) DO UPDATE SET seen = seen + 1
         """, (word_id,))
         
-        # Increment words table V2 analytics columns
-        cursor.execute("""
-            UPDATE words SET
-                flashcard_seen = flashcard_seen + 1,
-                total_seen = total_seen + 1
-            WHERE id = ?
-        """, (word_id,))
+        # Increment words table V3 analytics columns and general seen
+        if direction == 'vi_en':
+            cursor.execute("""
+                UPDATE words SET
+                    flashcard_vi_en_seen = flashcard_vi_en_seen + 1,
+                    flashcard_seen = flashcard_seen + 1,
+                    total_seen = total_seen + 1
+                WHERE id = ?
+            """, (word_id,))
+        else:
+            cursor.execute("""
+                UPDATE words SET
+                    flashcard_en_vi_seen = flashcard_en_vi_seen + 1,
+                    flashcard_seen = flashcard_seen + 1,
+                    total_seen = total_seen + 1
+                WHERE id = ?
+            """, (word_id,))
         
-        # Fetch current counters to recalculate score
+        # Fetch current counters to recalculate score using V3 logic
         cursor.execute("""
-            SELECT flashcard_seen, flashcard_correct,
-                   mcq_seen, mcq_correct,
+            SELECT flashcard_en_vi_seen, flashcard_en_vi_correct,
+                   flashcard_vi_en_seen, flashcard_vi_en_correct,
+                   mcq_en_vi_seen, mcq_en_vi_correct,
+                   mcq_vi_en_seen, mcq_vi_en_correct,
                    matching_seen, matching_correct,
                    fill_seen, fill_correct
             FROM words WHERE id = ?
@@ -253,32 +270,25 @@ def api_flashcard_flip():
         word = cursor.fetchone()
         
         if word:
-            fc_seen = word['flashcard_seen'] or 0
-            fc_corr = word['flashcard_correct'] or 0
-            mcq_seen = word['mcq_seen'] or 0
-            mcq_corr = word['mcq_correct'] or 0
-            mat_seen = word['matching_seen'] or 0
-            mat_corr = word['matching_correct'] or 0
-            fill_seen = word['fill_seen'] or 0
-            fill_corr = word['fill_correct'] or 0
-            
-            tot_seen = fc_seen + mcq_seen + mat_seen + fill_seen
-            tot_corr = fc_corr + mcq_corr + mat_corr + fill_corr
-            
-            import math
-            from scoring import _get_status_from_score
-            if tot_seen > 0:
-                accuracy = tot_corr / tot_seen
-                accuracy_bonus = accuracy * 40
-                frequency_bonus = min(math.log2(tot_seen + 1) * 10, 30)
-                new_score = int(round(30 + accuracy_bonus + frequency_bonus))
-                new_score = max(0, min(100, new_score))
-            else:
-                new_score = 30
-                
+            from scoring import calculate_split_scores, _get_status_from_score
+            ev_score, vi_en_score, new_score = calculate_split_scores(
+                word['flashcard_en_vi_seen'] or 0, word['flashcard_en_vi_correct'] or 0,
+                word['flashcard_vi_en_seen'] or 0, word['flashcard_vi_en_correct'] or 0,
+                word['mcq_en_vi_seen'] or 0, word['mcq_en_vi_correct'] or 0,
+                word['mcq_vi_en_seen'] or 0, word['mcq_vi_en_correct'] or 0,
+                word['matching_seen'] or 0, word['matching_correct'] or 0,
+                word['fill_seen'] or 0, word['fill_correct'] or 0
+            )
             new_status = _get_status_from_score(new_score)
             
-            cursor.execute("UPDATE words SET knowledge_score = ?, status = ? WHERE id = ?", (new_score, new_status, word_id))
+            cursor.execute("""
+                UPDATE words SET
+                    knowledge_score = ?,
+                    en_vi_score = ?,
+                    vi_en_score = ?,
+                    status = ?
+                WHERE id = ?
+            """, (new_score, ev_score, vi_en_score, new_status, word_id))
             
         conn.commit()
         return jsonify({'success': True})
@@ -295,6 +305,9 @@ def api_flashcard_rate():
     word_id = data.get('word_id')
     rating = data.get('rating')
     is_correct = data.get('is_correct')
+    direction = data.get('direction', 'en_vi').lower().replace('-', '_')
+    if direction not in ['en_vi', 'vi_en']:
+        direction = 'en_vi'
     
     if word_id is None:
         return jsonify({'success': False, 'message': 'Missing word_id'}), 400
@@ -314,7 +327,7 @@ def api_flashcard_rate():
         if not row:
             cursor.execute("INSERT INTO word_stats (word_id, exercise, seen, correct) VALUES (?, 'flashcard', 1, 0)", (word_id,))
             
-        new_score = update_score(int(word_id), 'flashcard', bool(is_correct), db=conn)
+        new_score = update_score(int(word_id), 'flashcard', bool(is_correct), db=conn, direction=direction)
         word = conn.execute("SELECT status, total_score FROM words WHERE id = ?", (word_id,)).fetchone()
         conn.commit()
         return jsonify({
@@ -598,9 +611,13 @@ def session_queue():
             random.shuffle(words)
             
         # Slice lấy n từ đầu tiên
-        queue_words = words[:n]
+        queue_words = [dict(w) for w in words[:n]]
         
-        # Thêm pos_entries và mastery_score
+        direction_param = request.args.get('direction', 'en_vi').lower().replace('-', '_')
+        if direction_param not in ['en_vi', 'vi_en', 'random']:
+            direction_param = 'en_vi'
+            
+        # Thêm pos_entries, mastery_score và direction
         for word in queue_words:
             pos_rows = db.execute(
                 "SELECT pos, meaning FROM word_pos WHERE word_id=? ORDER BY sort_order",
@@ -608,6 +625,11 @@ def session_queue():
             ).fetchall()
             word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
             word['mastery_score'] = calculate_mastery_score(word)
+            
+            if direction_param == 'random':
+                word['direction'] = random.choice(['en_vi', 'vi_en'])
+            else:
+                word['direction'] = direction_param
             
         actual_count = len(queue_words)
         
@@ -1573,60 +1595,111 @@ def api_words_bulk_action():
     finally:
         conn.close()
 
-def get_mcq_options(db, word, pool_words):
+def get_mcq_options(db, word, direction='en_vi'):
     word_id = word['id']
-    correct_text = word['short_translation'] or word['translation']
-    if not correct_text:
-        correct_text = ''
-    correct_text = correct_text.strip()
-    
-    pos_rows = db.execute("SELECT pos FROM word_pos WHERE word_id = ?", (word_id,)).fetchall()
-    pos_list = [r['pos'] for r in pos_rows if r['pos']]
-    
-    wrong_options = []
-    
-    if pos_list:
-        placeholders = ','.join('?' for _ in pos_list)
-        query = f"""
-            SELECT DISTINCT w.id, w.word, w.translation, w.short_translation 
-            FROM words w
-            JOIN word_pos wp ON w.id = wp.word_id
-            WHERE wp.pos IN ({placeholders}) AND w.id != ?
-            ORDER BY RANDOM() LIMIT 30
-        """
-        params = pos_list + [word_id]
-        pos_matching_rows = db.execute(query, params).fetchall()
-        for row in pos_matching_rows:
-            opt_text = (row['short_translation'] or row['translation'] or '').strip()
-            if opt_text and opt_text != correct_text and opt_text not in wrong_options:
-                wrong_options.append(opt_text)
-                if len(wrong_options) >= 3:
-                    break
-                    
-    if len(wrong_options) < 3:
-        query = """
-            SELECT id, word, translation, short_translation 
-            FROM words 
-            WHERE id != ? 
-            ORDER BY RANDOM() LIMIT 30
-        """
-        random_rows = db.execute(query, (word_id,)).fetchall()
-        for row in random_rows:
-            opt_text = (row['short_translation'] or row['translation'] or '').strip()
-            if opt_text and opt_text != correct_text and opt_text not in wrong_options:
-                wrong_options.append(opt_text)
-                if len(wrong_options) >= 3:
-                    break
-                    
-    while len(wrong_options) < 3:
-        wrong_options.append(f"Nghĩa giả lập {len(wrong_options) + 1}")
+    if direction == 'vi_en':
+        correct_text = word['word'].strip()
         
-    wrong_options = wrong_options[:3]
-    all_choices = wrong_options + [correct_text]
-    import random
-    random.shuffle(all_choices)
-    
-    return all_choices, correct_text
+        pos_rows = db.execute("SELECT pos FROM word_pos WHERE word_id = ?", (word_id,)).fetchall()
+        pos_list = [r['pos'] for r in pos_rows if r['pos']]
+        
+        wrong_options = []
+        
+        if pos_list:
+            placeholders = ','.join('?' for _ in pos_list)
+            query = f"""
+                SELECT DISTINCT w.id, w.word 
+                FROM words w
+                JOIN word_pos wp ON w.id = wp.word_id
+                WHERE wp.pos IN ({placeholders}) AND w.id != ?
+                ORDER BY RANDOM() LIMIT 30
+            """
+            params = pos_list + [word_id]
+            pos_matching_rows = db.execute(query, params).fetchall()
+            for row in pos_matching_rows:
+                opt_text = (row['word'] or '').strip()
+                if opt_text and opt_text.lower() != correct_text.lower() and opt_text not in wrong_options:
+                    wrong_options.append(opt_text)
+                    if len(wrong_options) >= 3:
+                        break
+                        
+        if len(wrong_options) < 3:
+            query = """
+                SELECT id, word 
+                FROM words 
+                WHERE id != ? 
+                ORDER BY RANDOM() LIMIT 30
+            """
+            random_rows = db.execute(query, (word_id,)).fetchall()
+            for row in random_rows:
+                opt_text = (row['word'] or '').strip()
+                if opt_text and opt_text.lower() != correct_text.lower() and opt_text not in wrong_options:
+                    wrong_options.append(opt_text)
+                    if len(wrong_options) >= 3:
+                        break
+                        
+        while len(wrong_options) < 3:
+            wrong_options.append(f"WordPlaceholder{len(wrong_options) + 1}")
+            
+        wrong_options = wrong_options[:3]
+        all_choices = wrong_options + [correct_text]
+        import random
+        random.shuffle(all_choices)
+        
+        return all_choices, correct_text
+    else: # en_vi
+        correct_text = word['short_translation'] or word['translation']
+        if not correct_text:
+            correct_text = ''
+        correct_text = correct_text.strip()
+        
+        pos_rows = db.execute("SELECT pos FROM word_pos WHERE word_id = ?", (word_id,)).fetchall()
+        pos_list = [r['pos'] for r in pos_rows if r['pos']]
+        
+        wrong_options = []
+        
+        if pos_list:
+            placeholders = ','.join('?' for _ in pos_list)
+            query = f"""
+                SELECT DISTINCT w.id, w.word, w.translation, w.short_translation 
+                FROM words w
+                JOIN word_pos wp ON w.id = wp.word_id
+                WHERE wp.pos IN ({placeholders}) AND w.id != ?
+                ORDER BY RANDOM() LIMIT 30
+            """
+            params = pos_list + [word_id]
+            pos_matching_rows = db.execute(query, params).fetchall()
+            for row in pos_matching_rows:
+                opt_text = (row['short_translation'] or row['translation'] or '').strip()
+                if opt_text and opt_text != correct_text and opt_text not in wrong_options:
+                    wrong_options.append(opt_text)
+                    if len(wrong_options) >= 3:
+                        break
+                        
+        if len(wrong_options) < 3:
+            query = """
+                SELECT id, word, translation, short_translation 
+                FROM words 
+                WHERE id != ? 
+                ORDER BY RANDOM() LIMIT 30
+            """
+            random_rows = db.execute(query, (word_id,)).fetchall()
+            for row in random_rows:
+                opt_text = (row['short_translation'] or row['translation'] or '').strip()
+                if opt_text and opt_text != correct_text and opt_text not in wrong_options:
+                    wrong_options.append(opt_text)
+                    if len(wrong_options) >= 3:
+                        break
+                        
+        while len(wrong_options) < 3:
+            wrong_options.append(f"Nghĩa giả lập {len(wrong_options) + 1}")
+            
+        wrong_options = wrong_options[:3]
+        all_choices = wrong_options + [correct_text]
+        import random
+        random.shuffle(all_choices)
+        
+        return all_choices, correct_text
 
 @app.route('/mcq')
 def mcq():
@@ -1638,6 +1711,9 @@ def api_mcq_queue():
     filter_key = request.args.get('filter', 'smart_priority')
     status = request.args.get('status', 'all')
     n = request.args.get('n', 10, type=int)
+    direction_param = request.args.get('direction', 'en_vi').lower().replace('-', '_')
+    if direction_param not in ['en_vi', 'vi_en', 'random']:
+        direction_param = 'en_vi'
     
     if n < 1:
         n = 10
@@ -1669,7 +1745,7 @@ def api_mcq_queue():
         if not pool_mode and not use_smart:
             random.shuffle(words)
             
-        queue_words = words[:n]
+        queue_words = [dict(w) for w in words[:n]]
         
         queue = []
         for word in queue_words:
@@ -1681,8 +1757,19 @@ def api_mcq_queue():
             word['pos_entries'] = [{'pos': r['pos'], 'meaning': r['meaning']} for r in pos_rows]
             word['mastery_score'] = calculate_mastery_score(word)
             
-            choices, correct_answer = get_mcq_options(db, word, queue)
+            # Decide direction per word
+            if direction_param == 'random':
+                word_direction = random.choice(['en_vi', 'vi_en'])
+            else:
+                word_direction = direction_param
+                
+            choices, correct_answer = get_mcq_options(db, word, direction=word_direction)
             
+            if word_direction == 'vi_en':
+                question_text = word['short_translation'] or word['translation']
+            else:
+                question_text = word['word']
+                
             queue.append({
                 'id': word['id'],
                 'word': word['word'],
@@ -1694,7 +1781,9 @@ def api_mcq_queue():
                 'pos_entries': word['pos_entries'],
                 'mastery_score': word['mastery_score'],
                 'choices': choices,
-                'correct_answer': correct_answer
+                'correct_answer': correct_answer,
+                'direction': word_direction,
+                'question_text': question_text
             })
             
         return jsonify({
@@ -1713,6 +1802,9 @@ def api_mcq_evaluate():
     word_id = data.get('word_id')
     is_correct = data.get('is_correct')
     choice = data.get('choice')
+    direction = data.get('direction', 'en_vi').lower().replace('-', '_')
+    if direction not in ['en_vi', 'vi_en']:
+        direction = 'en_vi'
     
     if word_id is None:
         return jsonify({'success': False, 'message': 'Missing word_id'}), 400
@@ -1720,15 +1812,18 @@ def api_mcq_evaluate():
     conn = get_db()
     try:
         if choice is not None:
-            word_row = conn.execute("SELECT translation, short_translation FROM words WHERE id = ?", (word_id,)).fetchone()
+            word_row = conn.execute("SELECT word, translation, short_translation FROM words WHERE id = ?", (word_id,)).fetchone()
             if word_row:
-                correct_text = (word_row['short_translation'] or word_row['translation'] or '').strip()
+                if direction == 'vi_en':
+                    correct_text = word_row['word'].strip()
+                else:
+                    correct_text = (word_row['short_translation'] or word_row['translation'] or '').strip()
                 is_correct = choice.strip() == correct_text
                 
         if is_correct is None:
             return jsonify({'success': False, 'message': 'Missing is_correct or choice'}), 400
             
-        new_score = update_score(int(word_id), 'mcq', bool(is_correct), db=conn)
+        new_score = update_score(int(word_id), 'mcq', bool(is_correct), db=conn, direction=direction)
         word = conn.execute("SELECT * FROM words WHERE id = ?", (word_id,)).fetchone()
         conn.commit()
         return jsonify({
@@ -1906,10 +2001,11 @@ def api_toeic_topics():
 def api_toeic_questions():
     topic = request.args.get('topic', 'all')
     limit = request.args.get('limit', type=int)
+    unanswered_only = request.args.get('unanswered_only', '0') == '1'
     
     db = get_db()
     try:
-        questions = get_toeic_questions(db, topic=topic, limit=limit)
+        questions = get_toeic_questions(db, topic=topic, limit=limit, unanswered_only=unanswered_only)
         return jsonify(questions)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

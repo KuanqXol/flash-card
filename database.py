@@ -128,14 +128,18 @@ def init_db(conn=None):
                 tot_corr = fc_corr + mcq_corr + mat_corr + fill_corr
                 tot_wrong = fc_wrong + mcq_wrong + mat_wrong + fill_wrong
                 
-                if tot_seen > 0:
-                    accuracy = tot_corr / tot_seen
-                    accuracy_bonus = accuracy * 40
-                    frequency_bonus = min(math.log2(tot_seen + 1) * 10, 30)
-                    new_k_score = int(round(30 + accuracy_bonus + frequency_bonus))
-                    new_k_score = max(0, min(100, new_k_score))
-                else:
+                seen_count = tot_seen
+                if seen_count == 0:
                     new_k_score = 30
+                else:
+                    review_quality = (fc_corr / fc_seen) * 100.0 if fc_seen > 0 else 0.0
+                    en_vi_seen = mcq_seen + mat_seen
+                    en_vi_corr = mcq_corr + mat_corr
+                    quiz_score = (en_vi_corr / en_vi_seen) * 100.0 if en_vi_seen > 0 else 0.0
+                    quiz_score_vi_en = (fill_corr / fill_seen) * 100.0 if fill_seen > 0 else 0.0
+                    seen_score = min(100.0, (math.log(1 + seen_count) / math.log(31)) * 100.0)
+                    final_score = 0.40 * review_quality + 0.20 * quiz_score + 0.30 * quiz_score_vi_en + 0.10 * seen_score
+                    new_k_score = max(0, min(100, int(round(final_score))))
                     
                 new_status = get_status_from_score(new_k_score)
                 
@@ -157,6 +161,116 @@ def init_db(conn=None):
                     new_k_score, new_status, wid
                 ))
             
+    # Define V3 2-way scoring and stats columns
+    new_cols_v3 = {
+        'flashcard_en_vi_seen': 'INTEGER DEFAULT 0',
+        'flashcard_en_vi_correct': 'INTEGER DEFAULT 0',
+        'flashcard_en_vi_wrong': 'INTEGER DEFAULT 0',
+        'flashcard_vi_en_seen': 'INTEGER DEFAULT 0',
+        'flashcard_vi_en_correct': 'INTEGER DEFAULT 0',
+        'flashcard_vi_en_wrong': 'INTEGER DEFAULT 0',
+        'mcq_en_vi_seen': 'INTEGER DEFAULT 0',
+        'mcq_en_vi_correct': 'INTEGER DEFAULT 0',
+        'mcq_en_vi_wrong': 'INTEGER DEFAULT 0',
+        'mcq_vi_en_seen': 'INTEGER DEFAULT 0',
+        'mcq_vi_en_correct': 'INTEGER DEFAULT 0',
+        'mcq_vi_en_wrong': 'INTEGER DEFAULT 0',
+        'en_vi_score': 'INTEGER DEFAULT 0',
+        'vi_en_score': 'INTEGER DEFAULT 0'
+    }
+    
+    added_v3 = False
+    for col_name, col_def in new_cols_v3.items():
+        if col_name not in columns:
+            cursor.execute(f"ALTER TABLE words ADD COLUMN {col_name} {col_def}")
+            added_v3 = True
+            
+    # Backfill migration if V3 columns were added
+    if added_v3:
+        # Fetch current values of flashcard_seen, flashcard_correct, flashcard_wrong, mcq_seen, mcq_correct, mcq_wrong
+        # and copy them to the en_vi versions since the old history was all En-Vi.
+        cursor.execute("""
+            UPDATE words SET
+                flashcard_en_vi_seen = flashcard_seen,
+                flashcard_en_vi_correct = flashcard_correct,
+                flashcard_en_vi_wrong = flashcard_wrong,
+                mcq_en_vi_seen = mcq_seen,
+                mcq_en_vi_correct = mcq_correct,
+                mcq_en_vi_wrong = mcq_wrong
+        """)
+        
+        # Now recalculate scores using the split scoring formula for all words!
+        cursor.execute("SELECT id FROM words")
+        words_list = [r['id'] for r in cursor.fetchall()]
+        
+        for wid in words_list:
+            cursor.execute("""
+                SELECT flashcard_en_vi_seen, flashcard_en_vi_correct,
+                       flashcard_vi_en_seen, flashcard_vi_en_correct,
+                       mcq_en_vi_seen, mcq_en_vi_correct,
+                       mcq_vi_en_seen, mcq_vi_en_correct,
+                       matching_seen, matching_correct,
+                       fill_seen, fill_correct
+                FROM words WHERE id = ?
+            """, (wid,))
+            w = cursor.fetchone()
+            if w:
+                fc_ev_seen = w['flashcard_en_vi_seen'] or 0
+                fc_ev_corr = w['flashcard_en_vi_correct'] or 0
+                fc_ve_seen = w['flashcard_vi_en_seen'] or 0
+                fc_ve_corr = w['flashcard_vi_en_correct'] or 0
+                
+                mcq_ev_seen = w['mcq_en_vi_seen'] or 0
+                mcq_ev_corr = w['mcq_en_vi_correct'] or 0
+                mcq_ve_seen = w['mcq_vi_en_seen'] or 0
+                mcq_ve_corr = w['mcq_vi_en_correct'] or 0
+                
+                mat_seen = w['matching_seen'] or 0
+                mat_corr = w['matching_correct'] or 0
+                fill_seen = w['fill_seen'] or 0
+                fill_corr = w['fill_correct'] or 0
+                
+                # Formula
+                seen_count = fc_ev_seen + fc_ve_seen + mcq_ev_seen + mcq_ve_seen + mat_seen + fill_seen
+                
+                if seen_count == 0:
+                    ev_score = 0
+                    ve_score = 0
+                    final_score = 30
+                else:
+                    fc_ev_acc = (fc_ev_corr / fc_ev_seen) * 100.0 if fc_ev_seen > 0 else 0.0
+                    mcq_ev_acc = (mcq_ev_corr / mcq_ev_seen) * 100.0 if mcq_ev_seen > 0 else 0.0
+                    mat_acc = (mat_corr / mat_seen) * 100.0 if mat_seen > 0 else 0.0
+                    ev_score = int(round(0.40 * fc_ev_acc + 0.30 * mcq_ev_acc + 0.30 * mat_acc))
+                    
+                    fc_ve_acc = (fc_ve_corr / fc_ve_seen) * 100.0 if fc_ve_seen > 0 else 0.0
+                    mcq_ve_acc = (mcq_ve_corr / mcq_ve_seen) * 100.0 if mcq_ve_seen > 0 else 0.0
+                    fill_acc = (fill_corr / fill_seen) * 100.0 if fill_seen > 0 else 0.0
+                    ve_score = int(round(0.40 * fc_ve_acc + 0.30 * mcq_ve_acc + 0.30 * fill_acc))
+                    
+                    import math
+                    seen_score = min(100.0, (math.log(1 + seen_count) / math.log(31)) * 100.0)
+                    
+                    final_score = int(round(0.45 * ev_score + 0.45 * ve_score + 0.10 * seen_score))
+                    final_score = max(0, min(100, final_score))
+                
+                def get_status_from_score(score):
+                    if 0 <= score <= 29: return 'danger'
+                    elif 30 <= score <= 49: return 'new'
+                    elif 50 <= score <= 69: return 'learning'
+                    elif 70 <= score <= 89: return 'familiar'
+                    elif 90 <= score <= 100: return 'mastered'
+                    return 'new'
+                    
+                new_status = get_status_from_score(final_score)
+                cursor.execute("""
+                    UPDATE words SET
+                        en_vi_score = ?,
+                        vi_en_score = ?,
+                        knowledge_score = ?,
+                        status = ?
+                    WHERE id = ?
+                """, (ev_score, ve_score, final_score, new_status, wid))
         
     # Create word_events table
     cursor.execute('''
@@ -859,7 +973,7 @@ def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
     return [dict(r) for r in rows]
 
 
-def get_toeic_questions(db, topic=None, limit=None):
+def get_toeic_questions(db, topic=None, limit=None, unanswered_only=False):
     """Retrieves list of TOEIC questions, optionally filtered by topic and shuffled."""
     query_parts = []
     params = []
@@ -911,6 +1025,29 @@ def get_toeic_questions(db, topic=None, limit=None):
         else:
             query_parts.append("topic = ?")
             params.append(topic)
+            
+    if unanswered_only and topic != 'wrong_questions':
+        # Retrieve all toeic sessions to analyze answered questions
+        rows = db.execute("SELECT details FROM toeic_sessions").fetchall()
+        answered_set = set()
+        for r in rows:
+            details_str = r['details']
+            if not details_str:
+                continue
+            try:
+                import json
+                details = json.loads(details_str)
+                for item in details:
+                    q_id = item.get('question_id')
+                    if q_id is not None:
+                        answered_set.add(int(q_id))
+            except Exception:
+                pass
+        
+        if answered_set:
+            placeholders = ",".join("?" for _ in answered_set)
+            query_parts.append(f"id NOT IN ({placeholders})")
+            params.extend(answered_set)
         
     where_clause = "WHERE " + " AND ".join(query_parts) if query_parts else ""
     limit_clause = f"LIMIT {limit}" if limit else ""

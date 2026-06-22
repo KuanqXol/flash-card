@@ -7,6 +7,7 @@ let session = {
     hasAnsweredCurrent: false,
     filter: 'smart_priority',
     status: 'all',
+    direction: 'en_vi',
     streak: 0,
     startedAt: null
 };
@@ -19,6 +20,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Keyboard shortcuts listener
     document.addEventListener('keydown', handleKeyPress);
     
+    // Bind direction helpers
+    window.toggleDirectionMenu = toggleDirectionMenu;
+    window.selectDirection = selectDirection;
+
+    // Close menus when clicking outside
+    document.addEventListener('click', (e) => {
+        const dirMenu = document.getElementById('direction-menu');
+        const dirContainer = document.getElementById('direction-dropdown-container');
+        if (dirMenu && !dirMenu.hidden && dirContainer && !dirContainer.contains(e.target)) {
+            dirMenu.hidden = true;
+        }
+    });
+
     // Initialize Study Header Filters
     await initStudyHeaderFilters(async (filter, status) => {
         session.filter = filter;
@@ -26,6 +40,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         await startNewSession();
     });
 });
+
+// Direction dropdown toggle and selection
+function toggleDirectionMenu(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('direction-menu');
+    if (menu) menu.hidden = !menu.hidden;
+}
+
+function selectDirection(dir) {
+    session.direction = dir;
+    
+    // Update active class on buttons
+    const items = document.querySelectorAll('#direction-menu .menu-item');
+    items.forEach(item => {
+        if (item.dataset.direction === dir) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+    
+    // Update label text
+    const label = document.getElementById('direction-label');
+    if (label) {
+        if (dir === 'en_vi') label.textContent = 'Chiều học: En ➔ Vi';
+        else if (dir === 'vi_en') label.textContent = 'Chiều học: Vi ➔ En';
+        else if (dir === 'random') label.textContent = 'Chiều học: Ngẫu nhiên';
+    }
+    
+    // Close menu
+    const menu = document.getElementById('direction-menu');
+    if (menu) menu.hidden = true;
+    
+    // Restart session
+    startNewSession();
+}
 
 // Start / Fetch MCQ queue
 async function startNewSession() {
@@ -48,7 +98,8 @@ async function startNewSession() {
         streak: 0,
         startedAt: Date.now(),
         filter: session.filter || 'smart_priority',
-        status: session.status || 'all'
+        status: session.status || 'all',
+        direction: session.direction || 'en_vi'
     };
     
     document.getElementById('correct-count').textContent = '0';
@@ -62,7 +113,8 @@ async function startNewSession() {
     if (streakBadge) streakBadge.style.display = 'none';
     
     try {
-        const response = await fetch(`/api/mcq/queue?filter=${session.filter}&status=${session.status}&n=10`);
+        const dir = session.direction || 'en_vi';
+        const response = await fetch(`/api/mcq/queue?filter=${session.filter}&status=${session.status}&n=10&direction=${dir}`);
         if (!response.ok) {
             throw new Error("Failed to fetch MCQ queue");
         }
@@ -122,9 +174,10 @@ function renderQuestion() {
     const progressFillEl = document.getElementById('progress-fill');
     if (progressFillEl) progressFillEl.style.width = `${percent}%`;
     
-    // Prompt
-    document.getElementById('word-prompt').textContent = word.word;
-    document.getElementById('phonetic-prompt').textContent = word.phonetic || '';
+    // Prompt & TTS setup based on direction
+    const wordPrompt = document.getElementById('word-prompt');
+    const phoneticPrompt = document.getElementById('phonetic-prompt');
+    const ttsGroup = document.querySelector('#prompt-card .card-tts-group');
     
     // Set data-word attributes for TTS
     const promptCard = document.getElementById('prompt-card');
@@ -134,12 +187,27 @@ function renderQuestion() {
     const btnTtsSlow = document.getElementById('mcq-btn-tts-slow');
     if (btnTtsSlow) btnTtsSlow.setAttribute('data-word', word.word);
     
-    // Autoplay pronunciation when new question loads
-    setTimeout(() => {
-        if (session.queue[session.currentIndex] && session.queue[session.currentIndex].word === word.word) {
-            playWord(word.word, 'normal');
+    if (word.direction === 'vi_en') {
+        // Vietnamese meaning prompts English word. Hide phonetics and TTS to avoid giving away the spelling.
+        if (wordPrompt) wordPrompt.textContent = word.question_text || '';
+        if (phoneticPrompt) phoneticPrompt.style.display = 'none';
+        if (ttsGroup) ttsGroup.style.display = 'none';
+    } else {
+        // English word prompts Vietnamese choices.
+        if (wordPrompt) wordPrompt.textContent = word.word;
+        if (phoneticPrompt) {
+            phoneticPrompt.textContent = word.phonetic || '';
+            phoneticPrompt.style.display = 'block';
         }
-    }, 300);
+        if (ttsGroup) ttsGroup.style.display = 'inline-flex';
+        
+        // Autoplay pronunciation when new question loads
+        setTimeout(() => {
+            if (session.queue[session.currentIndex] && session.queue[session.currentIndex].word === word.word && session.queue[session.currentIndex].direction === 'en_vi') {
+                playWord(word.word, 'normal');
+            }
+        }, 300);
+    }
     
     // POS Badges
     const posContainer = document.getElementById('pos-container');
@@ -217,7 +285,8 @@ async function selectChoice(selectedChoice, selectedIndex) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 word_id: word.id,
-                choice: selectedChoice
+                choice: selectedChoice,
+                direction: word.direction || 'en_vi'
             })
         });
         
@@ -254,6 +323,22 @@ async function selectChoice(selectedChoice, selectedIndex) {
                 btn.querySelector('.choice-status-icon').innerHTML = '❌';
             }
         });
+        
+        // If direction is vi_en, reveal phonetics and TTS buttons upon answering
+        if (word.direction === 'vi_en') {
+            const phoneticPrompt = document.getElementById('phonetic-prompt');
+            if (phoneticPrompt) {
+                phoneticPrompt.textContent = word.phonetic || '';
+                phoneticPrompt.style.display = 'block';
+            }
+            const ttsGroup = document.querySelector('#prompt-card .card-tts-group');
+            if (ttsGroup) {
+                ttsGroup.style.display = 'inline-flex';
+            }
+            if (localStorage.getItem('soundAutoplay') !== 'false') {
+                playWord(word.word, 'normal');
+            }
+        }
         
         if (isCorrect) {
             session.correctAnswers++;

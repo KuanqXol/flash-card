@@ -129,6 +129,17 @@ function handlePracticeCategoryChange() {
     const subtopicLabel = document.getElementById('practice-subtopic-label');
     const subtopicSelect = document.getElementById('practice-subtopic');
     
+    const unansweredContainer = document.getElementById('practice-unanswered-container');
+    if (unansweredContainer) {
+        if (category === 'wrong_questions') {
+            unansweredContainer.style.display = 'none';
+            const unansweredChk = document.getElementById('practice-unanswered-only');
+            if (unansweredChk) unansweredChk.checked = false;
+        } else {
+            unansweredContainer.style.display = 'flex';
+        }
+    }
+    
     if (!subtopicContainer || !subtopicSelect) return;
     
     if (category === 'tenses') {
@@ -177,7 +188,15 @@ async function startPracticeSession() {
         topic = document.getElementById('practice-subtopic').value;
     }
     
-    const limit = parseInt(document.getElementById('practice-limit').value);
+    const limitInput = document.getElementById('practice-limit');
+    let limit = parseInt(limitInput.value);
+    if (isNaN(limit) || limit <= 0) {
+        showToast("Vui lòng nhập số lượng câu hỏi hợp lệ (lớn hơn 0)!", "warning");
+        return;
+    }
+    
+    const unansweredCheckbox = document.getElementById('practice-unanswered-only');
+    const unansweredOnly = unansweredCheckbox && unansweredCheckbox.checked ? 1 : 0;
     
     // Check if there are questions in bank first
     try {
@@ -195,7 +214,7 @@ async function startPracticeSession() {
     showToast("Đang chuẩn bị đề thi...", "info");
     
     try {
-        const res = await fetch(`/api/toeic/questions?topic=${encodeURIComponent(topic)}&limit=${limit}`);
+        const res = await fetch(`/api/toeic/questions?topic=${encodeURIComponent(topic)}&limit=${limit}&unanswered_only=${unansweredOnly}`);
         const questions = await res.json();
         
         if (!questions || questions.length === 0) {

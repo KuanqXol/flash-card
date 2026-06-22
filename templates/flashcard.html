@@ -255,6 +255,19 @@
             </div>
         </div>
         
+        <!-- Direction filter -->
+        <div class="filter-dropdown" id="direction-dropdown-container">
+            <button class="filter-trigger" onclick="toggleDirectionMenu(event)">
+                <span id="direction-label">Chiều học: En ➔ Vi</span>
+                <i class="ph ph-translate"></i>
+            </button>
+            <div class="filter-menu" id="direction-menu" hidden style="min-width: 140px;">
+                <button class="menu-item active" data-direction="en_vi" onclick="selectDirection('en_vi')">En ➔ Vi</button>
+                <button class="menu-item" data-direction="vi_en" onclick="selectDirection('vi_en')">Vi ➔ En</button>
+                <button class="menu-item" data-direction="random" onclick="selectDirection('random')">Ngẫu nhiên</button>
+            </div>
+        </div>
+        
         <!-- Quick status pills -->
         <div class="status-pills">
             <button class="pill active" data-status="all">Tất cả</button>

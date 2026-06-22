@@ -9,6 +9,61 @@ SCORE_CONFIG = {
     'typing':    {'correct': 5, 'wrong': -1}
 }
 
+def calculate_split_scores(
+    fc_ev_seen: int, fc_ev_corr: int,
+    fc_ve_seen: int, fc_ve_corr: int,
+    mcq_ev_seen: int, mcq_ev_corr: int,
+    mcq_ve_seen: int, mcq_ve_corr: int,
+    mat_seen: int, mat_corr: int,
+    fill_seen: int, fill_corr: int
+) -> tuple:
+    """
+    Recalculates the vocabulary knowledge split scores (En-Vi and Vi-En) and the final score.
+    Formula:
+      en_vi_score = 0.40 * fc_ev_acc + 0.30 * mcq_ev_acc + 0.30 * matching_acc
+      vi_en_score = 0.40 * fc_ve_acc + 0.30 * mcq_ve_acc + 0.30 * fill_acc
+      seen_count = fc_ev_seen + fc_ve_seen + mcq_ev_seen + mcq_ve_seen + matching_seen + fill_seen
+      seen_score = min(100.0, ln(1 + seen_count) / ln(31) * 100.0)
+      final_score = 0.45 * en_vi_score + 0.45 * vi_en_score + 0.10 * seen_score
+    """
+    seen_count = fc_ev_seen + fc_ve_seen + mcq_ev_seen + mcq_ve_seen + mat_seen + fill_seen
+    if seen_count == 0:
+        return 0, 0, 30  # Baseline default score
+
+    fc_ev_acc = (fc_ev_corr / fc_ev_seen) * 100.0 if fc_ev_seen > 0 else 0.0
+    mcq_ev_acc = (mcq_ev_corr / mcq_ev_seen) * 100.0 if mcq_ev_seen > 0 else 0.0
+    mat_acc = (mat_corr / mat_seen) * 100.0 if mat_seen > 0 else 0.0
+    ev_score = int(round(0.40 * fc_ev_acc + 0.30 * mcq_ev_acc + 0.30 * mat_acc))
+    ev_score = max(0, min(100, ev_score))
+    
+    fc_ve_acc = (fc_ve_corr / fc_ve_seen) * 100.0 if fc_ve_seen > 0 else 0.0
+    mcq_ve_acc = (mcq_ve_corr / mcq_ve_seen) * 100.0 if mcq_ve_seen > 0 else 0.0
+    fill_acc = (fill_corr / fill_seen) * 100.0 if fill_seen > 0 else 0.0
+    ve_score = int(round(0.40 * fc_ve_acc + 0.30 * mcq_ve_acc + 0.30 * fill_acc))
+    ve_score = max(0, min(100, ve_score))
+    
+    seen_score = min(100.0, (math.log(1 + seen_count) / math.log(31)) * 100.0)
+    
+    final_score = int(round(0.45 * ev_score + 0.45 * ve_score + 0.10 * seen_score))
+    final_score = max(0, min(100, final_score))
+    
+    return ev_score, ve_score, final_score
+
+def calculate_knowledge_score(
+    fc_seen: int, fc_corr: int,
+    mcq_seen: int, mcq_corr: int,
+    mat_seen: int, mat_corr: int,
+    fill_seen: int, fill_corr: int
+) -> int:
+    """Legacy wrapper delegating to split score calculation."""
+    _, _, final_score = calculate_split_scores(
+        fc_seen, fc_corr, 0, 0,
+        mcq_seen, mcq_corr, 0, 0,
+        mat_seen, mat_corr,
+        fill_seen, fill_corr
+    )
+    return final_score
+
 def _get_status_from_score(score: int) -> str:
     if 0 <= score <= 29:
         return 'danger'
@@ -22,10 +77,10 @@ def _get_status_from_score(score: int) -> str:
         return 'mastered'
     return 'new'
 
-def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
+def update_score(word_id: int, exercise: str, is_correct: bool, db=None, direction: str = 'en_vi') -> int:
     """
-    Updates the knowledge_score of a word based on exercise type and correctness.
-    Recalculates score strictly using the V2 accuracy and frequency formula.
+    Updates the knowledge_score of a word based on exercise type, correctness, and direction.
+    Recalculates score strictly using the V3 split-scoring accuracy and frequency formula.
     """
     # Normalize fill to typing
     if exercise == 'fill':
@@ -44,13 +99,15 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
     try:
         cursor = db.cursor()
         
-        # 1. Fetch current word details
+        # 1. Fetch current word details including V3 columns
         cursor.execute("""
             SELECT status, knowledge_score, total_score, correct_count, wrong_count, 
                    correct_streak, consecutive_wrong, needs_review, last_failed_at, 
                    self_correct_count, self_wrong_count,
-                   flashcard_seen, flashcard_correct, flashcard_wrong,
-                   mcq_seen, mcq_correct, mcq_wrong,
+                   flashcard_en_vi_seen, flashcard_en_vi_correct, flashcard_en_vi_wrong,
+                   flashcard_vi_en_seen, flashcard_vi_en_correct, flashcard_vi_en_wrong,
+                   mcq_en_vi_seen, mcq_en_vi_correct, mcq_en_vi_wrong,
+                   mcq_vi_en_seen, mcq_vi_en_correct, mcq_vi_en_wrong,
                    matching_seen, matching_correct, matching_wrong,
                    fill_seen, fill_correct, fill_wrong
             FROM words WHERE id = ?
@@ -59,14 +116,20 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
         if not word:
             raise ValueError(f"Word with id {word_id} not found")
             
-        # 2. Increment mode-specific seen/correct/wrong counters
-        fc_seen = word['flashcard_seen'] or 0
-        fc_corr = word['flashcard_correct'] or 0
-        fc_wrong = word['flashcard_wrong'] or 0
+        # 2. Extract and increment mode-specific counters
+        fc_ev_seen = word['flashcard_en_vi_seen'] or 0
+        fc_ev_corr = word['flashcard_en_vi_correct'] or 0
+        fc_ev_wrong = word['flashcard_en_vi_wrong'] or 0
+        fc_ve_seen = word['flashcard_vi_en_seen'] or 0
+        fc_ve_corr = word['flashcard_vi_en_correct'] or 0
+        fc_ve_wrong = word['flashcard_vi_en_wrong'] or 0
         
-        mcq_seen = word['mcq_seen'] or 0
-        mcq_corr = word['mcq_correct'] or 0
-        mcq_wrong = word['mcq_wrong'] or 0
+        mcq_ev_seen = word['mcq_en_vi_seen'] or 0
+        mcq_ev_corr = word['mcq_en_vi_correct'] or 0
+        mcq_ev_wrong = word['mcq_en_vi_wrong'] or 0
+        mcq_ve_seen = word['mcq_vi_en_seen'] or 0
+        mcq_ve_corr = word['mcq_vi_en_correct'] or 0
+        mcq_ve_wrong = word['mcq_vi_en_wrong'] or 0
         
         mat_seen = word['matching_seen'] or 0
         mat_corr = word['matching_correct'] or 0
@@ -78,16 +141,29 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
         
         if exercise == 'flashcard':
             # flashcard_seen is incremented on flip, not here
-            if is_correct:
-                fc_corr += 1
+            if direction == 'vi_en':
+                if is_correct:
+                    fc_ve_corr += 1
+                else:
+                    fc_ve_wrong += 1
             else:
-                fc_wrong += 1
+                if is_correct:
+                    fc_ev_corr += 1
+                else:
+                    fc_ev_wrong += 1
         elif exercise == 'mcq':
-            mcq_seen += 1
-            if is_correct:
-                mcq_corr += 1
+            if direction == 'vi_en':
+                mcq_ve_seen += 1
+                if is_correct:
+                    mcq_ve_corr += 1
+                else:
+                    mcq_ve_wrong += 1
             else:
-                mcq_wrong += 1
+                mcq_ev_seen += 1
+                if is_correct:
+                    mcq_ev_corr += 1
+                else:
+                    mcq_ev_wrong += 1
         elif exercise == 'matching':
             mat_seen += 1
             if is_correct:
@@ -101,22 +177,33 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
             else:
                 fill_wrong += 1
                 
+        # Re-derive legacy / general counters
+        fc_seen = fc_ev_seen + fc_ve_seen
+        fc_corr = fc_ev_corr + fc_ve_corr
+        fc_wrong = fc_ev_wrong + fc_ve_wrong
+        
+        mcq_seen = mcq_ev_seen + mcq_ve_seen
+        mcq_corr = mcq_ev_corr + mcq_ve_corr
+        mcq_wrong = mcq_ev_wrong + mcq_ve_wrong
+        
         tot_seen = fc_seen + mcq_seen + mat_seen + fill_seen
         tot_corr = fc_corr + mcq_corr + mat_corr + fill_corr
         tot_wrong = fc_wrong + mcq_wrong + mat_wrong + fill_wrong
         
-        # 3. Recalculate knowledge score
+        # 3. Recalculate knowledge split scores and final score
+        ev_score, vi_en_score, calculated_final_score = calculate_split_scores(
+            fc_ev_seen, fc_ev_corr,
+            fc_ve_seen, fc_ve_corr,
+            mcq_ev_seen, mcq_ev_corr,
+            mcq_ve_seen, mcq_ve_corr,
+            mat_seen, mat_corr,
+            fill_seen, fill_corr
+        )
+        
         if word['status'] == 'mastered' and not is_correct:
             new_score = word['knowledge_score'] if word['knowledge_score'] is not None else 95
         else:
-            if tot_seen > 0:
-                accuracy = tot_corr / tot_seen
-                accuracy_bonus = accuracy * 40
-                frequency_bonus = min(math.log2(tot_seen + 1) * 10, 30)
-                new_score = int(round(30 + accuracy_bonus + frequency_bonus))
-                new_score = max(0, min(100, new_score))
-            else:
-                new_score = 30
+            new_score = calculated_final_score
             
         new_status = _get_status_from_score(new_score)
         
@@ -184,7 +271,12 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
                 mcq_seen = ?, mcq_correct = ?, mcq_wrong = ?,
                 matching_seen = ?, matching_correct = ?, matching_wrong = ?,
                 fill_seen = ?, fill_correct = ?, fill_wrong = ?,
-                total_seen = ?, total_correct = ?, total_wrong = ?
+                total_seen = ?, total_correct = ?, total_wrong = ?,
+                flashcard_en_vi_seen = ?, flashcard_en_vi_correct = ?, flashcard_en_vi_wrong = ?,
+                flashcard_vi_en_seen = ?, flashcard_vi_en_correct = ?, flashcard_vi_en_wrong = ?,
+                mcq_en_vi_seen = ?, mcq_en_vi_correct = ?, mcq_en_vi_wrong = ?,
+                mcq_vi_en_seen = ?, mcq_vi_en_correct = ?, mcq_vi_en_wrong = ?,
+                en_vi_score = ?, vi_en_score = ?
             WHERE id = ?
         """, (
             new_score, new_status, new_total_score, c_count_inc, w_count_inc,
@@ -195,6 +287,11 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
             mat_seen, mat_corr, mat_wrong,
             fill_seen, fill_corr, fill_wrong,
             tot_seen, tot_corr, tot_wrong,
+            fc_ev_seen, fc_ev_corr, fc_ev_wrong,
+            fc_ve_seen, fc_ve_corr, fc_ve_wrong,
+            mcq_ev_seen, mcq_ev_corr, mcq_ev_wrong,
+            mcq_ve_seen, mcq_ve_corr, mcq_ve_wrong,
+            ev_score, vi_en_score,
             word_id
         ))
         
@@ -216,7 +313,7 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None) -> int:
         if should_close:
             db.close()
 
-def _apply_score_change(db: sqlite3.Connection, word_id: int, delta: int, mode: str, rating: int = None, is_correct: bool = None) -> tuple:
+def _apply_score_change(db: sqlite3.Connection, word_id: int, delta: int, mode: str, rating: int = None, is_correct: bool = None, direction: str = 'en_vi') -> tuple:
     """
     Apply generic score changes.
     """
@@ -231,7 +328,7 @@ def _apply_score_change(db: sqlite3.Connection, word_id: int, delta: int, mode: 
     old_status = row['status'] if row else 'new'
     
     if exercise in SCORE_CONFIG:
-        new_score = update_score(word_id, exercise, is_correct_val, db=db)
+        new_score = update_score(word_id, exercise, is_correct_val, db=db, direction=direction)
     else:
         cursor.execute("SELECT knowledge_score FROM words WHERE id = ?", (word_id,))
         w_row = cursor.fetchone()
@@ -250,7 +347,7 @@ def _apply_score_change(db: sqlite3.Connection, word_id: int, delta: int, mode: 
     
     return new_score, new_status != old_status, new_status
 
-def apply_flashcard_rating(db: sqlite3.Connection, word_id: int, rating: int) -> dict:
+def apply_flashcard_rating(db: sqlite3.Connection, word_id: int, rating: int, direction: str = 'en_vi') -> dict:
     """
     Apply flashcard rating for backward compatibility.
     """
@@ -266,7 +363,7 @@ def apply_flashcard_rating(db: sqlite3.Connection, word_id: int, rating: int) ->
     old_score = old_score_row['knowledge_score'] if (old_score_row and old_score_row['knowledge_score'] is not None) else 30
     old_status = old_score_row['status'] if old_score_row else 'new'
     
-    new_score = update_score(word_id, 'flashcard', is_correct, db=db)
+    new_score = update_score(word_id, 'flashcard', is_correct, db=db, direction=direction)
     
     word_row = db.execute("SELECT status FROM words WHERE id = ?", (word_id,)).fetchone()
     new_status = word_row['status']
