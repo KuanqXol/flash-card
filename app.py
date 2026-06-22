@@ -16,8 +16,14 @@ from database import (
     set_setting,
     update_word_after_review,
     FILTERS,
-    get_filtered_words
+    get_filtered_words,
+    get_toeic_questions,
+    get_toeic_topics,
+    insert_toeic_session,
+    get_toeic_sessions
 )
+from import_toeic import import_toeic_from_xlsx
+
 from scoring import (
     apply_flashcard_rating,
     apply_matching_result,
@@ -1843,6 +1849,240 @@ def api_tts_cache_stats():
         'total_files': total_files,
         'total_size_mb': total_size_mb
     })
+
+@app.route('/toeic')
+def toeic_page():
+    return render_template('toeic.html')
+
+@app.route('/api/toeic/import', methods=['POST'])
+def api_toeic_import():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file part in request'}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+    if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+        return jsonify({'success': False, 'error': 'Uploaded file is not an Excel file'}), 400
+        
+    try:
+        # Save file to a temporary location
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
+            temp_path = temp_file.name
+            file.save(temp_path)
+            
+        try:
+            # Import from Excel
+            result = import_toeic_from_xlsx(temp_path)
+            return jsonify({
+                'success': True,
+                'imported': result['imported'],
+                'updated': result['updated'],
+                'skipped': result['skipped'],
+                'total': result['total']
+            })
+        finally:
+            # Cleanup temp file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/toeic/topics')
+def api_toeic_topics():
+    db = get_db()
+    try:
+        topics = get_toeic_topics(db)
+        return jsonify(topics)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/questions')
+def api_toeic_questions():
+    topic = request.args.get('topic', 'all')
+    limit = request.args.get('limit', type=int)
+    
+    db = get_db()
+    try:
+        questions = get_toeic_questions(db, topic=topic, limit=limit)
+        return jsonify(questions)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/submit', methods=['POST'])
+def api_toeic_submit():
+    import json
+    data = request.get_json() or {}
+    topic = data.get('topic', 'Tất cả')
+    total_questions = data.get('total_questions')
+    correct_count = data.get('correct_count')
+    accuracy = data.get('accuracy')
+    duration_seconds = data.get('duration_seconds')
+    details_list = data.get('details', [])
+    
+    if total_questions is None or correct_count is None or accuracy is None or duration_seconds is None:
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        
+    db = get_db()
+    try:
+        details_json = json.dumps(details_list, ensure_ascii=False)
+        last_id = insert_toeic_session(db, topic, total_questions, correct_count, accuracy, duration_seconds, details_json)
+        return jsonify({'success': True, 'session_id': last_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/history')
+def api_toeic_history():
+    limit = request.args.get('limit', type=int)
+    db = get_db()
+    try:
+        sessions = get_toeic_sessions(db, limit=limit)
+        return jsonify(sessions)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/analytics')
+def api_toeic_analytics():
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT COUNT(*) FROM toeic_questions")
+        total_in_db = cursor.fetchone()[0] or 0
+
+        cursor.execute("""
+            SELECT
+                COUNT(*) as total_sessions,
+                COALESCE(SUM(total_questions), 0) as total_qs,
+                COALESCE(SUM(correct_count), 0) as total_correct,
+                COALESCE(SUM(duration_seconds), 0) as total_duration
+            FROM toeic_sessions
+        """)
+        row = cursor.fetchone()
+        
+        total_sessions = row['total_sessions'] or 0
+        total_qs = row['total_qs'] or 0
+        total_correct = row['total_correct'] or 0
+        total_duration = row['total_duration'] or 0
+        
+        overall_acc = round(total_correct * 100.0 / total_qs, 1) if total_qs > 0 else 0.0
+        
+        cursor.execute("SELECT id, topic FROM toeic_questions")
+        q_map = {r['id']: r['topic'] for r in cursor.fetchall()}
+        
+        cursor.execute("SELECT details FROM toeic_sessions")
+        sessions = cursor.fetchall()
+        
+        topic_stats = {}
+        for s in sessions:
+            det_str = s['details']
+            if not det_str:
+                continue
+            try:
+                import json
+                details = json.loads(det_str)
+                for item in details:
+                    q_id = item.get('question_id')
+                    is_correct = item.get('is_correct')
+                    correct = (is_correct is True or is_correct == 1 or str(is_correct).lower() == 'true')
+                    if q_id in q_map:
+                        topic = q_map[q_id] or "Khác"
+                        if topic not in topic_stats:
+                            topic_stats[topic] = {'correct': 0, 'total': 0}
+                        topic_stats[topic]['total'] += 1
+                        if correct:
+                            topic_stats[topic]['correct'] += 1
+            except Exception:
+                pass
+                
+        grammar_stats = []
+        for topic, stats in topic_stats.items():
+            acc = round(stats['correct'] * 100.0 / stats['total'], 1) if stats['total'] > 0 else 0.0
+            grammar_stats.append({
+                'topic': topic,
+                'correct': stats['correct'],
+                'total': stats['total'],
+                'accuracy': acc
+            })
+            
+        grammar_stats.sort(key=lambda x: (x['accuracy'], -x['total']))
+        
+        return jsonify({
+            'total_in_db': total_in_db,
+            'total_sessions': total_sessions,
+            'total_qs_practiced': total_qs,
+            'total_correct': total_correct,
+            'overall_accuracy': overall_acc,
+            'total_duration_seconds': total_duration,
+            'grammar_stats': grammar_stats
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/questions/list')
+def api_toeic_questions_list():
+    q = request.args.get('q', '').strip()
+    topic = request.args.get('topic', '').strip()
+    
+    db = get_db()
+    try:
+        where_clauses = []
+        params = []
+        if q:
+            where_clauses.append("(question LIKE ? OR explanation LIKE ? OR translation LIKE ?)")
+            params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+        if topic and topic != 'all':
+            where_clauses.append("topic = ?")
+            params.append(topic)
+            
+        where_clause_str = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        query = f"SELECT * FROM toeic_questions {where_clause_str} ORDER BY id DESC"
+        rows = db.execute(query, tuple(params)).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/questions/<int:qid>', methods=['DELETE'])
+def api_toeic_question_delete(qid):
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM toeic_questions WHERE id = ?", (qid,))
+        if cursor.rowcount == 0:
+            return jsonify({'success': False, 'error': 'Question not found'}), 404
+        db.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/questions/delete-all', methods=['POST'])
+def api_toeic_delete_all():
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM toeic_questions")
+        cursor.execute("DELETE FROM toeic_sessions")
+        db.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
 
 if __name__ == '__main__':
     # Initialize SQLite database and tables

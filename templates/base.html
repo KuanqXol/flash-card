@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}FlashVocab{% endblock %}</title>
-    <meta name="description" content="FlashVocab - Nền tảng học từ vựng tiếng Anh thông minh với SRS, flashcard, trắc nghiệm và nhiều chế độ luyện tập">
+    <meta name="description"
+        content="FlashVocab - Nền tảng học từ vựng tiếng Anh thông minh với SRS, flashcard, trắc nghiệm và nhiều chế độ luyện tập">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <!-- Design System -->
     <link rel="stylesheet" href="/static/css/style.css">
     <!-- Phosphor Icons -->
@@ -22,6 +26,7 @@
     <script src="/static/js/theme.js"></script>
     {% block styles %}{% endblock %}
 </head>
+
 <body>
     <div class="app-layout">
         <!-- Sidebar Navigation (Desktop) -->
@@ -45,7 +50,9 @@
                 </a>
 
                 <div style="padding: 0 12px; margin: 12px 0 4px;">
-                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary);">Luyện tập</span>
+                    <span
+                        style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary);">Luyện
+                        tập</span>
                 </div>
 
                 <a href="/flashcard" class="nav-link" id="nav-flashcard">
@@ -63,6 +70,10 @@
                 <a href="/mcq" class="nav-link" id="nav-mcq">
                     <span class="nav-icon"><i class="ph ph-list-checks"></i></span>
                     <span>Trắc nghiệm</span>
+                </a>
+                <a href="/toeic" class="nav-link" id="nav-toeic">
+                    <span class="nav-icon"><i class="ph ph-graduation-cap"></i></span>
+                    <span>TOEIC Part 5</span>
                 </a>
             </nav>
 
@@ -96,7 +107,8 @@
         <main class="main-content">
             <header class="topbar">
                 <div class="topbar-left">
-                    <button class="sidebar-toggle" id="sidebar-toggle-btn" aria-label="Toggle Sidebar" style="position: static; margin-right: var(--sp-2); display: none;">
+                    <button class="sidebar-toggle" id="sidebar-toggle-btn" aria-label="Toggle Sidebar"
+                        style="position: static; margin-right: var(--sp-2); display: none;">
                         <i class="ph ph-list"></i>
                     </button>
                     <div class="breadcrumbs" id="topbar-breadcrumbs">
@@ -105,7 +117,7 @@
                         <span class="breadcrumb-item active" id="breadcrumb-current">Dashboard</span>
                     </div>
                 </div>
-                
+
                 <div class="topbar-center">
                     <div class="global-search-container">
                         <i class="ph ph-magnifying-glass search-icon"></i>
@@ -115,13 +127,14 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="topbar-right">
                     <!-- Sound toggle -->
-                    <button class="topbar-btn" id="btn-sound-toggle" onclick="toggleGlobalSound()" title="Tự động phát âm thanh">
+                    <button class="topbar-btn" id="btn-sound-toggle" onclick="toggleGlobalSound()"
+                        title="Tự động phát âm thanh">
                         <i class="ph ph-speaker-high" id="sound-toggle-icon"></i>
                     </button>
-                    
+
                     <!-- User Menu Dropdown -->
                     <div class="user-menu-dropdown">
                         <button class="user-menu-trigger" onclick="toggleUserMenu(event)">
@@ -136,12 +149,13 @@
                             </div>
                             <div class="user-dropdown-divider"></div>
                             <a href="/words" class="dropdown-item"><i class="ph ph-book-open"></i> Sổ từ vựng</a>
-                            <button class="dropdown-item" onclick="openGlobalSettings()"><i class="ph ph-gear-six"></i> Cài đặt</button>
+                            <button class="dropdown-item" onclick="openGlobalSettings()"><i class="ph ph-gear-six"></i>
+                                Cài đặt</button>
                         </div>
                     </div>
                 </div>
             </header>
-            
+
             {% block content %}{% endblock %}
         </main>
 
@@ -171,514 +185,538 @@
                 <span class="nav-icon"><i class="ph ph-list-checks"></i></span>
                 <span class="nav-text">Trắc nghiệm</span>
             </a>
+            <a href="/toeic" class="bottom-nav-link" id="bnav-toeic">
+                <span class="nav-icon"><i class="ph ph-graduation-cap"></i></span>
+                <span class="nav-text">Luyện TOEIC</span>
+            </a>
         </nav>
     </div>
 
     <!-- Toast Container -->
     <div id="toast-container"></div>
-    
+
     <script>
-    // Global Toast Notification System (upgraded with premium styling)
-    function showToast(message, type = 'success', duration = 3000) {
-      const icons = {
-        success: '<i class="ph-fill ph-check-circle" style="font-size: 18px; color: var(--color-success);"></i>',
-        error:   '<i class="ph-fill ph-x-circle" style="font-size: 18px; color: var(--color-danger);"></i>',
-        info:    '<i class="ph-fill ph-info" style="font-size: 18px; color: var(--color-primary);"></i>',
-        warning: '<i class="ph-fill ph-warning" style="font-size: 18px; color: var(--color-warning);"></i>'
-      };
-      
-      let container = document.getElementById('toast-container');
-      if (!container) {
-          container = document.createElement('div');
-          container.id = 'toast-container';
-          document.body.appendChild(container);
-      }
-      
-      const toast = document.createElement('div');
-      toast.className = `toast toast-${type}`;
-      toast.innerHTML = `${icons[type] || icons.info} <span>${message}</span>`;
-      container.appendChild(toast);
-      
-      setTimeout(() => {
-        toast.style.animation = `toastSlideOut var(--duration-normal) var(--ease-default) forwards`;
-        setTimeout(() => toast.remove(), 300);
-      }, duration);
-    }
+        // Global Toast Notification System (upgraded with premium styling)
+        function showToast(message, type = 'success', duration = 3000) {
+            const icons = {
+                success: '<i class="ph-fill ph-check-circle" style="font-size: 18px; color: var(--color-success);"></i>',
+                error: '<i class="ph-fill ph-x-circle" style="font-size: 18px; color: var(--color-danger);"></i>',
+                info: '<i class="ph-fill ph-info" style="font-size: 18px; color: var(--color-primary);"></i>',
+                warning: '<i class="ph-fill ph-warning" style="font-size: 18px; color: var(--color-warning);"></i>'
+            };
 
-    // Set Active Navigation State based on Pathname
-    function updateActiveNav() {
-        const path = window.location.pathname;
-        let activeId = 'dashboard';
-        if (path.startsWith('/words')) activeId = 'words';
-        else if (path.startsWith('/flashcard')) activeId = 'flashcard';
-        else if (path.startsWith('/matching')) activeId = 'matching';
-        else if (path.startsWith('/fill')) activeId = 'fill';
-        else if (path.startsWith('/mcq')) activeId = 'mcq';
-
-        // Sidebar Links
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.classList.remove('active');
-        });
-        const activeSidebarLink = document.getElementById(`nav-${activeId}`);
-        if (activeSidebarLink) activeSidebarLink.classList.add('active');
-
-        // Bottom Nav Links
-        document.querySelectorAll('.bottom-nav-link').forEach(link => {
-            link.classList.remove('active');
-        });
-        const activeBottomLink = document.getElementById(`bnav-${activeId}`);
-        if (activeBottomLink) activeBottomLink.classList.add('active');
-    }
-    updateActiveNav();
-
-    // User Level title helper
-    function getLevelTitle(level) {
-        if (level < 5) return 'Đồng';
-        if (level < 10) return 'Bạc';
-        if (level < 15) return 'Vàng';
-        if (level < 20) return 'Bạch Kim';
-        return 'Kim Cương';
-    }
-
-    // Global username and profile loading
-    async function loadUserHeader() {
-        try {
-            const res = await fetch('/api/settings');
-            const settings = await res.json();
-            const displayName = settings.display_name || 'Khách';
-            
-            // Store TTS speeds in localStorage for playWord utility
-            localStorage.setItem('tts_speed_normal', settings.tts_speed_normal || '1.0');
-            localStorage.setItem('tts_speed_slow', settings.tts_speed_slow || '0.5');
-            
-            const topbarUsername = document.getElementById('topbar-username');
-            const topbarAvatar = document.getElementById('topbar-avatar');
-            const menuUserName = document.getElementById('menu-user-name');
-            
-            if (topbarUsername) topbarUsername.textContent = displayName;
-            if (topbarAvatar && displayName) topbarAvatar.textContent = displayName.charAt(0).toUpperCase();
-            if (menuUserName) menuUserName.textContent = displayName;
-            
-            // Dispatch custom event so pages like Dashboard can update their greetings
-            window.dispatchEvent(new CustomEvent('userLoaded', { detail: { displayName } }));
-        } catch (err) {
-            console.error("Error loading user header:", err);
-        }
-    }
-
-    // Global total count badge update + sidebar stats
-    async function updateWordCountBadge() {
-        try {
-            const res = await fetch('/api/stats');
-            const stats = await res.json();
-            const badge = document.getElementById('nav-word-count');
-            if (badge) {
-                badge.textContent = stats.total || 0;
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                document.body.appendChild(container);
             }
-            // Update sidebar footer stats
-            const masteredEl = document.getElementById('sidebar-mastered');
-            if (masteredEl) masteredEl.textContent = stats.learned || 0;
 
-            // XP = total_score_sum
-            const xpEl = document.getElementById('sidebar-xp');
-            if (xpEl) xpEl.textContent = stats.total_score_sum || 0;
-            
-            // Update topbar user stats
-            const totalXp = stats.total_score_sum || 0;
-            const level = Math.floor(totalXp / 100) + 1;
-            const levelTitle = getLevelTitle(level);
-            
-            const menuLevelEl = document.getElementById('menu-user-level');
-            if (menuLevelEl) menuLevelEl.textContent = `Hạng: ${levelTitle} (LV ${level})`;
-            
-        } catch (err) {
-            console.error("Error updating word badge:", err);
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `${icons[type] || icons.info} <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = `toastSlideOut var(--duration-normal) var(--ease-default) forwards`;
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
         }
-    }
-    updateWordCountBadge();
 
-    // Update streak in sidebar (from daily progress)
-    async function updateSidebarStreak() {
-        try {
-            const res = await fetch('/api/analytics/daily-progress');
-            const data = await res.json();
-            const streakEl = document.getElementById('sidebar-streak');
-            if (streakEl && data.today) {
-                let streak = 0;
-                if (data.weekly) {
-                    for (let i = data.weekly.length - 1; i >= 0; i--) {
-                        if (data.weekly[i].review_count > 0) streak++;
-                        else break;
-                    }
-                }
-                streakEl.textContent = streak;
-            }
-        } catch (err) {
-            // Silently fail
+        // Set Active Navigation State based on Pathname
+        function updateActiveNav() {
+            const path = window.location.pathname;
+            let activeId = 'dashboard';
+            if (path.startsWith('/words')) activeId = 'words';
+            else if (path.startsWith('/flashcard')) activeId = 'flashcard';
+            else if (path.startsWith('/matching')) activeId = 'matching';
+            else if (path.startsWith('/fill')) activeId = 'fill';
+            else if (path.startsWith('/mcq')) activeId = 'mcq';
+            else if (path.startsWith('/toeic')) activeId = 'toeic';
+
+            // Sidebar Links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            const activeSidebarLink = document.getElementById(`nav-${activeId}`);
+            if (activeSidebarLink) activeSidebarLink.classList.add('active');
+
+            // Bottom Nav Links
+            document.querySelectorAll('.bottom-nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            const activeBottomLink = document.getElementById(`bnav-${activeId}`);
+            if (activeBottomLink) activeBottomLink.classList.add('active');
         }
-    }
-    updateSidebarStreak();
+        updateActiveNav();
 
-    // Breadcrumbs auto updater
-    function updateBreadcrumbs() {
-        const currentEl = document.getElementById('breadcrumb-current');
-        if (!currentEl) return;
-        
-        const path = window.location.pathname;
-        let label = 'Dashboard';
-        if (path.startsWith('/words')) label = 'Từ vựng';
-        else if (path.startsWith('/flashcard')) label = 'Flash Card';
-        else if (path.startsWith('/matching')) label = 'Nối Từ';
-        else if (path.startsWith('/fill')) label = 'Điền Nghĩa';
-        else if (path.startsWith('/mcq')) label = 'Trắc nghiệm';
-        
-        currentEl.textContent = label;
-    }
-
-    // User Menu dropdown visibility toggler
-    function toggleUserMenu(event) {
-        if (event) event.stopPropagation();
-        const menu = document.getElementById('user-dropdown-menu');
-        if (menu) {
-            menu.hidden = !menu.hidden;
+        // User Level title helper
+        function getLevelTitle(level) {
+            if (level < 5) return 'Đồng';
+            if (level < 10) return 'Bạc';
+            if (level < 15) return 'Vàng';
+            if (level < 20) return 'Bạch Kim';
+            return 'Kim Cương';
         }
-    }
 
-    // Settings redirection or modal trigger helper
-    function openGlobalSettings() {
-        if (typeof openSettingsModal === 'function') {
-            openSettingsModal();
-        } else {
-            window.location.href = '/?settings=true';
-        }
-    }
-
-    // Sound toggle autoplay state
-    let soundAutoplay = localStorage.getItem('soundAutoplay') !== 'false';
-    function updateSoundIcon() {
-        const icon = document.getElementById('sound-toggle-icon');
-        if (icon) {
-            icon.className = soundAutoplay ? 'ph ph-speaker-high' : 'ph-speaker-slash';
-        }
-    }
-    function toggleGlobalSound() {
-        soundAutoplay = !soundAutoplay;
-        localStorage.setItem('soundAutoplay', soundAutoplay ? 'true' : 'false');
-        updateSoundIcon();
-        showToast(soundAutoplay ? "Đã bật tự động phát âm thanh 🔊" : "Đã tắt tự động phát âm thanh 🔇", "info");
-    }
-
-    // Global Search Auto-Complete dropdown implementation
-    const globalSearchInput = document.getElementById('global-search-input');
-    const searchDropdown = document.getElementById('search-dropdown-menu');
-
-    if (globalSearchInput && searchDropdown) {
-        globalSearchInput.addEventListener('input', debounceSearch(async () => {
-            const query = globalSearchInput.value.trim();
-            if (!query) {
-                searchDropdown.hidden = true;
-                searchDropdown.innerHTML = '';
-                return;
-            }
-            
+        // Global username and profile loading
+        async function loadUserHeader() {
             try {
-                const res = await fetch(`/api/words/search?q=${encodeURIComponent(query)}&per_page=6`);
+                const res = await fetch('/api/settings');
+                const settings = await res.json();
+                const displayName = settings.display_name || 'Khách';
+
+                // Store TTS speeds in localStorage for playWord utility
+                localStorage.setItem('tts_speed_normal', settings.tts_speed_normal || '1.0');
+                localStorage.setItem('tts_speed_slow', settings.tts_speed_slow || '0.5');
+
+                const topbarUsername = document.getElementById('topbar-username');
+                const topbarAvatar = document.getElementById('topbar-avatar');
+                const menuUserName = document.getElementById('menu-user-name');
+
+                if (topbarUsername) topbarUsername.textContent = displayName;
+                if (topbarAvatar && displayName) topbarAvatar.textContent = displayName.charAt(0).toUpperCase();
+                if (menuUserName) menuUserName.textContent = displayName;
+
+                // Dispatch custom event so pages like Dashboard can update their greetings
+                window.dispatchEvent(new CustomEvent('userLoaded', { detail: { displayName } }));
+            } catch (err) {
+                console.error("Error loading user header:", err);
+            }
+        }
+
+        // Global total count badge update + sidebar stats
+        async function updateWordCountBadge() {
+            try {
+                const res = await fetch('/api/stats');
+                const stats = await res.json();
+                const badge = document.getElementById('nav-word-count');
+                if (badge) {
+                    badge.textContent = stats.total || 0;
+                }
+                // Update sidebar footer stats
+                const masteredEl = document.getElementById('sidebar-mastered');
+                if (masteredEl) masteredEl.textContent = stats.learned || 0;
+
+                // XP = total_score_sum
+                const xpEl = document.getElementById('sidebar-xp');
+                if (xpEl) xpEl.textContent = stats.total_score_sum || 0;
+
+                // Update topbar user stats
+                const totalXp = stats.total_score_sum || 0;
+                const level = Math.floor(totalXp / 100) + 1;
+                const levelTitle = getLevelTitle(level);
+
+                const menuLevelEl = document.getElementById('menu-user-level');
+                if (menuLevelEl) menuLevelEl.textContent = `Hạng: ${levelTitle} (LV ${level})`;
+
+            } catch (err) {
+                console.error("Error updating word badge:", err);
+            }
+        }
+        updateWordCountBadge();
+
+        // Update streak in sidebar (from daily progress)
+        async function updateSidebarStreak() {
+            try {
+                const res = await fetch('/api/analytics/daily-progress');
                 const data = await res.json();
-                
-                if (data.words && data.words.length > 0) {
-                    searchDropdown.innerHTML = data.words.map(w => `
+                const streakEl = document.getElementById('sidebar-streak');
+                if (streakEl && data.today) {
+                    let streak = 0;
+                    if (data.weekly) {
+                        for (let i = data.weekly.length - 1; i >= 0; i--) {
+                            if (data.weekly[i].review_count > 0) streak++;
+                            else break;
+                        }
+                    }
+                    streakEl.textContent = streak;
+                }
+            } catch (err) {
+                // Silently fail
+            }
+        }
+        updateSidebarStreak();
+
+        // Breadcrumbs auto updater
+        function updateBreadcrumbs() {
+            const currentEl = document.getElementById('breadcrumb-current');
+            if (!currentEl) return;
+
+            const path = window.location.pathname;
+            let label = 'Dashboard';
+            if (path.startsWith('/words')) label = 'Từ vựng';
+            else if (path.startsWith('/flashcard')) label = 'Flash Card';
+            else if (path.startsWith('/matching')) label = 'Nối Từ';
+            else if (path.startsWith('/fill')) label = 'Điền Nghĩa';
+            else if (path.startsWith('/mcq')) label = 'Trắc nghiệm';
+            else if (path.startsWith('/toeic')) label = 'Luyện TOEIC';
+
+            currentEl.textContent = label;
+        }
+
+        // User Menu dropdown visibility toggler
+        function toggleUserMenu(event) {
+            if (event) event.stopPropagation();
+            const menu = document.getElementById('user-dropdown-menu');
+            if (menu) {
+                menu.hidden = !menu.hidden;
+            }
+        }
+
+        // Settings redirection or modal trigger helper
+        function openGlobalSettings() {
+            if (typeof openSettingsModal === 'function') {
+                openSettingsModal();
+            } else {
+                window.location.href = '/?settings=true';
+            }
+        }
+
+        // Sound toggle autoplay state
+        let soundAutoplay = localStorage.getItem('soundAutoplay') !== 'false';
+        function updateSoundIcon() {
+            const icon = document.getElementById('sound-toggle-icon');
+            if (icon) {
+                icon.className = soundAutoplay ? 'ph ph-speaker-high' : 'ph-speaker-slash';
+            }
+        }
+        function toggleGlobalSound() {
+            soundAutoplay = !soundAutoplay;
+            localStorage.setItem('soundAutoplay', soundAutoplay ? 'true' : 'false');
+            updateSoundIcon();
+            showToast(soundAutoplay ? "Đã bật tự động phát âm thanh 🔊" : "Đã tắt tự động phát âm thanh 🔇", "info");
+        }
+
+        // Global Search Auto-Complete dropdown implementation
+        const globalSearchInput = document.getElementById('global-search-input');
+        const searchDropdown = document.getElementById('search-dropdown-menu');
+
+        if (globalSearchInput && searchDropdown) {
+            globalSearchInput.addEventListener('input', debounceSearch(async () => {
+                const query = globalSearchInput.value.trim();
+                if (!query) {
+                    searchDropdown.hidden = true;
+                    searchDropdown.innerHTML = '';
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`/api/words/search?q=${encodeURIComponent(query)}&per_page=6`);
+                    const data = await res.json();
+
+                    if (data.words && data.words.length > 0) {
+                        searchDropdown.innerHTML = data.words.map(w => `
                         <a href="/words?q=${encodeURIComponent(w.word)}" class="search-dropdown-item">
                             <span class="word-part">${highlightSearchMatch(w.word, query)}</span>
                             <span class="trans-part">${highlightSearchMatch(w.short_translation || '', query)}</span>
                         </a>
                     `).join('');
-                    searchDropdown.hidden = false;
-                } else {
-                    searchDropdown.innerHTML = `<div style="padding: var(--sp-2) var(--sp-3); font-size: var(--text-xs); color: var(--text-tertiary); text-align: center;">Không tìm thấy từ nào</div>`;
-                    searchDropdown.hidden = false;
-                }
-            } catch (err) {
-                console.error("Global search fetch error:", err);
-            }
-        }, 250));
-        
-        globalSearchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const query = globalSearchInput.value.trim();
-                if (query) {
-                    window.location.href = `/words?q=${encodeURIComponent(query)}`;
-                }
-            }
-        });
-    }
-
-    function debounceSearch(fn, delay) {
-        let timer;
-        return (...args) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        };
-    }
-
-    function highlightSearchMatch(text, query) {
-        if (!text) return '';
-        if (!query) return text;
-        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = new RegExp(`(${escapedQuery})`, 'gi');
-        return text.replace(re, '<mark>$1</mark>');
-    }
-
-    // Hide dropdowns when clicking outside
-    document.addEventListener('click', (e) => {
-        if (searchDropdown && !e.target.closest('.global-search-container')) {
-            searchDropdown.hidden = true;
-        }
-        const userMenu = document.getElementById('user-dropdown-menu');
-        if (userMenu && !userMenu.hidden && !e.target.closest('.user-menu-dropdown')) {
-            userMenu.hidden = true;
-        }
-    });
-
-    // Global Filter Dropdown populator helper
-    async function populateFilterDropdown(dropdownId, initialValue = 'smart_priority') {
-      const dropdown = document.getElementById(dropdownId);
-      if (!dropdown) return;
-      
-      try {
-        const res = await fetch('/api/filters/list');
-        const data = await res.json();
-        
-        dropdown.innerHTML = '';
-        
-        // Add default/status options
-        const allOpt = document.createElement('option');
-        allOpt.value = 'all';
-        allOpt.textContent = '📖 Tất cả từ vựng';
-        dropdown.appendChild(allOpt);
-        
-        const statusGroup = document.createElement('optgroup');
-        statusGroup.label = 'Trạng thái';
-        
-        const statuses = [
-            { value: 'new', label: 'Từ mới' },
-            { value: 'learning', label: 'Đang học' },
-            { value: 'learned', label: 'Đã thuộc' }
-        ];
-        statuses.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s.value;
-            opt.textContent = s.label;
-            statusGroup.appendChild(opt);
-        });
-        dropdown.appendChild(statusGroup);
-        
-        // Add dynamic quick/performance/smart filters
-        data.groups.forEach(g => {
-            const optGroup = document.createElement('optgroup');
-            optGroup.label = g.label;
-            
-            g.filters.forEach(f => {
-                const opt = document.createElement('option');
-                opt.value = f.id;
-                let text = f.label;
-                if (f.pool_mode) text += ' (pool)';
-                opt.textContent = text;
-                optGroup.appendChild(opt);
-            });
-            dropdown.appendChild(optGroup);
-        });
-        
-        dropdown.value = initialValue;
-      } catch (err) {
-        console.error("Error populating filter dropdown:", err);
-      }
-    }
-
-    // Global dynamic study header filters setup (multi-select checkboxes)
-    async function initStudyHeaderFilters(onFilterChangeCallback) {
-        const filterTrigger = document.querySelector('.filter-trigger');
-        const filterMenu = document.getElementById('filter-menu');
-        const filterLabel = document.getElementById('filter-label');
-        
-        if (!filterMenu) return;
-        
-        // Load initial filter selection from sessionStorage
-        const saved = JSON.parse(sessionStorage.getItem('lastFilter') || '{}');
-        let selectedFilters = saved.filters || ['smart_priority']; // array of filter IDs
-        let selectedStatuses = saved.statuses || []; // array: ['new','learning'] etc. empty = all
-        
-        // Backward compat: migrate old single-filter format
-        if (!saved.filters && saved.filter) {
-            selectedFilters = saved.filter === 'all' ? [] : [saved.filter];
-        }
-        if (!saved.statuses && saved.status && saved.status !== 'all') {
-            selectedStatuses = [saved.status];
-        }
-        
-        // Function to toggle menu
-        window.toggleFilterMenu = function(e) {
-            if (e) e.stopPropagation();
-            filterMenu.hidden = !filterMenu.hidden;
-        };
-        
-        // Hide menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (filterMenu && !filterMenu.hidden && !e.target.closest('.filter-dropdown')) {
-                filterMenu.hidden = true;
-            }
-        });
-        
-        // Helper: build the composite filter string for the API
-        function getFilterString() {
-            if (selectedFilters.length === 0) return 'all';
-            return selectedFilters.join(',');
-        }
-        
-        function getStatusString() {
-            if (selectedStatuses.length === 0) return 'all';
-            return selectedStatuses.join(',');
-        }
-        
-        // Helper: update the trigger label text
-        function updateTriggerLabel() {
-            if (!filterLabel) return;
-            if (selectedFilters.length === 0) {
-                filterLabel.textContent = 'Tất cả từ';
-            } else if (selectedFilters.includes('smart_priority')) {
-                filterLabel.textContent = 'Ưu tiên thông minh';
-            } else if (selectedFilters.length <= 2) {
-                // Show names
-                const names = selectedFilters.map(fid => {
-                    if (window._filterLabelsMap && window._filterLabelsMap[fid]) {
-                        return window._filterLabelsMap[fid];
+                        searchDropdown.hidden = false;
+                    } else {
+                        searchDropdown.innerHTML = `<div style="padding: var(--sp-2) var(--sp-3); font-size: var(--text-xs); color: var(--text-tertiary); text-align: center;">Không tìm thấy từ nào</div>`;
+                        searchDropdown.hidden = false;
                     }
-                    return fid;
+                } catch (err) {
+                    console.error("Global search fetch error:", err);
+                }
+            }, 250));
+
+            globalSearchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const query = globalSearchInput.value.trim();
+                    if (query) {
+                        window.location.href = `/words?q=${encodeURIComponent(query)}`;
+                    }
+                }
+            });
+        }
+
+        function debounceSearch(fn, delay) {
+            let timer;
+            return (...args) => {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn(...args), delay);
+            };
+        }
+
+        function highlightSearchMatch(text, query) {
+            if (!text) return '';
+            if (!query) return text;
+            const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(`(${escapedQuery})`, 'gi');
+            return text.replace(re, '<mark>$1</mark>');
+        }
+
+        // Hide dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (searchDropdown && !e.target.closest('.global-search-container')) {
+                searchDropdown.hidden = true;
+            }
+            const userMenu = document.getElementById('user-dropdown-menu');
+            if (userMenu && !userMenu.hidden && !e.target.closest('.user-menu-dropdown')) {
+                userMenu.hidden = true;
+            }
+        });
+
+        // Global Filter Dropdown populator helper
+        async function populateFilterDropdown(dropdownId, initialValue = 'smart_priority') {
+            const dropdown = document.getElementById(dropdownId);
+            if (!dropdown) return;
+
+            try {
+                const res = await fetch('/api/filters/list');
+                const data = await res.json();
+
+                dropdown.innerHTML = '';
+
+                // Add default/status options
+                const allOpt = document.createElement('option');
+                allOpt.value = 'all';
+                allOpt.textContent = '📖 Tất cả từ vựng';
+                dropdown.appendChild(allOpt);
+
+                const statusGroup = document.createElement('optgroup');
+                statusGroup.label = 'Trạng thái';
+
+                const statuses = [
+                    { value: 'new', label: 'Từ mới' },
+                    { value: 'learning', label: 'Đang học' },
+                    { value: 'learned', label: 'Đã thuộc' }
+                ];
+                statuses.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.value;
+                    opt.textContent = s.label;
+                    statusGroup.appendChild(opt);
                 });
-                filterLabel.textContent = names.join(', ');
-            } else {
-                filterLabel.textContent = `Bộ lọc (${selectedFilters.length})`;
+                dropdown.appendChild(statusGroup);
+
+                // Add dynamic quick/performance/smart filters
+                data.groups.forEach(g => {
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = g.label;
+
+                    g.filters.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.id;
+                        let text = f.label;
+                        if (f.pool_mode) text += ' (pool)';
+                        opt.textContent = text;
+                        optGroup.appendChild(opt);
+                    });
+                    dropdown.appendChild(optGroup);
+                });
+
+                dropdown.value = initialValue;
+            } catch (err) {
+                console.error("Error populating filter dropdown:", err);
             }
         }
-        
-        try {
-            const res = await fetch('/api/filters/list');
-            const data = await res.json();
-            
-            // Build a lookup map for filter labels
-            window._filterLabelsMap = {};
-            data.groups.forEach(g => {
-                g.filters.forEach(f => {
-                    window._filterLabelsMap[f.id] = f.label;
+
+        // Global dynamic study header filters setup (multi-select checkboxes)
+        async function initStudyHeaderFilters(onFilterChangeCallback) {
+            const filterTrigger = document.querySelector('.filter-trigger');
+            const filterMenu = document.getElementById('filter-menu');
+            const filterLabel = document.getElementById('filter-label');
+
+            if (!filterMenu) return;
+
+            // Load initial filter selection from sessionStorage
+            const saved = JSON.parse(sessionStorage.getItem('lastFilter') || '{}');
+            let selectedFilters = saved.filters || ['smart_priority']; // array of filter IDs
+            let selectedStatuses = saved.statuses || []; // array: ['new','learning'] etc. empty = all
+
+            // Backward compat: migrate old single-filter format
+            if (!saved.filters && saved.filter) {
+                selectedFilters = saved.filter === 'all' ? [] : [saved.filter];
+            }
+            if (!saved.statuses && saved.status && saved.status !== 'all') {
+                selectedStatuses = [saved.status];
+            }
+
+            // Function to toggle menu
+            window.toggleFilterMenu = function (e) {
+                if (e) e.stopPropagation();
+                filterMenu.hidden = !filterMenu.hidden;
+            };
+
+            // Hide menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (filterMenu && !filterMenu.hidden && !e.target.closest('.filter-dropdown')) {
+                    filterMenu.hidden = true;
+                }
+            });
+
+            // Helper: build the composite filter string for the API
+            function getFilterString() {
+                if (selectedFilters.length === 0) return 'all';
+                return selectedFilters.join(',');
+            }
+
+            function getStatusString() {
+                if (selectedStatuses.length === 0) return 'all';
+                return selectedStatuses.join(',');
+            }
+
+            // Helper: update the trigger label text
+            function updateTriggerLabel() {
+                if (!filterLabel) return;
+                if (selectedFilters.length === 0) {
+                    filterLabel.textContent = 'Tất cả từ';
+                } else if (selectedFilters.includes('smart_priority')) {
+                    filterLabel.textContent = 'Ưu tiên thông minh';
+                } else if (selectedFilters.length <= 2) {
+                    // Show names
+                    const names = selectedFilters.map(fid => {
+                        if (window._filterLabelsMap && window._filterLabelsMap[fid]) {
+                            return window._filterLabelsMap[fid];
+                        }
+                        return fid;
+                    });
+                    filterLabel.textContent = names.join(', ');
+                } else {
+                    filterLabel.textContent = `Bộ lọc (${selectedFilters.length})`;
+                }
+            }
+
+            try {
+                const res = await fetch('/api/filters/list');
+                const data = await res.json();
+
+                // Build a lookup map for filter labels
+                window._filterLabelsMap = {};
+                data.groups.forEach(g => {
+                    g.filters.forEach(f => {
+                        window._filterLabelsMap[f.id] = f.label;
+                    });
                 });
-            });
-            
-            // Build the menu with checkboxes
-            filterMenu.innerHTML = '';
-            
-            // Status section
-            const statusTitle = document.createElement('div');
-            statusTitle.className = 'filter-section-title';
-            statusTitle.textContent = 'Trạng thái';
-            filterMenu.appendChild(statusTitle);
-            
-            const statusGroup = document.createElement('div');
-            statusGroup.className = 'filter-group';
-            
-            const statusOptions = [
-                { id: 'new', label: 'Từ mới' },
-                { id: 'learning', label: 'Đang học' },
-                { id: 'learned', label: 'Đã thuộc' }
-            ];
-            
-            statusOptions.forEach(opt => {
-                const isChecked = selectedStatuses.includes(opt.id);
-                const label = document.createElement('label');
-                label.className = `filter-option ${isChecked ? 'active' : ''}`;
-                label.innerHTML = `<input type="checkbox" name="study-status-filter" value="${opt.id}" ${isChecked ? 'checked' : ''}> <span>${opt.label}</span>`;
-                statusGroup.appendChild(label);
-            });
-            filterMenu.appendChild(statusGroup);
-            
-            // Filter groups (time, performance, smart — skip combo)
-            data.groups.forEach(g => {
-                if (g.id === 'combo') return; // skip combo group
-                
-                const groupTitle = document.createElement('div');
-                groupTitle.className = 'filter-section-title';
-                groupTitle.textContent = g.label;
-                filterMenu.appendChild(groupTitle);
-                
-                const groupDiv = document.createElement('div');
-                groupDiv.className = 'filter-group';
-                
-                g.filters.forEach(f => {
-                    const isChecked = selectedFilters.includes(f.id);
+
+                // Build the menu with checkboxes
+                filterMenu.innerHTML = '';
+
+                // Status section
+                const statusTitle = document.createElement('div');
+                statusTitle.className = 'filter-section-title';
+                statusTitle.textContent = 'Trạng thái';
+                filterMenu.appendChild(statusTitle);
+
+                const statusGroup = document.createElement('div');
+                statusGroup.className = 'filter-group';
+
+                const statusOptions = [
+                    { id: 'new', label: 'Từ mới' },
+                    { id: 'learning', label: 'Đang học' },
+                    { id: 'learned', label: 'Đã thuộc' }
+                ];
+
+                statusOptions.forEach(opt => {
+                    const isChecked = selectedStatuses.includes(opt.id);
                     const label = document.createElement('label');
                     label.className = `filter-option ${isChecked ? 'active' : ''}`;
-                    const poolSuffix = f.pool_mode ? ' <small style="opacity:0.6">(pool)</small>' : '';
-                    label.innerHTML = `<input type="checkbox" name="study-filter" value="${f.id}" data-group="${g.id}" ${isChecked ? 'checked' : ''}> <span>${f.label}${poolSuffix}</span>`;
-                    groupDiv.appendChild(label);
+                    label.innerHTML = `<input type="checkbox" name="study-status-filter" value="${opt.id}" ${isChecked ? 'checked' : ''}> <span>${opt.label}</span>`;
+                    statusGroup.appendChild(label);
                 });
-                filterMenu.appendChild(groupDiv);
-            });
-            
-            // Attach status checkbox change listeners
-            filterMenu.querySelectorAll('input[name="study-status-filter"]').forEach(cb => {
-                cb.addEventListener('change', function() {
-                    const val = this.value;
-                    if (this.checked) {
-                        if (!selectedStatuses.includes(val)) selectedStatuses.push(val);
-                        this.closest('.filter-option').classList.add('active');
-                    } else {
-                        selectedStatuses = selectedStatuses.filter(s => s !== val);
-                        this.closest('.filter-option').classList.remove('active');
-                    }
-                    syncPillsFromCheckboxes();
-                    saveAndTrigger();
+                filterMenu.appendChild(statusGroup);
+
+                // Filter groups (time, performance, smart — skip combo)
+                data.groups.forEach(g => {
+                    if (g.id === 'combo') return; // skip combo group
+
+                    const groupTitle = document.createElement('div');
+                    groupTitle.className = 'filter-section-title';
+                    groupTitle.textContent = g.label;
+                    filterMenu.appendChild(groupTitle);
+
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'filter-group';
+
+                    g.filters.forEach(f => {
+                        const isChecked = selectedFilters.includes(f.id);
+                        const label = document.createElement('label');
+                        label.className = `filter-option ${isChecked ? 'active' : ''}`;
+                        const poolSuffix = f.pool_mode ? ' <small style="opacity:0.6">(pool)</small>' : '';
+                        label.innerHTML = `<input type="checkbox" name="study-filter" value="${f.id}" data-group="${g.id}" ${isChecked ? 'checked' : ''}> <span>${f.label}${poolSuffix}</span>`;
+                        groupDiv.appendChild(label);
+                    });
+                    filterMenu.appendChild(groupDiv);
                 });
-            });
-            
-            // Attach filter checkbox change listeners
-            filterMenu.querySelectorAll('input[name="study-filter"]').forEach(cb => {
-                cb.addEventListener('change', function() {
-                    const val = this.value;
-                    const group = this.dataset.group;
-                    
-                    if (this.checked) {
-                        // Mutual exclusion: smart vs others
-                        if (val === 'smart_priority') {
-                            // Uncheck all non-smart filters
-                            filterMenu.querySelectorAll('input[name="study-filter"]').forEach(other => {
-                                if (other.value !== 'smart_priority') {
-                                    other.checked = false;
-                                    other.closest('.filter-option').classList.remove('active');
-                                }
-                            });
-                            selectedFilters = ['smart_priority'];
+
+                // Attach status checkbox change listeners
+                filterMenu.querySelectorAll('input[name="study-status-filter"]').forEach(cb => {
+                    cb.addEventListener('change', function () {
+                        const val = this.value;
+                        if (this.checked) {
+                            if (!selectedStatuses.includes(val)) selectedStatuses.push(val);
+                            this.closest('.filter-option').classList.add('active');
                         } else {
-                            // Uncheck smart if checking a manual filter
-                            const smartCb = filterMenu.querySelector('input[name="study-filter"][value="smart_priority"]');
-                            if (smartCb) {
-                                smartCb.checked = false;
-                                smartCb.closest('.filter-option').classList.remove('active');
-                            }
-                            selectedFilters = selectedFilters.filter(f => f !== 'smart_priority');
-                            if (!selectedFilters.includes(val)) selectedFilters.push(val);
+                            selectedStatuses = selectedStatuses.filter(s => s !== val);
+                            this.closest('.filter-option').classList.remove('active');
                         }
-                        this.closest('.filter-option').classList.add('active');
-                    } else {
-                        selectedFilters = selectedFilters.filter(f => f !== val);
-                        this.closest('.filter-option').classList.remove('active');
-                    }
-                    updateTriggerLabel();
-                    saveAndTrigger();
+                        syncPillsFromCheckboxes();
+                        saveAndTrigger();
+                    });
                 });
-            });
-            
-            // Setup Quick status pills (toggle mode — allow multiple)
-            const pills = document.querySelectorAll('.status-pills .pill');
-            
-            function syncPillsFromCheckboxes() {
+
+                // Attach filter checkbox change listeners
+                filterMenu.querySelectorAll('input[name="study-filter"]').forEach(cb => {
+                    cb.addEventListener('change', function () {
+                        const val = this.value;
+                        const group = this.dataset.group;
+
+                        if (this.checked) {
+                            // Mutual exclusion: smart vs others
+                            if (val === 'smart_priority') {
+                                // Uncheck all non-smart filters
+                                filterMenu.querySelectorAll('input[name="study-filter"]').forEach(other => {
+                                    if (other.value !== 'smart_priority') {
+                                        other.checked = false;
+                                        other.closest('.filter-option').classList.remove('active');
+                                    }
+                                });
+                                selectedFilters = ['smart_priority'];
+                            } else {
+                                // Uncheck smart if checking a manual filter
+                                const smartCb = filterMenu.querySelector('input[name="study-filter"][value="smart_priority"]');
+                                if (smartCb) {
+                                    smartCb.checked = false;
+                                    smartCb.closest('.filter-option').classList.remove('active');
+                                }
+                                selectedFilters = selectedFilters.filter(f => f !== 'smart_priority');
+                                if (!selectedFilters.includes(val)) selectedFilters.push(val);
+                            }
+                            this.closest('.filter-option').classList.add('active');
+                        } else {
+                            selectedFilters = selectedFilters.filter(f => f !== val);
+                            this.closest('.filter-option').classList.remove('active');
+                        }
+                        updateTriggerLabel();
+                        saveAndTrigger();
+                    });
+                });
+
+                // Setup Quick status pills (toggle mode — allow multiple)
+                const pills = document.querySelectorAll('.status-pills .pill');
+
+                function syncPillsFromCheckboxes() {
+                    pills.forEach(pill => {
+                        const st = pill.dataset.status;
+                        if (st === 'all') {
+                            pill.classList.toggle('active', selectedStatuses.length === 0);
+                        } else {
+                            pill.classList.toggle('active', selectedStatuses.includes(st));
+                        }
+                    });
+                }
+
+                function syncCheckboxesFromPills() {
+                    filterMenu.querySelectorAll('input[name="study-status-filter"]').forEach(cb => {
+                        const isSelected = selectedStatuses.includes(cb.value);
+                        cb.checked = isSelected;
+                        cb.closest('.filter-option').classList.toggle('active', isSelected);
+                    });
+                }
+
                 pills.forEach(pill => {
                     const st = pill.dataset.status;
                     if (st === 'all') {
@@ -686,92 +724,75 @@
                     } else {
                         pill.classList.toggle('active', selectedStatuses.includes(st));
                     }
-                });
-            }
-            
-            function syncCheckboxesFromPills() {
-                filterMenu.querySelectorAll('input[name="study-status-filter"]').forEach(cb => {
-                    const isSelected = selectedStatuses.includes(cb.value);
-                    cb.checked = isSelected;
-                    cb.closest('.filter-option').classList.toggle('active', isSelected);
-                });
-            }
-            
-            pills.forEach(pill => {
-                const st = pill.dataset.status;
-                if (st === 'all') {
-                    pill.classList.toggle('active', selectedStatuses.length === 0);
-                } else {
-                    pill.classList.toggle('active', selectedStatuses.includes(st));
-                }
-                
-                pill.addEventListener('click', function() {
-                    const clickedStatus = this.dataset.status;
-                    
-                    if (clickedStatus === 'all') {
-                        // Clear all status selections
-                        selectedStatuses = [];
-                    } else {
-                        // Toggle this status
-                        if (selectedStatuses.includes(clickedStatus)) {
-                            selectedStatuses = selectedStatuses.filter(s => s !== clickedStatus);
+
+                    pill.addEventListener('click', function () {
+                        const clickedStatus = this.dataset.status;
+
+                        if (clickedStatus === 'all') {
+                            // Clear all status selections
+                            selectedStatuses = [];
                         } else {
-                            selectedStatuses.push(clickedStatus);
+                            // Toggle this status
+                            if (selectedStatuses.includes(clickedStatus)) {
+                                selectedStatuses = selectedStatuses.filter(s => s !== clickedStatus);
+                            } else {
+                                selectedStatuses.push(clickedStatus);
+                            }
                         }
-                    }
-                    
-                    syncPillsFromCheckboxes();
-                    syncCheckboxesFromPills();
-                    saveAndTrigger();
+
+                        syncPillsFromCheckboxes();
+                        syncCheckboxesFromPills();
+                        saveAndTrigger();
+                    });
                 });
-            });
-            
-            // Initial sync
-            syncPillsFromCheckboxes();
-            updateTriggerLabel();
-            
-            function saveAndTrigger() {
-                sessionStorage.setItem('lastFilter', JSON.stringify({ 
-                    filters: selectedFilters, 
-                    statuses: selectedStatuses 
-                }));
+
+                // Initial sync
+                syncPillsFromCheckboxes();
+                updateTriggerLabel();
+
+                function saveAndTrigger() {
+                    sessionStorage.setItem('lastFilter', JSON.stringify({
+                        filters: selectedFilters,
+                        statuses: selectedStatuses
+                    }));
+                    onFilterChangeCallback(getFilterString(), getStatusString());
+                }
+
+                // Initial call to let JS load the queue
+                onFilterChangeCallback(getFilterString(), getStatusString());
+
+            } catch (err) {
+                console.error("Error setting up study header filters:", err);
                 onFilterChangeCallback(getFilterString(), getStatusString());
             }
-            
-            // Initial call to let JS load the queue
-            onFilterChangeCallback(getFilterString(), getStatusString());
-            
-        } catch (err) {
-            console.error("Error setting up study header filters:", err);
-            onFilterChangeCallback(getFilterString(), getStatusString());
         }
-    }
 
-    // Global Keyboard Shortcuts
-    document.addEventListener('keydown', e => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.key === '/') {
-        e.preventDefault();
-        const searchInput = document.getElementById('global-search-input');
-        if (searchInput) {
-            searchInput.focus();
-            searchInput.select();
-        }
-        return;
-      }
-      const map = { 'd': '/', 'w': '/words', 'f': '/flashcard', 'm': '/matching', 't': '/fill', 'q': '/mcq' };
-      if (map[e.key.toLowerCase()]) window.location.href = map[e.key.toLowerCase()];
-    });
+        // Global Keyboard Shortcuts
+        document.addEventListener('keydown', e => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.key === '/') {
+                e.preventDefault();
+                const searchInput = document.getElementById('global-search-input');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                return;
+            }
+            const map = { 'd': '/', 'w': '/words', 'f': '/flashcard', 'm': '/matching', 't': '/fill', 'q': '/mcq' };
+            if (map[e.key.toLowerCase()]) window.location.href = map[e.key.toLowerCase()];
+        });
 
-    // Run updates on DOM load
-    document.addEventListener('DOMContentLoaded', () => {
-        loadUserHeader();
-        updateSoundIcon();
-        updateBreadcrumbs();
-    });
+        // Run updates on DOM load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUserHeader();
+            updateSoundIcon();
+            updateBreadcrumbs();
+        });
     </script>
     <!-- TTS Pronunciation Helper -->
     <script src="/static/js/tts.js"></script>
     {% block scripts %}{% endblock %}
 </body>
+
 </html>

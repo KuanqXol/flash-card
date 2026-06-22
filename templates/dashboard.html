@@ -211,7 +211,7 @@
     /* ─── QUICK ACTIONS ─── */
     .actions-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         gap: var(--sp-4);
         margin-bottom: var(--sp-8);
     }
@@ -289,11 +289,13 @@
     .action-card[data-variant="mcq"] .action-icon-wrap       { background: #FFF7ED; color: #EA580C; }
     .action-card[data-variant="matching"] .action-icon-wrap   { background: #F0FDF4; color: #16A34A; }
     .action-card[data-variant="fill"] .action-icon-wrap       { background: #FDF4FF; color: #A855F7; }
+    .action-card[data-variant="toeic"] .action-icon-wrap      { background: #F0F9FF; color: #0284C7; }
 
     [data-theme="dark"] .action-card[data-variant="flashcard"] .action-icon-wrap { background: rgba(79, 70, 229, 0.15); }
     [data-theme="dark"] .action-card[data-variant="mcq"] .action-icon-wrap       { background: rgba(234, 88, 12, 0.15); }
     [data-theme="dark"] .action-card[data-variant="matching"] .action-icon-wrap   { background: rgba(22, 163, 74, 0.15); }
     [data-theme="dark"] .action-card[data-variant="fill"] .action-icon-wrap       { background: rgba(168, 85, 247, 0.15); }
+    [data-theme="dark"] .action-card[data-variant="toeic"] .action-icon-wrap      { background: rgba(2, 132, 199, 0.15); }
 
     /* ─── ANALYTICS GRID ─── */
     .analytics-grid {
@@ -847,6 +849,22 @@
             </div>
         </div>
     </a>
+
+    <a href="/toeic" class="action-card" data-variant="toeic">
+        <div class="action-card-header">
+            <div class="title-group" style="display: flex; align-items: center; gap: var(--sp-2);">
+                <div class="action-icon-wrap" style="width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--text-base);"><i class="ph ph-graduation-cap"></i></div>
+                <span class="action-title" style="font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-sm);">TOEIC Part 5</span>
+            </div>
+        </div>
+        <div class="action-card-stats" style="margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-1);">
+            <div class="acc-value" id="stats-toeic-acc" style="font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-extrabold); line-height: 1.1; margin-bottom: 2px;">0% Acc</div>
+            <div class="detail-row" style="display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-medium);">
+                <span>Hôm nay: <strong id="stats-toeic-today">0</strong></span>
+                <span>Tổng: <strong id="stats-toeic-total">0</strong></span>
+            </div>
+        </div>
+    </a>
 </section>
 
 <!-- Analytics & Learning Insights -->
@@ -980,6 +998,81 @@
         <div class="heatmap-years-sidebar" id="heatmap-years">
             <!-- Year buttons populated dynamically -->
         </div>
+    </div>
+</section>
+
+<!-- TOEIC Part 5 Grammar Analysis Section (Hidden by default, shown when sessions practiced > 0) -->
+<section class="dashboard-bottom-row" id="toeic-analytics-row" style="grid-template-columns: 1fr 1fr; margin-bottom: var(--sp-8); display: none;">
+    <!-- General TOEIC stats -->
+    <div class="analytics-card" style="display: flex; flex-direction: column; justify-content: space-between; border-left: 3px solid var(--color-primary);">
+        <div class="analytics-card-header" style="margin-bottom: var(--sp-4);">
+            <span><i class="ph ph-graduation-cap" style="color: var(--color-primary);"></i> Phân tích TOEIC Part 5</span>
+            <span>Tổng quan tiến độ</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); flex-grow: 1;">
+            <div class="stat-card" style="padding: var(--sp-4); background: var(--surface-sunken); border-radius: var(--radius-lg); text-align: center;">
+                <div style="font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: 2px;">Tỷ lệ chính xác</div>
+                <div style="font-size: var(--text-2xl); font-weight: var(--weight-extrabold); color: var(--color-success);" id="toeic-overall-acc">0%</div>
+            </div>
+            <div class="stat-card" style="padding: var(--sp-4); background: var(--surface-sunken); border-radius: var(--radius-lg); text-align: center;">
+                <div style="font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: 2px;">Thời gian ôn tập</div>
+                <div style="font-size: var(--text-xl); font-weight: var(--weight-extrabold); color: var(--color-primary);" id="toeic-total-duration">00:00</div>
+            </div>
+            <div class="stat-card" style="padding: var(--sp-4); background: var(--surface-sunken); border-radius: var(--radius-lg); text-align: center;">
+                <div style="font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: 2px;">Số câu đã luyện</div>
+                <div style="font-size: var(--text-xl); font-weight: var(--weight-extrabold); color: var(--color-primary);" id="toeic-total-practiced">0 câu</div>
+            </div>
+            <div class="stat-card" style="padding: var(--sp-4); background: var(--surface-sunken); border-radius: var(--radius-lg); text-align: center;">
+                <div style="font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: 2px;">Số phiên hoàn thành</div>
+                <div style="font-size: var(--text-xl); font-weight: var(--weight-extrabold); color: var(--color-primary);" id="toeic-total-sessions">0 phiên</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grammar Strength & Weakness List -->
+    <div class="analytics-card" style="border-left: 3px solid var(--color-warning);">
+        <div class="analytics-card-header" style="margin-bottom: var(--sp-3);">
+            <span><i class="ph ph-chart-line-up" style="color: var(--color-warning);"></i> Chủ đề ngữ pháp</span>
+            <span>Hiệu suất theo ngữ pháp</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: var(--sp-4); height: calc(100% - 30px); overflow-y: auto; max-height: 200px;">
+            <div>
+                <div style="font-size: var(--text-xs); font-weight: 700; color: var(--color-danger); margin-bottom: var(--sp-2); display: flex; align-items: center; gap: 4px;">
+                    <i class="ph ph-trend-down"></i> Chủ đề cần cải thiện (&lt; 70%)
+                </div>
+                <div id="toeic-weak-topics" class="analytics-list" style="gap: var(--sp-2);">
+                    <!-- Dynamic weak topics -->
+                </div>
+            </div>
+            <div style="margin-top: var(--sp-2);">
+                <div style="font-size: var(--text-xs); font-weight: 700; color: var(--color-success); margin-bottom: var(--sp-2); display: flex; align-items: center; gap: 4px;">
+                    <i class="ph ph-trend-up"></i> Chủ đề thế mạnh (&ge; 70%)
+                </div>
+                <div id="toeic-strong-topics" class="analytics-list" style="gap: var(--sp-2);">
+                    <!-- Dynamic strong topics -->
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- TOEIC Part 5 Empty State Widget (Shown when sessions practiced == 0) -->
+<section class="card animate-fade-in delay-4" id="toeic-empty-row" style="margin-bottom: var(--sp-8); padding: var(--sp-6) var(--sp-8); display: none;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); flex-wrap: wrap;">
+        <div style="display: flex; gap: var(--sp-4); align-items: center; min-width: 280px; flex: 1;">
+            <div style="font-size: 3rem; filter: drop-shadow(0 4px 6px rgba(2,132,199,0.25)); flex-shrink: 0;">🎓</div>
+            <div>
+                <h3 style="font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-base); color: var(--text-primary); margin-bottom: 2px;">
+                    Bắt đầu luyện tập TOEIC Part 5!
+                </h3>
+                <p style="font-size: var(--text-xs); color: var(--text-secondary); max-width: 500px; line-height: 1.5;">
+                    Kiểm tra và nâng cao trình độ ngữ pháp tiếng Anh của bạn với 12 thì tiếng Anh và các chủ đề TOEIC đa dạng khác. Làm bài test, xem lời giải chi tiết và theo dõi tiến độ ở đây!
+                </p>
+            </div>
+        </div>
+        <a href="/toeic" class="btn btn-primary btn-sm" style="box-shadow: var(--shadow-md); background: var(--color-primary); flex-shrink: 0;">
+            <i class="ph ph-play-circle" style="font-size: 1.2rem;"></i> Bắt đầu luyện ngay
+        </a>
     </div>
 </section>
 
@@ -1191,6 +1284,12 @@
             document.getElementById('stats-fill-today').textContent = fill.today_reviews;
             document.getElementById('stats-fill-total').textContent = fill.total_reviews;
             
+            // TOEIC
+            const toeic = pStats.toeic || { accuracy: 0.0, today_reviews: 0, total_reviews: 0 };
+            document.getElementById('stats-toeic-acc').textContent = `${toeic.accuracy}% Acc`;
+            document.getElementById('stats-toeic-today').textContent = toeic.today_reviews;
+            document.getElementById('stats-toeic-total').textContent = toeic.total_reviews;
+            
         } catch (err) {
             console.error("Error loading stats:", err);
         }
@@ -1247,8 +1346,82 @@
             renderWeeklyChart(progressData.weekly);
             renderStreak(progressData.weekly);
             renderHeatmap(progressData.heatmap, progressData.today.reviewed_today);
+            
+            // Fetch TOEIC analytics
+            fetchToeicAnalytics();
         } catch (err) {
             console.error("Error fetching analytics:", err);
+        }
+    }
+
+    // ═══ TOEIC ANALYTICS ═══
+    async function fetchToeicAnalytics() {
+        try {
+            const res = await fetch('/api/toeic/analytics');
+            const data = await res.json();
+            
+            const emptyRow = document.getElementById('toeic-empty-row');
+            const analyticsRow = document.getElementById('toeic-analytics-row');
+            
+            if (!data || data.total_sessions === 0) {
+                if (emptyRow) emptyRow.style.display = 'block';
+                if (analyticsRow) analyticsRow.style.display = 'none';
+                return;
+            }
+            
+            if (emptyRow) emptyRow.style.display = 'none';
+            if (analyticsRow) analyticsRow.style.display = 'grid';
+            
+            // Format duration
+            const mins = Math.floor(data.total_duration_seconds / 60);
+            const secs = data.total_duration_seconds % 60;
+            const durationText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            // Set summary fields
+            document.getElementById('toeic-overall-acc').textContent = `${data.overall_accuracy}%`;
+            document.getElementById('toeic-total-duration').textContent = durationText;
+            document.getElementById('toeic-total-practiced').textContent = `${data.total_qs_practiced} câu`;
+            document.getElementById('toeic-total-sessions').textContent = `${data.total_sessions} phiên`;
+            
+            // Filter weak vs strong topics
+            const weakContainer = document.getElementById('toeic-weak-topics');
+            const strongContainer = document.getElementById('toeic-strong-topics');
+            
+            if (weakContainer) weakContainer.innerHTML = '';
+            if (strongContainer) strongContainer.innerHTML = '';
+            
+            let weakCount = 0;
+            let strongCount = 0;
+            
+            data.grammar_stats.forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'analytics-item';
+                item.style.padding = 'var(--sp-2) var(--sp-3)';
+                item.style.fontSize = 'var(--text-xs)';
+                item.innerHTML = `
+                    <span class="word-name" style="font-weight:600;">${s.topic}</span>
+                    <span style="font-size: var(--text-xxs); color: var(--text-tertiary); margin-left: var(--sp-1);">(${s.correct}/${s.total} câu)</span>
+                    <span style="margin-left:auto; font-weight:700; color: ${s.accuracy >= 70 ? 'var(--color-success)' : 'var(--color-danger)'};">${s.accuracy}%</span>
+                `;
+                
+                if (s.accuracy < 70) {
+                    if (weakContainer) weakContainer.appendChild(item);
+                    weakCount++;
+                } else {
+                    if (strongContainer) strongContainer.appendChild(item);
+                    strongCount++;
+                }
+            });
+            
+            if (weakCount === 0 && weakContainer) {
+                weakContainer.innerHTML = '<div style="font-size: var(--text-xxs); color: var(--text-tertiary); padding: 4px 0; text-align: center; width: 100%;">Không có chủ đề yếu nào! 👏</div>';
+            }
+            if (strongCount === 0 && strongContainer) {
+                strongContainer.innerHTML = '<div style="font-size: var(--text-xxs); color: var(--text-tertiary); padding: 4px 0; text-align: center; width: 100%;">Hãy tiếp tục cố gắng để đạt mốc thế mạnh! 💪</div>';
+            }
+            
+        } catch (err) {
+            console.error("Error fetching TOEIC analytics:", err);
         }
     }
 

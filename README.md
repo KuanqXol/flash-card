@@ -1,173 +1,63 @@
-# 📚 FlashVocab
+# FlashVocab
 
-Ứng dụng học từ vựng tiếng Anh cá nhân hóa chạy trên local, hỗ trợ nhiều chế độ luyện tập, hệ thống chấm điểm thông minh, và bộ lọc nâng cao.
+FlashVocab là ứng dụng học tiếng Anh cá nhân hóa chạy trên môi trường local. Ứng dụng hỗ trợ học từ vựng theo phương pháp Spaced Repetition (Lặp lại ngắt quãng) kết hợp luyện tập ngữ pháp trắc nghiệm TOEIC Part 5.
 
----
+## Tính năng chính
 
-## ✨ Tính năng chính
+*   **Flashcard**: Học từ vựng, phiên âm IPA, ví dụ và phát âm tự động (TTS) với 2 tốc độ.
+*   **Trắc nghiệm (MCQ)**: Ôn tập từ vựng với đáp án nhiễu tự động sinh từ kho dữ liệu.
+*   **Điền nghĩa (Fill)**: Gõ từ tiếng Anh dựa trên gợi ý nghĩa tiếng Việt và ký tự đầu.
+*   **Nối từ (Matching)**: Ghép cặp từ - nghĩa trong thời gian giới hạn bằng thao tác kéo thả.
+*   **Luyện TOEIC Part 5**:
+    *   Học theo chủ đề ngữ pháp chi tiết (các thì tiếng Anh, giới từ, liên từ...).
+    *   Hiển thị dịch nghĩa và giải thích chi tiết ngay sau khi chọn đáp án.
+*   **Quản lý từ vựng**: Bộ lọc nâng cao (thời gian thêm, hiệu suất học, thuật toán ưu tiên thông minh) giúp lọc danh sách từ vựng. Hỗ trợ import/export CSV.
+*   **Dashboard**: Thống kê tổng quan tiến độ học tập, biểu đồ hoạt động 7 ngày gần nhất, và khối phân tích điểm mạnh/yếu đối với từng chủ đề ngữ pháp TOEIC.
 
-### 🎴 Flashcard
-- Lật thẻ xem nghĩa, phiên âm IPA, ví dụ minh họa.
-- Đánh giá bản thân: **Tạm nhớ** / **Chưa thuộc** / **Đã thuộc**.
-- Tự động phát âm TTS (tốc độ bình thường & đọc chậm).
+## Công nghệ sử dụng
 
-### 📝 Trắc nghiệm (MCQ)
-- 4 đáp án cho mỗi câu hỏi, tự động sinh đáp án nhiễu từ pool từ vựng.
-- Đánh giá ngay lập tức, cộng/trừ điểm theo kết quả.
+*   **Backend**: Python / Flask (REST API và rendering)
+*   **Frontend**: HTML, CSS, Vanilla JavaScript (không cần build step)
+*   **Cơ sở dữ liệu**: SQLite
+*   **Phát âm**: Google Text-to-Speech (gTTS) với cache local tự động dọn dẹp
+*   **Xử lý dữ liệu**: Pandas và OpenPyXL (đọc Excel/CSV)
 
-### ✍️ Điền nghĩa (Fill)
-- Gợi ý nghĩa tiếng Việt, người dùng gõ từ tiếng Anh.
-- So khớp thông minh, hỗ trợ gợi ý ký tự đầu.
+## Hướng dẫn cài đặt và chạy
 
-### 🔗 Nối từ (Matching)
-- Ghép cặp từ – nghĩa trong thời gian giới hạn.
-- Giao diện kéo thả trực quan.
+1.  **Cài đặt môi trường:**
+    ```bash
+    python -m venv .venv
+    # Windows:
+    .venv\Scripts\activate
+    # macOS/Linux:
+    source .venv/bin/activate
+    ```
 
-### 📖 Quản lý từ vựng
-- Xem tất cả từ vựng với bộ lọc đa dạng (trạng thái, thời gian, hiệu suất).
-- Thêm / sửa / xóa từ vựng trực tiếp trên giao diện.
-- Xem chi tiết từ: lịch sử ôn tập, thống kê theo bài tập, ngày thêm.
-- Import CSV hàng loạt & Export CSV.
+2.  **Cài đặt dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-### 📊 Dashboard
-- Tổng quan thống kê: tổng từ, từ mới, đang học, đã thuộc.
-- Biểu đồ tiến trình hàng ngày (heatmap).
-- Danh sách từ yếu, từ nguy hiểm, từ hay quên.
+3.  **Chạy ứng dụng:**
+    ```bash
+    python app.py
+    ```
+    Mở trình duyệt tại địa chỉ: `http://localhost:5000`
 
-### 🔍 Hệ thống bộ lọc nâng cao
-- **Multi-select checkbox**: Tick chọn nhiều bộ lọc cùng lúc.
-- **Nhóm bộ lọc**:
-  - ⏰ **Thời gian**: Thêm hôm nay, thêm tuần này, chưa ôn hôm nay, chưa ôn 3/7 ngày, vừa sai…
-  - 📈 **Hiệu suất**: Điểm thấp nhất, accuracy thấp nhất, sai nhiều nhất, chưa ôn lần nào, từ nguy hiểm.
-  - 🧠 **Thông minh**: Ưu tiên thông minh (dựa trên thuật toán scoring).
-- **Loại trừ tương hỗ**: "Ưu tiên thông minh" tự động tắt khi chọn bộ lọc khác.
-- **Đồng bộ trạng thái**: Pills trạng thái ↔ checkbox trong dropdown.
+## Định dạng file dữ liệu
 
-### 🔊 Text-to-Speech (TTS)
-- Phát âm từ vựng bằng giọng tiếng Anh tự nhiên (gTTS).
-- 2 tốc độ: bình thường & đọc chậm (tùy chỉnh trong Cài đặt).
-- Cache audio local tự động, LRU eviction khi vượt 100MB.
+### File từ vựng (CSV)
 
-### ⚙️ Cài đặt
-- Tùy chỉnh tốc độ đọc chậm.
-- Chế độ sáng / tối (Dark mode).
-- Lưu cài đặt persistent trong database.
+*   **Word**: Từ / cụm từ tiếng Anh (ví dụ: `representative`).
+*   **Phonetic**: Phiên âm IPA (ví dụ: `/ˌreprɪˈzentətɪv/`, có thể để trống hoặc ghi `--`).
+*   **Translation**: Nghĩa tiếng Việt, đi kèm phân loại từ loại (n., v., adj., adv., prep., conj., pron.), phân cách bằng dấu `;` (ví dụ: `n. người đại diện; adj. đại diện`).
+*   **Date**: Ngày thêm từ (ví dụ: `2026-06-22`).
 
----
+### File câu hỏi TOEIC (Excel - .xlsx)
 
-## 🏗️ Tech Stack
-
-| Thành phần | Công nghệ | Ghi chú |
-|---|---|---|
-| Backend | Python 3.10+ / Flask | REST API, server-side rendering |
-| Frontend | HTML5 + CSS3 + Vanilla JS | Không cần build step |
-| Database | SQLite (`sqlite3` built-in) | Zero-config, 1 file `.db` |
-| TTS | gTTS (Google Text-to-Speech) | Sinh file `.mp3` cache local |
-| Data import | pandas | Đọc CSV, xử lý encoding |
-
----
-
-## 🚀 Cài đặt & Chạy
-
-```bash
-# 1. Clone repo
-git clone <repo-url>
-cd flash-card
-
-# 2. Tạo virtual environment
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-
-# 3. Cài dependencies
-pip install -r requirements.txt
-
-# 4. Chạy ứng dụng
-python app.py
-```
-
-Mở trình duyệt tại **http://localhost:5000**
-
-> **Lưu ý**: Database `flashcards.db` tự động tạo khi chạy lần đầu. Từ vựng mới import sẽ có điểm mặc định **30**.
-
----
-
-## 📊 Cấu trúc CSV đầu vào
-
-| Cột | Ý nghĩa | Ví dụ |
-|---|---|---|
-| `Word` | Từ / cụm từ tiếng Anh | `representative`, `the nasal spray` |
-| `Phonetic` | Phiên âm IPA (có thể là `--`) | `/ˌreprɪˈzentətɪv/` |
-| `Translation` | Nghĩa tiếng Việt, prefix từ loại, phân cách `;` | `n. người đại diện; adj. đại diện` |
-| `Date` | Ngày thêm từ | `2026-06-17` |
-
----
-
-## 🧮 Hệ thống chấm điểm
-
-### Điểm kiến thức (Knowledge Score)
-
-Mỗi từ có điểm **0 – 100**, quyết định trạng thái:
-
-| Khoảng điểm | Trạng thái | Biểu tượng |
-|---|---|---|
-| 0 – 29 | Danger (Nguy hiểm) | 🔴 |
-| 30 – 49 | New (Từ mới) | 🟡 |
-| 50 – 69 | Learning (Đang học) | 🔵 |
-| 70 – 89 | Familiar (Quen thuộc) | 🟢 |
-| 90 – 100 | Mastered (Đã thuộc) | ⭐ |
-
-### Điểm cộng/trừ theo bài tập
-
-| Bài tập | Đúng | Sai |
-|---|---|---|
-| Flashcard | +1 | 0 |
-| Matching | +2 | −3 |
-| MCQ | +3 | −2 |
-| Fill (Typing) | +5 | −1 |
-
-> Điểm được tính dựa trên **accuracy tổng hợp** và **tần suất ôn tập**, không chỉ đơn thuần cộng/trừ tuyến tính.
-
----
-
-## 📁 Cấu trúc thư mục
-
-```
-flash-card/
-├── app.py                  # Flask backend — tất cả API routes (~50 endpoints)
-├── database.py             # SQLite schema, queries, bộ lọc FILTERS
-├── scoring.py              # Thuật toán tính điểm V2, spaced repetition logic
-├── import_csv.py           # Script import CSV vào DB
-├── migrate_v2.py           # Script migration database lên schema V2
-├── migrate_scores.py       # Script migration điểm
-│
-├── templates/
-│   ├── base.html           # Layout chung + initStudyHeaderFilters()
-│   ├── dashboard.html      # Trang chủ & thống kê tổng quan
-│   ├── flashcard.html      # Chế độ flashcard
-│   ├── mcq.html            # Chế độ trắc nghiệm
-│   ├── fill.html           # Chế độ điền nghĩa
-│   ├── matching.html       # Chế độ nối từ
-│   └── words.html          # Quản lý tất cả từ vựng
-│
-├── static/
-│   ├── css/style.css       # CSS design system (2000+ dòng)
-│   ├── js/
-│   │   ├── flashcard.js    # Logic flashcard
-│   │   ├── mcq.js          # Logic trắc nghiệm
-│   │   ├── fill.js         # Logic điền nghĩa
-│   │   ├── matching.js     # Logic nối từ
-│   │   ├── words.js        # Logic quản lý từ vựng
-│   │   ├── theme.js        # Dark/light mode toggle
-│   │   └── tts.js          # Text-to-speech client
-│   └── audio/              # Cache file .mp3 TTS (tự sinh)
-│
-├── data/                   # Thư mục chứa file CSV gốc
-├── tests/                  # Unit tests
-├── flashcards.db           # SQLite DB (tự tạo khi chạy)
-├── requirements.txt        # Dependencies: flask, pandas, gTTS
-└── README.md
-```
+*   **Chu De**: Chủ đề ngữ pháp hoặc từ vựng của câu hỏi (ví dụ: `Hiện tại đơn`, `Giới từ`).
+*   **Cau Hoi**: Nội dung câu hỏi trắc nghiệm tiếng Anh (chứa dấu gạch trống `___`).
+*   **Dap An A / B / C / D**: Các phương án lựa chọn trắc nghiệm.
+*   **Dap An Dung**: Chữ cái in hoa đáp án chính xác (`A`, `B`, `C` hoặc `D`).
+*   **Giai Thich**: Lời giải thích tại sao chọn đáp án đó.
+*   **Dich Nghia**: Bản dịch nghĩa câu hỏi và các phương án lựa chọn.

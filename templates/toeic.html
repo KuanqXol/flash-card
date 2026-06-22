@@ -1,0 +1,693 @@
+{% extends "base.html" %}
+
+{% block title %}Luyện TOEIC Part 5 - FlashVocab{% endblock %}
+
+{% block styles %}
+<style>
+    .toeic-container {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: var(--sp-6) var(--sp-4);
+    }
+
+    /* Premium Tab Navigation */
+    .tabs-nav {
+        display: flex;
+        border-bottom: 2px solid var(--border-subtle);
+        margin-bottom: var(--sp-6);
+        gap: var(--sp-6);
+    }
+
+    .tab-link {
+        background: none;
+        border: none;
+        padding: var(--sp-3) 0;
+        font-family: var(--font-display);
+        font-size: var(--text-base);
+        font-weight: 700;
+        color: var(--text-muted);
+        cursor: pointer;
+        position: relative;
+        transition: color var(--duration-normal) ease;
+    }
+
+    .tab-link:hover {
+        color: var(--text-primary);
+    }
+
+    .tab-link.active {
+        color: var(--color-primary);
+    }
+
+    .tab-link.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--color-primary);
+        border-radius: 999px;
+    }
+
+    .toeic-card {
+        background: var(--surface-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-2xl);
+        padding: var(--sp-8) var(--sp-6);
+        box-shadow: var(--shadow-md);
+        margin-bottom: var(--sp-6);
+    }
+
+    /* Configuration Panel Styles */
+    .config-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--sp-4);
+        margin-bottom: var(--sp-6);
+    }
+
+    @media (min-width: 640px) {
+        .config-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-2);
+    }
+
+    .form-group label {
+        font-family: var(--font-display);
+        font-size: var(--text-sm);
+        font-weight: 700;
+        color: var(--text-secondary);
+    }
+
+    .form-control {
+        background: var(--surface-sunken);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-xl);
+        padding: var(--sp-3) var(--sp-4);
+        color: var(--text-primary);
+        font-family: var(--font-body);
+        font-size: var(--text-sm);
+        outline: none;
+        transition: border-color var(--duration-normal) ease;
+        width: 100%;
+    }
+
+    .form-control:focus {
+        border-color: var(--color-primary);
+    }
+
+    /* Practice UI Styles */
+    .practice-header-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--sp-6);
+        padding-bottom: var(--sp-4);
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .practice-meta {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-4);
+    }
+
+    .timer-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--sp-1-5);
+        background: var(--surface-sunken);
+        border: 1px solid var(--border-subtle);
+        padding: var(--sp-2) var(--sp-4);
+        border-radius: var(--radius-lg);
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: var(--text-sm);
+        color: var(--text-secondary);
+    }
+
+    .toeic-question-text {
+        font-size: var(--text-xl);
+        font-weight: 600;
+        color: var(--text-primary);
+        line-height: 1.6;
+        margin-bottom: var(--sp-8);
+        padding: var(--sp-4) var(--sp-6);
+        background: var(--surface-sunken);
+        border-left: 4px solid var(--color-primary);
+        border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    }
+
+    .toeic-options-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--sp-4);
+        margin-bottom: var(--sp-8);
+    }
+
+    @media (min-width: 768px) {
+        .toeic-options-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    .toeic-option-btn {
+        background: var(--surface-card);
+        border: 2px solid var(--border-subtle);
+        border-radius: var(--radius-xl);
+        padding: var(--sp-4) var(--sp-5);
+        text-align: left;
+        font-family: var(--font-body);
+        font-size: var(--text-base);
+        font-weight: 600;
+        color: var(--text-primary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-sm);
+        outline: none;
+    }
+
+    .toeic-option-btn:hover:not(:disabled) {
+        border-color: var(--color-primary-muted);
+        background: var(--color-primary-subtle);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .toeic-option-btn:disabled {
+        cursor: default;
+    }
+
+    .option-prefix {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--surface-sunken);
+        border: 1px solid var(--border-subtle);
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: var(--text-sm);
+        color: var(--text-muted);
+        margin-right: var(--sp-4);
+        flex-shrink: 0;
+    }
+
+    .toeic-option-btn:hover:not(:disabled) .option-prefix {
+        background: var(--color-primary);
+        color: white;
+        border-color: var(--color-primary);
+    }
+
+    .option-text {
+        flex-grow: 1;
+    }
+
+    .option-status-icon {
+        opacity: 0;
+        transform: scale(0.5);
+        transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        margin-left: var(--sp-2);
+    }
+
+    /* Option Correct/Wrong States */
+    .toeic-option-btn.correct {
+        border-color: var(--color-success);
+        background: var(--color-success-subtle);
+        color: #065F46;
+    }
+
+    .toeic-option-btn.correct .option-prefix {
+        background: var(--color-success);
+        color: white;
+        border-color: var(--color-success);
+    }
+
+    .toeic-option-btn.correct .option-status-icon {
+        opacity: 1;
+        transform: scale(1);
+        color: var(--color-success);
+    }
+
+    .toeic-option-btn.wrong {
+        border-color: var(--color-danger);
+        background: var(--color-danger-subtle);
+        color: #991B1B;
+    }
+
+    .toeic-option-btn.wrong .option-prefix {
+        background: var(--color-danger);
+        color: white;
+        border-color: var(--color-danger);
+    }
+
+    .toeic-option-btn.wrong .option-status-icon {
+        opacity: 1;
+        transform: scale(1);
+        color: var(--color-danger);
+    }
+
+    /* Explanation Card */
+    .explanation-card {
+        background: var(--color-primary-subtle);
+        border: 1px solid var(--color-primary-muted);
+        border-radius: var(--radius-xl);
+        padding: var(--sp-5) var(--sp-6);
+        margin-bottom: var(--sp-6);
+        animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .exp-section {
+        margin-bottom: var(--sp-3);
+    }
+
+    .exp-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .exp-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: var(--text-sm);
+        color: var(--color-primary);
+        margin-bottom: var(--sp-1);
+        display: flex;
+        align-items: center;
+        gap: var(--sp-1-5);
+    }
+
+    .exp-body {
+        font-size: var(--text-sm);
+        color: var(--text-primary);
+        line-height: 1.5;
+    }
+
+    /* Excel Import Drag-Drop Zone */
+    .drag-drop-zone {
+        border: 2px dashed var(--border-muted);
+        border-radius: var(--radius-2xl);
+        padding: var(--sp-10) var(--sp-6);
+        text-align: center;
+        background: var(--surface-sunken);
+        cursor: pointer;
+        transition: all var(--duration-normal) ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--sp-3);
+    }
+
+    .drag-drop-zone:hover, .drag-drop-zone.dragover {
+        border-color: var(--color-primary);
+        background: var(--color-primary-subtle);
+    }
+
+    .upload-icon {
+        font-size: 3.5rem;
+        color: var(--color-primary);
+    }
+
+    /* Generic tables formatting */
+    .toeic-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .toeic-table th, .toeic-table td {
+        padding: var(--sp-3-5) var(--sp-4);
+        border-bottom: 1px solid var(--border-subtle);
+        text-align: left;
+        font-size: var(--text-sm);
+    }
+
+    .toeic-table th {
+        background: var(--surface-sunken);
+        font-family: var(--font-display);
+        font-weight: 700;
+        color: var(--text-secondary);
+    }
+
+    /* Modal styling */
+    .toeic-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--duration-normal) ease;
+    }
+
+    .toeic-modal.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .toeic-modal-content {
+        background: var(--surface-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-2xl);
+        width: 90%;
+        max-width: 720px;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-2xl);
+        animation: scaleUp 0.3s ease;
+    }
+
+    @keyframes scaleUp {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .toeic-modal-header {
+        padding: var(--sp-4) var(--sp-6);
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .toeic-modal-title {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: var(--text-lg);
+        color: var(--text-primary);
+    }
+
+    .toeic-modal-body {
+        padding: var(--sp-6);
+    }
+
+    .modal-detail-item {
+        margin-bottom: var(--sp-6);
+        padding-bottom: var(--sp-6);
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .modal-detail-item:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+
+    /* Completion Score Cards */
+    .trophy-container {
+        font-size: 5rem;
+        margin-bottom: var(--sp-4);
+        animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+    }
+
+    .comp-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--sp-4);
+        margin: var(--sp-6) 0 var(--sp-8);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="toeic-container">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6);">
+        <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 2.2rem; color: var(--text-primary); margin: 0;">Luyện TOEIC Part 5</h1>
+        <div id="toeic-bank-badge" class="badge badge-primary" style="font-weight: 700;">Kho câu hỏi: <span id="bank-count-val">0</span> câu</div>
+    </div>
+
+    <!-- Tab navigation -->
+    <nav class="tabs-nav">
+        <button class="tab-link active" onclick="switchTab('practice')">Luyện tập</button>
+        <button class="tab-link" onclick="switchTab('history')">Lịch sử làm bài</button>
+        <button class="tab-link" onclick="switchTab('database')">Kho câu hỏi & Nhập liệu</button>
+    </nav>
+
+    <!-- Tab Content: Practice -->
+    <div id="tab-practice" class="tab-pane">
+        <!-- Configuration Panel -->
+        <div id="practice-config" class="toeic-card">
+            <h2 style="font-family: var(--font-display); font-weight: 700; margin-top: 0; margin-bottom: var(--sp-4);">Thiết lập bài luyện tập</h2>
+            
+            <div class="config-grid">
+                <div class="form-group">
+                    <label for="practice-category">Chủ đề chính</label>
+                    <select id="practice-category" class="form-control" onchange="handlePracticeCategoryChange()">
+                        <option value="all">📚 Tất cả chủ đề</option>
+                        <option value="tenses">⏱ Các thì tiếng Anh (Tenses)</option>
+                        <option value="others">🧩 Chủ đề khác</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="practice-subtopic-container" style="display: none;">
+                    <label for="practice-subtopic" id="practice-subtopic-label">Chủ đề chi tiết</label>
+                    <select id="practice-subtopic" class="form-control">
+                        <!-- Dynamic sub-topics will go here -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="config-grid" style="margin-top: var(--sp-4);">
+                <div class="form-group">
+                    <label for="practice-limit">Số lượng câu hỏi</label>
+                    <select id="practice-limit" class="form-control">
+                        <option value="5">5 câu</option>
+                        <option value="10" selected>10 câu</option>
+                        <option value="20">20 câu</option>
+                        <option value="30">30 câu</option>
+                    </select>
+                </div>
+            </div>
+
+
+            <div style="display: flex; justify-content: flex-end;">
+                <button class="btn btn-primary" onclick="startPracticeSession()"><i class="ph ph-play-circle" style="font-size: 1.2rem;"></i> Bắt đầu ôn luyện</button>
+            </div>
+        </div>
+
+        <!-- Practice Session Card (hidden by default) -->
+        <div id="practice-session" class="toeic-card" style="display: none;">
+            <div class="practice-header-bar">
+                <div class="session-progress">
+                    <span id="session-progress-text" style="font-family: var(--font-display); font-weight: 700; color: var(--text-secondary);">Câu 1 / 10</span>
+                    <div class="progress-track" style="width: 150px; margin-left: var(--sp-2);">
+                        <div id="session-progress-fill" class="progress-fill" style="width: 10%"></div>
+                    </div>
+                </div>
+                
+                <div class="practice-meta">
+                    <div class="timer-badge">
+                        <i class="ph ph-clock"></i>
+                        <span id="session-timer">00:00</span>
+                    </div>
+                    <div class="stat-badge correct" style="color: var(--color-success); background: var(--color-success-subtle); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-lg); font-family: var(--font-display); font-weight: 700; font-size: var(--text-sm);">
+                        <i class="ph ph-check"></i> <span id="session-correct-count">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toeic-question-text" id="question-text">
+                Question text here...
+            </div>
+
+            <div class="toeic-options-grid" id="options-grid">
+                <!-- 4 choice buttons -->
+            </div>
+
+            <!-- Explanation Card (shown after option clicked) -->
+            <div class="explanation-card" id="explanation-box" style="display: none;">
+                <div class="exp-section">
+                    <div class="exp-title"><i class="ph ph-translate"></i> Dịch nghĩa</div>
+                    <div class="exp-body" id="exp-translation">Translation text here...</div>
+                </div>
+                <div class="exp-section" style="margin-top: var(--sp-3);">
+                    <div class="exp-title"><i class="ph ph-lightbulb"></i> Giải thích đáp án</div>
+                    <div class="exp-body" id="exp-explanation">Explanation text here...</div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button class="btn btn-ghost" onclick="confirmQuitSession()">Hủy buổi học</button>
+                <button class="btn btn-primary" id="btn-session-next" onclick="nextSessionQuestion()" style="display: none;">Tiếp tục ⏭</button>
+            </div>
+        </div>
+
+        <!-- Completion View (hidden by default) -->
+        <div id="practice-completion" class="toeic-card" style="display: none; text-align: center; padding: var(--sp-12) var(--sp-6);">
+            <div class="trophy-container">🏆</div>
+            <h2 class="completion-title" id="comp-title">Hoàn thành bài ôn tập!</h2>
+            <p style="color: var(--text-secondary); margin-bottom: var(--sp-4);">Hệ thống đã lưu lại kết quả ôn tập của bạn.</p>
+
+            <div class="comp-stat-grid">
+                <div class="comp-stat-card">
+                    <div class="comp-stat-val" id="comp-stat-correct">0 / 10</div>
+                    <div class="comp-stat-lbl">Đáp án đúng</div>
+                </div>
+                <div class="comp-stat-card">
+                    <div class="comp-stat-val" id="comp-stat-accuracy" style="color: var(--color-success);">0%</div>
+                    <div class="comp-stat-lbl">Tỷ lệ chính xác</div>
+                </div>
+                <div class="comp-stat-card">
+                    <div class="comp-stat-val" id="comp-stat-duration" style="color: var(--color-primary);">00:00</div>
+                    <div class="comp-stat-lbl">Thời gian làm</div>
+                </div>
+            </div>
+
+            <h3 style="text-align: left; font-family: var(--font-display); font-weight: 700; margin-bottom: var(--sp-3); border-bottom: 1px solid var(--border-subtle); padding-bottom: var(--sp-2);">Chi tiết câu hỏi</h3>
+            <div class="results-table-container" style="margin-bottom: var(--sp-8); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); overflow: hidden; background: var(--surface-card);">
+                <table class="toeic-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Câu hỏi</th>
+                            <th>Lựa chọn</th>
+                            <th style="width: 100px;">Đáp án đúng</th>
+                            <th style="width: 100px; text-align: center;">Kết quả</th>
+                        </tr>
+                    </thead>
+                    <tbody id="session-results-table-body">
+                        <!-- Questions summary rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: center; gap: var(--sp-4);">
+                <button class="btn btn-ghost" onclick="quitSessionToConfig()">Về trang cấu hình</button>
+                <button class="btn btn-primary" onclick="restartSession()">Luyện tập tiếp 🔄</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Content: History -->
+    <div id="tab-history" class="tab-pane" style="display: none;">
+        <div class="toeic-card">
+            <h2 style="font-family: var(--font-display); font-weight: 700; margin-top: 0; margin-bottom: var(--sp-4);">Lịch sử làm bài</h2>
+            
+            <div style="overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); background: var(--surface-card);">
+                <table class="toeic-table" id="history-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>Chủ đề</th>
+                            <th>Đúng / Tổng</th>
+                            <th>Độ chính xác</th>
+                            <th>Thời lượng</th>
+                            <th style="text-align: right;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: var(--sp-6);">Không có lịch sử làm bài.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Content: Question Bank / Database -->
+    <div id="tab-database" class="tab-pane" style="display: none;">
+        <!-- Upload Area -->
+        <div class="toeic-card">
+            <h2 style="font-family: var(--font-display); font-weight: 700; margin-top: 0; margin-bottom: var(--sp-4);">Nhập câu hỏi từ file Excel</h2>
+            <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--sp-4);">
+                Tải lên file Excel (`.xlsx`) chứa các câu hỏi trắc nghiệm tiếng Anh. Cấu trúc bảng phải có các cột sau:
+                <code>Chu De, Cau Hoi, Dap An A, Dap An B, Dap An C, Dap An D, Dap An Dung, Giai Thich, Dich Nghia</code>.
+            </p>
+
+            <div class="drag-drop-zone" id="excel-drag-drop" onclick="triggerFileInput()">
+                <i class="ph ph-file-xls upload-icon"></i>
+                <div style="font-weight: 700; color: var(--text-primary); font-family: var(--font-display); font-size: var(--text-base);">Nhấn vào đây hoặc Kéo thả file Excel vào đây</div>
+                <div style="font-size: var(--text-xs); color: var(--text-muted);">Chấp nhận định dạng .xlsx, .xls</div>
+                <input type="file" id="excel-file-input" accept=".xlsx, .xls" style="display: none;" onchange="handleFileSelect(event)">
+            </div>
+        </div>
+
+        <!-- Question List / Database management -->
+        <div class="toeic-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-4); margin-bottom: var(--sp-4);">
+                <h2 style="font-family: var(--font-display); font-weight: 700; margin: 0;">Danh sách câu hỏi</h2>
+                <button class="btn btn-danger btn-sm" onclick="confirmDeleteAllQuestions()"><i class="ph ph-trash-simple"></i> Xóa sạch kho câu hỏi</button>
+            </div>
+
+            <!-- Search and Filter filters -->
+            <div style="display: grid; grid-template-columns: 1fr; gap: var(--sp-3); margin-bottom: var(--sp-4);" class="config-grid">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <input type="text" id="bank-search-input" class="form-control" placeholder="Tìm câu hỏi..." oninput="filterQuestionBank()">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <select id="bank-filter-topic" class="form-control" onchange="filterQuestionBank()">
+                        <option value="all">Tất cả chủ đề</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); background: var(--surface-card); max-height: 500px; overflow-y: auto;">
+                <table class="toeic-table" style="width: 100%;">
+                    <thead style="position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th>Chủ đề</th>
+                            <th>Câu hỏi</th>
+                            <th style="width: 100px;">Đáp án đúng</th>
+                            <th style="width: 80px; text-align: right;">Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bank-table-body">
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: var(--sp-6);">Chưa có câu hỏi nào.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Practice Session Details -->
+<div class="toeic-modal" id="session-detail-modal" onclick="closeDetailModal(event)">
+    <div class="toeic-modal-content" onclick="event.stopPropagation()">
+        <div class="toeic-modal-header">
+            <h3 class="toeic-modal-title" id="modal-session-title">Chi tiết phiên làm bài</h3>
+            <button class="btn-close-modal" onclick="closeDetailModal()" aria-label="Close modal" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted);"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="toeic-modal-body" id="modal-session-body">
+            <!-- Populated dynamically -->
+        </div>
+        <div style="padding: var(--sp-4) var(--sp-6); border-top:1px solid var(--border-subtle); display:flex; justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeDetailModal()">Đóng</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/toeic.js"></script>
+{% endblock %}

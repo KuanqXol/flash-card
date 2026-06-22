@@ -230,6 +230,37 @@ def init_db(conn=None):
     for key, value in defaults:
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
         
+    # Create toeic_questions table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS toeic_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        topic TEXT,
+        question TEXT NOT NULL,
+        option_a TEXT NOT NULL,
+        option_b TEXT NOT NULL,
+        option_c TEXT NOT NULL,
+        option_d TEXT NOT NULL,
+        correct_option TEXT NOT NULL,
+        explanation TEXT,
+        translation TEXT,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    );
+    ''')
+
+    # Create toeic_sessions table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS toeic_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT DEFAULT (datetime('now','localtime')),
+        topic TEXT DEFAULT 'Tất cả',
+        total_questions INTEGER NOT NULL,
+        correct_count INTEGER NOT NULL,
+        accuracy REAL NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        details TEXT
+    );
+    ''')
+        
     conn.commit()
     if should_close:
         conn.close()
@@ -522,7 +553,8 @@ def get_stats():
         'flashcard': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0},
         'mcq': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0},
         'matching': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0},
-        'typing': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0}
+        'typing': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0},
+        'toeic': {'total_reviews': 0, 'total_correct': 0, 'today_reviews': 0, 'today_correct': 0, 'accuracy': 0.0}
     }
     
     for r in mode_rows:
@@ -542,6 +574,32 @@ def get_stats():
                 'today_correct': tod_corr,
                 'accuracy': acc
             }
+            
+    # Fetch TOEIC stats
+    cursor.execute("""
+        SELECT
+            COUNT(*) as sessions_count,
+            SUM(total_questions) as total_q,
+            SUM(correct_count) as correct_q,
+            SUM(CASE WHEN substr(timestamp, 1, 10) = ? THEN total_questions ELSE 0 END) as today_total_q,
+            SUM(CASE WHEN substr(timestamp, 1, 10) = ? THEN correct_count ELSE 0 END) as today_correct_q
+        FROM toeic_sessions
+    """, (today_str, today_str))
+    toeic_row = cursor.fetchone()
+    
+    if toeic_row and toeic_row['total_q'] and toeic_row['total_q'] > 0:
+        tot_q = toeic_row['total_q']
+        tot_c = toeic_row['correct_q'] or 0
+        tod_q = toeic_row['today_total_q'] or 0
+        tod_c = toeic_row['today_correct_q'] or 0
+        
+        practice_stats['toeic'] = {
+            'total_reviews': tot_q,
+            'total_correct': tot_c,
+            'today_reviews': tod_q,
+            'today_correct': tod_c,
+            'accuracy': round(tot_c * 100.0 / tot_q, 1)
+        }
             
     conn.close()
     
@@ -793,5 +851,59 @@ def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
     query = f"SELECT * FROM words {where_clause} ORDER BY {order}" + (f" LIMIT {limit}" if limit else "")
     rows = db.execute(query).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_toeic_questions(db, topic=None, limit=None):
+    """Retrieves list of TOEIC questions, optionally filtered by topic and shuffled."""
+    query_parts = []
+    params = []
+    
+    if topic and topic != 'all':
+        tenses = [
+            "Hiện tại đơn", "Hiện tại tiếp diễn", "Hiện tại hoàn thành", "Hiện tại hoàn thành tiếp diễn",
+            "Quá khứ đơn", "Quá khứ tiếp diễn", "Quá khứ hoàn thành", "Quá khứ hoàn thành tiếp diễn",
+            "Tương lai đơn", "Tương lai tiếp diễn", "Tương lai hoàn thành", "Tương lai hoàn thành tiếp diễn"
+        ]
+        if topic == 'tenses':
+            placeholders = ",".join("?" for _ in tenses)
+            query_parts.append(f"topic IN ({placeholders})")
+            params.extend(tenses)
+        elif topic == 'others':
+            placeholders = ",".join("?" for _ in tenses)
+            query_parts.append(f"(topic NOT IN ({placeholders}) OR topic IS NULL OR topic = '')")
+            params.extend(tenses)
+        else:
+            query_parts.append("topic = ?")
+            params.append(topic)
+        
+    where_clause = "WHERE " + " AND ".join(query_parts) if query_parts else ""
+    limit_clause = f"LIMIT {limit}" if limit else ""
+    
+    query = f"SELECT * FROM toeic_questions {where_clause} ORDER BY RANDOM() {limit_clause}"
+    rows = db.execute(query, tuple(params)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_toeic_topics(db):
+    """Retrieves all unique topics/categories in toeic_questions."""
+    rows = db.execute("SELECT DISTINCT topic FROM toeic_questions WHERE topic IS NOT NULL AND topic != '' ORDER BY topic").fetchall()
+    return [r['topic'] for r in rows]
+
+def insert_toeic_session(db, topic, total_questions, correct_count, accuracy, duration_seconds, details):
+    """Inserts a completed TOEIC practice session into database."""
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT INTO toeic_sessions (topic, total_questions, correct_count, accuracy, duration_seconds, details)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (topic, total_questions, correct_count, accuracy, duration_seconds, details))
+    db.commit()
+    return cursor.lastrowid
+
+def get_toeic_sessions(db, limit=None):
+    """Retrieves all TOEIC sessions sorted by recent timestamp first."""
+    limit_clause = f"LIMIT {limit}" if limit else ""
+    query = f"SELECT * FROM toeic_sessions ORDER BY timestamp DESC {limit_clause}"
+    rows = db.execute(query).fetchall()
+    return [dict(row) for row in rows]
 
 
