@@ -19,6 +19,7 @@ from database import (
     get_filtered_words,
     get_toeic_questions,
     get_toeic_topics,
+    get_toeic_import_batches,
     insert_toeic_session,
     get_toeic_sessions
 )
@@ -2034,6 +2035,7 @@ def api_toeic_analytics():
 def api_toeic_questions_list():
     q = request.args.get('q', '').strip()
     topic = request.args.get('topic', '').strip()
+    batch = request.args.get('batch', '').strip()
     
     db = get_db()
     try:
@@ -2045,6 +2047,9 @@ def api_toeic_questions_list():
         if topic and topic != 'all':
             where_clauses.append("topic = ?")
             params.append(topic)
+        if batch and batch != 'all':
+            where_clauses.append("import_batch = ?")
+            params.append(batch)
             
         where_clause_str = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         query = f"SELECT * FROM toeic_questions {where_clause_str} ORDER BY id DESC"
@@ -2079,6 +2084,31 @@ def api_toeic_delete_all():
         cursor.execute("DELETE FROM toeic_sessions")
         db.commit()
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/batches')
+def api_toeic_batches():
+    db = get_db()
+    try:
+        batches = get_toeic_import_batches(db)
+        return jsonify(batches)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/toeic/batches/<path:batch_name>', methods=['DELETE'])
+def api_toeic_delete_batch(batch_name):
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM toeic_questions WHERE import_batch = ?", (batch_name,))
+        deleted_count = cursor.rowcount
+        db.commit()
+        return jsonify({'success': True, 'deleted_count': deleted_count})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:

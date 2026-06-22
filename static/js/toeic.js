@@ -62,8 +62,23 @@ async function loadTopicsDropdown() {
         // Reset main category dropdown
         const categorySelect = document.getElementById('practice-category');
         if (categorySelect) {
+            categorySelect.innerHTML = `
+                <option value="all">📚 Tất cả chủ đề</option>
+                <option value="wrong_questions">❌ Luyện câu làm sai</option>
+                <option value="tenses">⏱ Các thì tiếng Anh (Tenses)</option>
+            `;
+            // Add other topics directly to the main level
+            topics.forEach(t => {
+                if (!TENSES_LIST.includes(t)) {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = `🧩 ${t}`;
+                    categorySelect.appendChild(opt);
+                }
+            });
             categorySelect.value = 'all';
         }
+        
         const subtopicContainer = document.getElementById('practice-subtopic-container');
         if (subtopicContainer) {
             subtopicContainer.style.display = 'none';
@@ -101,6 +116,8 @@ async function loadTopicsDropdown() {
         
         // Refresh question count badge
         updateQuestionCountBadge();
+        // Load import batches
+        await loadImportBatches();
     } catch (err) {
         console.error("Error loading TOEIC topics:", err);
     }
@@ -114,15 +131,9 @@ function handlePracticeCategoryChange() {
     
     if (!subtopicContainer || !subtopicSelect) return;
     
-    if (category === 'all') {
-        subtopicContainer.style.display = 'none';
-        return;
-    }
-    
-    subtopicContainer.style.display = 'flex';
-    subtopicSelect.innerHTML = '';
-    
     if (category === 'tenses') {
+        subtopicContainer.style.display = 'flex';
+        subtopicSelect.innerHTML = '';
         subtopicLabel.textContent = 'Chi tiết thì';
         
         const allOpt = document.createElement('option');
@@ -138,22 +149,9 @@ function handlePracticeCategoryChange() {
                 subtopicSelect.appendChild(opt);
             }
         });
-    } else if (category === 'others') {
-        subtopicLabel.textContent = 'Chủ đề chi tiết';
-        
-        const allOpt = document.createElement('option');
-        allOpt.value = 'others';
-        allOpt.textContent = '🧩 Tất cả chủ đề khác';
-        subtopicSelect.appendChild(allOpt);
-        
-        loadedTopics.forEach(t => {
-            if (!TENSES_LIST.includes(t)) {
-                const opt = document.createElement('option');
-                opt.value = t;
-                opt.textContent = t;
-                subtopicSelect.appendChild(opt);
-            }
-        });
+    } else {
+        // Any other category does not have a subtopic dropdown
+        subtopicContainer.style.display = 'none';
     }
 }
 
@@ -173,9 +171,9 @@ async function updateQuestionCountBadge() {
 // Start a practice session
 async function startPracticeSession() {
     const category = document.getElementById('practice-category').value;
-    let topic = 'all';
+    let topic = category;
     
-    if (category === 'tenses' || category === 'others') {
+    if (category === 'tenses') {
         topic = document.getElementById('practice-subtopic').value;
     }
     
@@ -201,7 +199,11 @@ async function startPracticeSession() {
         const questions = await res.json();
         
         if (!questions || questions.length === 0) {
-            showToast("Không tìm thấy câu hỏi phù hợp với chủ đề đã chọn!", "warning");
+            if (topic === 'wrong_questions') {
+                showToast("Bạn chưa có câu hỏi nào làm sai trong lịch sử để luyện tập lại!", "warning");
+            } else {
+                showToast("Không tìm thấy câu hỏi phù hợp với chủ đề đã chọn!", "warning");
+            }
             return;
         }
         
@@ -361,17 +363,23 @@ async function finishPracticeSession() {
     const categorySelect = document.getElementById('practice-category');
     const subtopicSelect = document.getElementById('practice-subtopic');
     let topic = "Tất cả chủ đề";
-    if (categorySelect && categorySelect.value === 'tenses') {
-        if (subtopicSelect && subtopicSelect.value === 'tenses') {
-            topic = "Các thì tiếng Anh";
-        } else if (subtopicSelect) {
-            topic = subtopicSelect.options[subtopicSelect.selectedIndex]?.text || subtopicSelect.value;
-        }
-    } else if (categorySelect && categorySelect.value === 'others') {
-        if (subtopicSelect && subtopicSelect.value === 'others') {
-            topic = "Chủ đề khác";
-        } else if (subtopicSelect) {
-            topic = subtopicSelect.options[subtopicSelect.selectedIndex]?.text || subtopicSelect.value;
+    if (categorySelect) {
+        const val = categorySelect.value;
+        if (val === 'tenses') {
+            if (subtopicSelect && subtopicSelect.value === 'tenses') {
+                topic = "Các thì tiếng Anh";
+            } else if (subtopicSelect) {
+                topic = subtopicSelect.options[subtopicSelect.selectedIndex]?.text || subtopicSelect.value;
+            }
+        } else if (val === 'wrong_questions') {
+            topic = "Câu hỏi làm sai";
+        } else if (val === 'all') {
+            topic = "Tất cả chủ đề";
+        } else {
+            // For custom topics directly under categorySelect, use their text representation (or value)
+            topic = categorySelect.options[categorySelect.selectedIndex]?.text || val;
+            // Clean up any emojis if present (e.g. "🧩 Liên từ" -> "Liên từ")
+            topic = topic.replace(/^🧩\s*/, '');
         }
     }
     
@@ -645,9 +653,11 @@ async function loadQuestionBank() {
     
     const searchVal = document.getElementById('bank-search-input').value.trim();
     const topicVal = document.getElementById('bank-filter-topic').value;
+    const batchSelect = document.getElementById('bank-filter-batch');
+    const batchVal = batchSelect ? batchSelect.value : 'all';
     
     try {
-        const res = await fetch(`/api/toeic/questions/list?q=${encodeURIComponent(searchVal)}&topic=${encodeURIComponent(topicVal)}`);
+        const res = await fetch(`/api/toeic/questions/list?q=${encodeURIComponent(searchVal)}&topic=${encodeURIComponent(topicVal)}&batch=${encodeURIComponent(batchVal)}`);
         const questions = await res.json();
         
         if (!questions || questions.length === 0) {
@@ -810,6 +820,58 @@ function initDragAndDrop() {
     zone.addEventListener('drop', (e) => {
         handleFileSelect(e);
     }, false);
+}
+
+async function loadImportBatches() {
+    try {
+        const res = await fetch('/api/toeic/batches');
+        const batches = await res.json();
+        const batchSelect = document.getElementById('bank-filter-batch');
+        if (batchSelect) {
+            const currentVal = batchSelect.value;
+            batchSelect.innerHTML = '<option value="all">Tất cả đợt nhập</option>';
+            batches.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b;
+                opt.textContent = b;
+                batchSelect.appendChild(opt);
+            });
+            if (batches.includes(currentVal)) {
+                batchSelect.value = currentVal;
+            } else {
+                batchSelect.value = 'all';
+            }
+        }
+    } catch (err) {
+        console.error("Error loading import batches:", err);
+    }
+}
+
+async function deleteSelectedBatch() {
+    const batchSelect = document.getElementById('bank-filter-batch');
+    if (!batchSelect) return;
+    const batchVal = batchSelect.value;
+    if (batchVal === 'all') {
+        showToast("Vui lòng chọn một đợt nhập cụ thể để xóa!", "warning");
+        return;
+    }
+    
+    if (confirm(`Bạn có chắc chắn muốn xóa toàn bộ câu hỏi thuộc đợt nhập "${batchVal}"?`)) {
+        try {
+            const res = await fetch(`/api/toeic/batches/${encodeURIComponent(batchVal)}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Đã xóa thành công đợt nhập "${batchVal}" (${data.deleted_count} câu hỏi).`, "success");
+                loadQuestionBank();
+                loadTopicsDropdown();
+            } else {
+                showToast("Lỗi khi xóa đợt nhập!", "error");
+            }
+        } catch (err) {
+            console.error("Error deleting batch:", err);
+            showToast("Lỗi kết nối khi xóa đợt nhập!", "error");
+        }
+    }
 }
 
 // Run initial configurations

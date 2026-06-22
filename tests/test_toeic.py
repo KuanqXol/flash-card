@@ -153,3 +153,111 @@ def test_toeic_stats_integration(tmp_path):
         conn.close()
     finally:
         database.DB_NAME = original_db_name
+
+def test_excel_import_positional(db, tmp_path):
+    # Create an excel file with scrambled/different header names but exactly 9 columns
+    df = pd.DataFrame([{
+        "Random Col 1": "Liên từ",
+        "Random Col 2": "___ he was tired, he finished his work.",
+        "Random Col 3": "Although",
+        "Random Col 4": "Because",
+        "Random Col 5": "However",
+        "Random Col 6": "Therefore",
+        "Random Col 7": "A",
+        "Random Col 8": "Although chỉ sự nhượng bộ",
+        "Random Col 9": "Mặc dù anh ấy mệt..."
+    }])
+    
+    xlsx_file = tmp_path / "test_scrambled_import.xlsx"
+    df.to_excel(xlsx_file, index=False)
+    
+    db_file = tmp_path / "test_flashcards_scrambled.db"
+    
+    import database
+    original_db_name = database.DB_NAME
+    database.DB_NAME = str(db_file)
+    
+    try:
+        res = import_toeic_from_xlsx(str(xlsx_file))
+        assert res['imported'] == 1
+        assert res['total'] == 1
+        assert 'batch_name' in res
+        
+        # Verify db contents and batch name
+        conn = database.get_db()
+        qs = get_toeic_questions(conn)
+        assert len(qs) == 1
+        assert qs[0]['topic'] == "Liên từ"
+        assert qs[0]['question'] == "___ he was tired, he finished his work."
+        assert qs[0]['correct_option'] == "A"
+        assert qs[0]['import_batch'] == res['batch_name']
+        conn.close()
+    finally:
+        database.DB_NAME = original_db_name
+
+def test_excel_import_column_mismatch(db, tmp_path):
+    # Create an excel file with only 8 columns (which is invalid)
+    df = pd.DataFrame([{
+        "Col 1": "Liên từ",
+        "Col 2": "___ he was tired, he finished his work.",
+        "Col 3": "Although",
+        "Col 4": "Because",
+        "Col 5": "However",
+        "Col 6": "Therefore",
+        "Col 7": "A",
+        "Col 8": "Although chỉ sự nhượng bộ"
+    }])
+    
+    xlsx_file = tmp_path / "test_invalid_import.xlsx"
+    df.to_excel(xlsx_file, index=False)
+    
+    with pytest.raises(ValueError) as excinfo:
+        import_toeic_from_xlsx(str(xlsx_file))
+    assert "Số lượng cột không đúng" in str(excinfo.value)
+
+def test_wrong_questions_filtering(db):
+    from database import get_toeic_questions, insert_toeic_session
+    import json
+    
+    cursor = db.cursor()
+    # Insert 3 questions
+    cursor.execute("""
+        INSERT INTO toeic_questions (id, topic, question, option_a, option_b, option_c, option_d, correct_option, explanation, translation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (1, "Liên từ", "Q1", "A", "B", "C", "D", "A", "E1", "T1"))
+    cursor.execute("""
+        INSERT INTO toeic_questions (id, topic, question, option_a, option_b, option_c, option_d, correct_option, explanation, translation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (2, "Giới từ", "Q2", "A", "B", "C", "D", "B", "E2", "T2"))
+    cursor.execute("""
+        INSERT INTO toeic_questions (id, topic, question, option_a, option_b, option_c, option_d, correct_option, explanation, translation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (3, "Các thì", "Q3", "A", "B", "C", "D", "C", "E3", "T3"))
+    db.commit()
+    
+    # Initially, wrong questions should be empty
+    assert len(get_toeic_questions(db, topic="wrong_questions")) == 0
+    
+    # Insert session 1: user got Q1 wrong, Q2 correct
+    details1 = [
+        {"question_id": 1, "is_correct": False},
+        {"question_id": 2, "is_correct": True}
+    ]
+    insert_toeic_session(db, "Tất cả", 2, 1, 50.0, 60, json.dumps(details1))
+    
+    # Now, Q1 should be in wrong questions
+    wrong_qs = get_toeic_questions(db, topic="wrong_questions")
+    assert len(wrong_qs) == 1
+    assert wrong_qs[0]['id'] == 1
+    
+    # Insert session 2: user got Q1 correct (solved), Q3 wrong
+    details2 = [
+        {"question_id": 1, "is_correct": True},
+        {"question_id": 3, "is_correct": False}
+    ]
+    insert_toeic_session(db, "Tất cả", 2, 1, 50.0, 60, json.dumps(details2))
+    
+    # Now, wrong questions should contain Q3, but Q1 should be removed
+    wrong_qs = get_toeic_questions(db, topic="wrong_questions")
+    assert len(wrong_qs) == 1
+    assert wrong_qs[0]['id'] == 3

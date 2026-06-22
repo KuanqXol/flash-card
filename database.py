@@ -247,6 +247,12 @@ def init_db(conn=None):
     );
     ''')
 
+    # Ensure column import_batch exists in toeic_questions
+    cursor.execute("PRAGMA table_info(toeic_questions)")
+    toeic_columns = [row['name'] for row in cursor.fetchall()]
+    if 'import_batch' not in toeic_columns:
+        cursor.execute("ALTER TABLE toeic_questions ADD COLUMN import_batch TEXT DEFAULT NULL")
+
     # Create toeic_sessions table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS toeic_sessions (
@@ -872,6 +878,36 @@ def get_toeic_questions(db, topic=None, limit=None):
             placeholders = ",".join("?" for _ in tenses)
             query_parts.append(f"(topic NOT IN ({placeholders}) OR topic IS NULL OR topic = '')")
             params.extend(tenses)
+        elif topic == 'wrong_questions':
+            # Retrieve all toeic sessions to analyze wrong questions
+            # Order by timestamp ASC so that later correct attempts overwrite earlier wrong attempts.
+            rows = db.execute("SELECT details FROM toeic_sessions ORDER BY timestamp ASC").fetchall()
+            wrong_set = set()
+            for r in rows:
+                details_str = r['details']
+                if not details_str:
+                    continue
+                try:
+                    import json
+                    details = json.loads(details_str)
+                    for item in details:
+                        q_id = item.get('question_id')
+                        is_correct = item.get('is_correct')
+                        correct = (is_correct is True or is_correct == 1 or str(is_correct).lower() == 'true')
+                        if q_id is not None:
+                            if not correct:
+                                wrong_set.add(int(q_id))
+                            else:
+                                wrong_set.discard(int(q_id))
+                except Exception:
+                    pass
+            
+            if not wrong_set:
+                return []
+            
+            placeholders = ",".join("?" for _ in wrong_set)
+            query_parts.append(f"id IN ({placeholders})")
+            params.extend(wrong_set)
         else:
             query_parts.append("topic = ?")
             params.append(topic)
@@ -888,6 +924,11 @@ def get_toeic_topics(db):
     """Retrieves all unique topics/categories in toeic_questions."""
     rows = db.execute("SELECT DISTINCT topic FROM toeic_questions WHERE topic IS NOT NULL AND topic != '' ORDER BY topic").fetchall()
     return [r['topic'] for r in rows]
+
+def get_toeic_import_batches(db):
+    """Retrieves list of all unique import batches from toeic_questions."""
+    rows = db.execute("SELECT DISTINCT import_batch FROM toeic_questions WHERE import_batch IS NOT NULL AND import_batch != '' ORDER BY import_batch DESC").fetchall()
+    return [r['import_batch'] for r in rows]
 
 def insert_toeic_session(db, topic, total_questions, correct_count, accuracy, duration_seconds, details):
     """Inserts a completed TOEIC practice session into database."""

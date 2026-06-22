@@ -463,8 +463,8 @@
                     <label for="practice-category">Chủ đề chính</label>
                     <select id="practice-category" class="form-control" onchange="handlePracticeCategoryChange()">
                         <option value="all">📚 Tất cả chủ đề</option>
+                        <option value="wrong_questions">❌ Luyện câu làm sai</option>
                         <option value="tenses">⏱ Các thì tiếng Anh (Tenses)</option>
-                        <option value="others">🧩 Chủ đề khác</option>
                     </select>
                 </div>
                 
@@ -635,17 +635,25 @@
         <div class="toeic-card">
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-4); margin-bottom: var(--sp-4);">
                 <h2 style="font-family: var(--font-display); font-weight: 700; margin: 0;">Danh sách câu hỏi</h2>
-                <button class="btn btn-danger btn-sm" onclick="confirmDeleteAllQuestions()"><i class="ph ph-trash-simple"></i> Xóa sạch kho câu hỏi</button>
+                <div style="display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;">
+                    <button class="btn btn-danger btn-sm" onclick="deleteSelectedBatch()"><i class="ph ph-trash-simple"></i> Xóa đợt nhập</button>
+                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteAllQuestions()"><i class="ph ph-trash-simple"></i> Xóa sạch kho</button>
+                </div>
             </div>
 
             <!-- Search and Filter filters -->
-            <div style="display: grid; grid-template-columns: 1fr; gap: var(--sp-3); margin-bottom: var(--sp-4);" class="config-grid">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-4);">
                 <div class="form-group" style="margin-bottom: 0;">
                     <input type="text" id="bank-search-input" class="form-control" placeholder="Tìm câu hỏi..." oninput="filterQuestionBank()">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <select id="bank-filter-topic" class="form-control" onchange="filterQuestionBank()">
                         <option value="all">Tất cả chủ đề</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <select id="bank-filter-batch" class="form-control" onchange="filterQuestionBank()">
+                        <option value="all">Tất cả đợt nhập</option>
                     </select>
                 </div>
             </div>
