@@ -106,7 +106,6 @@ async function startNewSession() {
     
     const progressTextEl = document.getElementById('progress-text');
     const progressFillEl = document.getElementById('progress-fill');
-    if (progressTextEl) progressTextEl.textContent = '0 / 10';
     if (progressFillEl) progressFillEl.style.width = '0%';
     
     const streakBadge = document.getElementById('mcq-streak-badge');
@@ -114,7 +113,17 @@ async function startNewSession() {
     
     try {
         const dir = session.direction || 'en_vi';
-        const response = await fetch(`/api/mcq/queue?filter=${session.filter}&status=${session.status}&n=10&direction=${dir}`);
+        let n = 10;
+        try {
+            const settingsRes = await fetch('/api/settings');
+            const settings = await settingsRes.json();
+            n = parseInt(settings.session_size) || 10;
+        } catch (e) {
+            console.error("Error loading session size setting:", e);
+        }
+        if (progressTextEl) progressTextEl.textContent = `0 / ${n}`;
+
+        const response = await fetch(`/api/mcq/queue?filter=${session.filter}&status=${session.status}&n=${n}&direction=${dir}`);
         if (!response.ok) {
             throw new Error("Failed to fetch MCQ queue");
         }

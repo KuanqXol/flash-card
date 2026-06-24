@@ -52,10 +52,11 @@ def migrate():
     # 4. Default settings
     defaults = [
         ('daily_goal', '20'),           # số từ ôn mỗi ngày
-        ('session_size', '10'),         # số từ mỗi phiên
+        ('session_size', '20'),         # số từ mỗi phiên
         ('matching_pairs', '6'),        # số cặp mỗi round matching
         ('new_word_ratio', '0.2'),      # 20% từ mới trong session
         ('theme', 'light'),
+        ('perf_pool_size', '20'),
     ]
     for key, value in defaults:
         c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))

@@ -99,7 +99,17 @@ async function startSession() {
     document.getElementById('matching-empty-state').style.display = 'none';
 
     try {
-        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=18`);
+        let n = 18;
+        try {
+            const settingsRes = await fetch('/api/settings');
+            const settings = await settingsRes.json();
+            n = parseInt(settings.session_size) || 18;
+        } catch (e) {
+            console.error("Error loading session size setting:", e);
+        }
+        if (progressTextEl) progressTextEl.textContent = `0 / ${n}`;
+
+        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=${n}`);
         const data = await res.json();
         
         if (!data.queue || data.queue.length === 0) {

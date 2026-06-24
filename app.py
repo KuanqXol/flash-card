@@ -578,21 +578,26 @@ def session_queue():
     import random
     filter_key = request.args.get('filter', 'all')
     status = request.args.get('status', 'all')
-    n = request.args.get('n', 20, type=int)
     
-    if n < 1:
-        n = 20
-        
     db = get_db()
     try:
-        words = get_filtered_words(db, filter_key=filter_key, status=status, limit=n*3)
+        try:
+            default_n = int(get_setting(db, 'session_size', '20'))
+        except Exception:
+            default_n = 20
+            
+        n = request.args.get('n', default_n, type=int)
+        if n < 1:
+            n = default_n
+            
+        words = get_filtered_words(db, filter_key=filter_key, status=status, limit=n)
         
         # Build composite filter labels, pool mode, use smart
         filter_keys = [fk.strip() for fk in filter_key.split(',') if fk.strip()] if filter_key else []
         labels = []
         pool_mode = False
         use_smart = False
-        pool_size = 20
+        pool_size = max(20, n)
         
         for fk in filter_keys:
             if fk in FILTERS:
@@ -1264,7 +1269,7 @@ def get_settings():
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     data = request.get_json() or {}
-    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme', 'user_name', 'tts_speed_normal', 'tts_speed_slow'}
+    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme', 'user_name', 'tts_speed_normal', 'tts_speed_slow', 'perf_pool_size'}
     conn = get_db()
     try:
         for key, value in data.items():
@@ -1710,24 +1715,29 @@ def api_mcq_queue():
     import random
     filter_key = request.args.get('filter', 'smart_priority')
     status = request.args.get('status', 'all')
-    n = request.args.get('n', 10, type=int)
     direction_param = request.args.get('direction', 'en_vi').lower().replace('-', '_')
     if direction_param not in ['en_vi', 'vi_en', 'random']:
         direction_param = 'en_vi'
-    
-    if n < 1:
-        n = 10
         
     db = get_db()
     try:
-        words = get_filtered_words(db, filter_key=filter_key, status=status, limit=n*3)
+        try:
+            default_n = int(get_setting(db, 'session_size', '20'))
+        except Exception:
+            default_n = 10
+            
+        n = request.args.get('n', default_n, type=int)
+        if n < 1:
+            n = default_n
+            
+        words = get_filtered_words(db, filter_key=filter_key, status=status, limit=n)
         
         # Build composite filter labels, pool mode, use smart
         filter_keys = [fk.strip() for fk in filter_key.split(',') if fk.strip()] if filter_key else []
         labels = []
         pool_mode = False
         use_smart = False
-        pool_size = 20
+        pool_size = max(20, n)
         
         for fk in filter_keys:
             if fk in FILTERS:

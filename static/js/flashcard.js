@@ -137,7 +137,17 @@ async function startSession() {
 
     try {
         const dir = session.direction || 'en_vi';
-        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=20&direction=${dir}`);
+        let n = 20;
+        try {
+            const settingsRes = await fetch('/api/settings');
+            const settings = await settingsRes.json();
+            n = parseInt(settings.session_size) || 20;
+        } catch (e) {
+            console.error("Error loading session size setting:", e);
+        }
+        updateProgressText(`0 / ${n}`);
+
+        const res = await fetch(`/api/session/queue?filter=${session.filter}&status=${session.status}&n=${n}&direction=${dir}`);
         const data = await res.json();
         
         if (!data.queue || data.queue.length === 0) {

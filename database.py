@@ -333,16 +333,23 @@ def init_db(conn=None):
     # Insert default settings
     defaults = [
         ('daily_goal', '20'),
-        ('session_size', '10'),
+        ('session_size', '20'),
         ('matching_pairs', '6'),
         ('new_word_ratio', '0.2'),
         ('theme', 'light'),
         ('user_name', ''),
         ('tts_speed_normal', '1.0'),
         ('tts_speed_slow', '0.5'),
+        ('perf_pool_size', '20'),
     ]
     for key, value in defaults:
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
+
+    # Migration: update default session_size from 10 to 20 for existing databases
+    cursor.execute("SELECT value FROM settings WHERE key = 'session_size'")
+    row = cursor.fetchone()
+    if row and row['value'] == '10':
+        cursor.execute("UPDATE settings SET value = '20' WHERE key = 'session_size'")
         
     # Create toeic_questions table
     cursor.execute('''
@@ -784,16 +791,16 @@ FILTERS = {
     'sql': "date(last_reviewed) = date('now','localtime')",
     'pool_mode': False,
   },
-  'not_reviewed_3days': {
-    'label': 'Chưa ôn 3 ngày',
+  'reviewed_within_2days': {
+    'label': 'Đã ôn trong 2 ngày',
     'group': 'time',
-    'sql': "(last_reviewed IS NULL OR last_reviewed < datetime('now','-3 days','localtime'))",
+    'sql': "last_reviewed IS NOT NULL AND date(last_reviewed) >= date('now','-1 day','localtime')",
     'pool_mode': False,
   },
-  'not_reviewed_7days': {
-    'label': 'Chưa ôn 7 ngày',
+  'reviewed_within_3days': {
+    'label': 'Đã ôn trong 3 ngày',
     'group': 'time',
-    'sql': "(last_reviewed IS NULL OR last_reviewed < datetime('now','-7 days','localtime'))",
+    'sql': "last_reviewed IS NOT NULL AND date(last_reviewed) >= date('now','-2 days','localtime')",
     'pool_mode': False,
   },
   'failed_today': {
@@ -841,7 +848,6 @@ FILTERS = {
     'group': 'performance',
     'sql': "status != 'mastered' AND status != 'learned'",
     'order': 'knowledge_score ASC',
-    'pool_size': 20,
     'pool_mode': True,   # ← lấy top N rồi shuffle
   },
   'lowest_accuracy': {
@@ -849,7 +855,6 @@ FILTERS = {
     'group': 'performance',
     'sql': "review_count >= 3",  # cần đủ data mới so sánh accuracy
     'order': "(correct_count * 1.0 / NULLIF(review_count, 0)) ASC",
-    'pool_size': 20,
     'pool_mode': True,
   },
   'most_wrong': {
@@ -857,7 +862,6 @@ FILTERS = {
     'group': 'performance',
     'sql': "wrong_count > 0",
     'order': 'wrong_count DESC',
-    'pool_size': 20,
     'pool_mode': True,
   },
   'never_reviewed': {
@@ -924,7 +928,17 @@ def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
     time_clauses = []
     perf_clauses = []
     pool_mode = False
-    pool_size = 20
+    
+    # Load perf_pool_size setting
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = 'perf_pool_size'")
+        row = cursor.fetchone()
+        perf_pool_size = int(row['value']) if row else 20
+    except Exception:
+        perf_pool_size = 20
+        
+    pool_size = perf_pool_size
     order_by_clauses = []
     
     for fk in filter_keys:
@@ -941,7 +955,7 @@ def get_filtered_words(db, filter_key: str = 'all', status: str = 'all',
                     perf_clauses.append(sql_cond)
             if f.get('pool_mode'):
                 pool_mode = True
-                pool_size = max(pool_size, f.get('pool_size', 20))
+                pool_size = max(pool_size, f.get('pool_size', perf_pool_size))
                 if f.get('order'):
                     order_by_clauses.append(f['order'])
                     

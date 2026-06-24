@@ -1148,6 +1148,10 @@
                     <input type="number" id="setting-session-size" min="1" max="50">
                 </div>
                 <div class="form-group">
+                    <label><i class="ph ph-sliders"></i> Số từ tối đa trong bộ lọc hiệu suất</label>
+                    <input type="number" id="setting-perf-pool-size" min="5" max="100">
+                </div>
+                <div class="form-group">
                     <label><i class="ph ph-link-simple"></i> Số cặp từ trong Nối Từ</label>
                     <select id="setting-matching-pairs">
                         <option value="4">4 cặp</option>
@@ -1918,7 +1922,8 @@
             const response = await fetch('/api/settings');
             const settings = await response.json();
             document.getElementById('setting-daily-goal').value = settings.daily_goal || 20;
-            document.getElementById('setting-session-size').value = settings.session_size || 10;
+            document.getElementById('setting-session-size').value = settings.session_size || 20;
+            document.getElementById('setting-perf-pool-size').value = settings.perf_pool_size || 20;
             document.getElementById('setting-matching-pairs').value = settings.matching_pairs || 6;
             
             // Set username from fetched settings user_name (fallback to empty)
@@ -1943,11 +1948,12 @@
         const usernameVal = document.getElementById('setting-username').value.trim();
         const dailyGoal = parseInt(document.getElementById('setting-daily-goal').value);
         const sessionSize = parseInt(document.getElementById('setting-session-size').value);
+        const perfPoolSize = parseInt(document.getElementById('setting-perf-pool-size').value);
         const matchingPairs = parseInt(document.getElementById('setting-matching-pairs').value);
         const ttsSpeedNormal = document.getElementById('setting-tts-speed-normal').value;
         const ttsSpeedSlow = document.getElementById('setting-tts-speed-slow').value;
         
-        if (isNaN(dailyGoal) || dailyGoal < 1 || isNaN(sessionSize) || sessionSize < 1) {
+        if (isNaN(dailyGoal) || dailyGoal < 1 || isNaN(sessionSize) || sessionSize < 1 || isNaN(perfPoolSize) || perfPoolSize < 5) {
             showToast("Vui lòng nhập giá trị hợp lệ!", "error");
             return;
         }
@@ -1960,6 +1966,7 @@
                     user_name: usernameVal,
                     daily_goal: dailyGoal,
                     session_size: sessionSize,
+                    perf_pool_size: perfPoolSize,
                     matching_pairs: matchingPairs,
                     tts_speed_normal: ttsSpeedNormal,
                     tts_speed_slow: ttsSpeedSlow
