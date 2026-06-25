@@ -272,6 +272,17 @@ def init_db(conn=None):
                     WHERE id = ?
                 """, (ev_score, ve_score, final_score, new_status, wid))
         
+    # Ensure first_learned_at column exists
+    cursor.execute("PRAGMA table_info(words)")
+    columns_latest = [row['name'] for row in cursor.fetchall()]
+    if 'first_learned_at' not in columns_latest:
+        cursor.execute("ALTER TABLE words ADD COLUMN first_learned_at TEXT DEFAULT NULL")
+        # Backfill: existing reviewed words get first_learned_at = date_added
+        cursor.execute("""
+            UPDATE words SET first_learned_at = date_added
+            WHERE review_count > 0 AND first_learned_at IS NULL
+        """)
+
     # Create word_events table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS word_events (
@@ -484,6 +495,12 @@ def update_word_after_review(db_or_id, word_id=None, delta=None, mode=None, rati
     try:
         now = datetime.now().isoformat()
         
+        # Set first_learned_at on first-ever review
+        db.execute("""
+            UPDATE words SET first_learned_at = ?
+            WHERE id = ? AND first_learned_at IS NULL
+        """, (now, word_id_val))
+        
         # Lấy word hiện tại
         word = db.execute("SELECT * FROM words WHERE id=?", (word_id_val,)).fetchone()
         if not word:
@@ -639,6 +656,11 @@ def get_stats():
     row_today = cursor.fetchone()
     reviewed_today = row_today[0] if row_today else 0
     
+    # New words reviewed today (first_learned_at is today)
+    cursor.execute("SELECT COUNT(*) FROM words WHERE substr(first_learned_at, 1, 10) = ?", (today_str,))
+    row_new_today = cursor.fetchone()
+    new_words_reviewed_today = row_new_today[0] if row_new_today else 0
+    
     # Total score sum
     cursor.execute("SELECT SUM(total_score) FROM words")
     row_score = cursor.fetchone()
@@ -744,6 +766,7 @@ def get_stats():
         'mastered': legacy_learned,
         'total': total,
         'reviewed_today': reviewed_today,
+        'new_words_reviewed_today': new_words_reviewed_today,
         'total_score_sum': total_score_sum,
         'knowledge_score_sum': knowledge_score_sum,
         'needs_review': needs_review_cnt,
@@ -791,6 +814,12 @@ FILTERS = {
     'sql': "date(last_reviewed) = date('now','localtime')",
     'pool_mode': False,
   },
+  'new_reviewed_today': {
+    'label': 'Từ mới đã ôn hôm nay',
+    'group': 'time',
+    'sql': "date(first_learned_at) = date('now','localtime')",
+    'pool_mode': False,
+  },
   'reviewed_within_2days': {
     'label': 'Đã ôn trong 2 ngày',
     'group': 'time',
@@ -801,6 +830,18 @@ FILTERS = {
     'label': 'Đã ôn trong 3 ngày',
     'group': 'time',
     'sql': "last_reviewed IS NOT NULL AND date(last_reviewed) >= date('now','-2 days','localtime')",
+    'pool_mode': False,
+  },
+  'new_reviewed_within_2days': {
+    'label': 'Từ mới trong 2 ngày',
+    'group': 'time',
+    'sql': "first_learned_at IS NOT NULL AND date(first_learned_at) >= date('now','-1 day','localtime')",
+    'pool_mode': False,
+  },
+  'new_reviewed_within_3days': {
+    'label': 'Từ mới trong 3 ngày',
+    'group': 'time',
+    'sql': "first_learned_at IS NOT NULL AND date(first_learned_at) >= date('now','-2 days','localtime')",
     'pool_mode': False,
   },
   'failed_today': {

@@ -61,7 +61,7 @@
     /* ─── STAT CARDS ─── */
     .stats-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         gap: var(--sp-4);
         margin-bottom: var(--sp-8);
     }
@@ -152,15 +152,25 @@
     .card-today .stat-icon { background: #C7D2FE; color: #4338CA; }
     .card-today:hover { box-shadow: 0 8px 24px rgba(79, 70, 229, 0.15); }
 
+    .card-new-today {
+        background: linear-gradient(135deg, var(--surface-card) 0%, #CCFBF1 100%);
+        border-color: rgba(20, 184, 166, 0.3);
+        color: #115E59;
+    }
+    .card-new-today .stat-icon { background: #99F6E4; color: #0D9488; }
+    .card-new-today:hover { box-shadow: 0 8px 24px rgba(20, 184, 166, 0.15); }
+
     /* Dark mode stat cards */
     [data-theme="dark"] .card-new { background: linear-gradient(135deg, var(--surface-card) 0%, rgba(148, 163, 184, 0.1) 100%); color: #CBD5E1; }
     [data-theme="dark"] .card-learning { background: linear-gradient(135deg, var(--surface-card) 0%, rgba(245, 158, 11, 0.1) 100%); color: #FCD34D; }
     [data-theme="dark"] .card-learned { background: linear-gradient(135deg, var(--surface-card) 0%, rgba(16, 185, 129, 0.1) 100%); color: #6EE7B7; }
     [data-theme="dark"] .card-today { background: linear-gradient(135deg, var(--surface-card) 0%, rgba(79, 70, 229, 0.1) 100%); color: #A5B4FC; }
+    [data-theme="dark"] .card-new-today { background: linear-gradient(135deg, var(--surface-card) 0%, rgba(20, 184, 166, 0.1) 100%); color: #5EEAD4; }
     [data-theme="dark"] .card-new .stat-icon { background: rgba(148, 163, 184, 0.2); color: #94A3B8; }
     [data-theme="dark"] .card-learning .stat-icon { background: rgba(245, 158, 11, 0.2); color: #F59E0B; }
     [data-theme="dark"] .card-learned .stat-icon { background: rgba(16, 185, 129, 0.2); color: #10B981; }
     [data-theme="dark"] .card-today .stat-icon { background: rgba(79, 70, 229, 0.2); color: #818CF8; }
+    [data-theme="dark"] .card-new-today .stat-icon { background: rgba(20, 184, 166, 0.2); color: #2DD4BF; }
 
     /* ─── PROGRESS SECTION ─── */
     .progress-section {
@@ -426,7 +436,7 @@
     /* ─── BOTTOM ROW: Recent Fails + Daily Goal ─── */
     .dashboard-bottom-row {
         display: grid;
-        grid-template-columns: 2fr 1fr;
+        grid-template-columns: 2fr 1fr 1fr;
         gap: var(--sp-4);
         margin-bottom: var(--sp-8);
     }
@@ -480,6 +490,17 @@
         box-shadow: var(--shadow-xs);
         display: flex;
         flex-direction: column;
+    }
+
+    /* Goal New Card Styles */
+    .goal-new-card .goal-percent-display {
+        color: #0D9488;
+    }
+    [data-theme="dark"] .goal-new-card .goal-percent-display {
+        color: #2DD4BF;
+    }
+    .goal-new-card .goal-ring-wrap svg {
+        filter: drop-shadow(0 2px 4px rgba(20, 184, 166, 0.15));
     }
 
     .goal-container {
@@ -638,7 +659,7 @@
 
     /* ─── RESPONSIVE ─── */
     @media (max-width: 1024px) {
-        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        .stats-grid { grid-template-columns: repeat(3, 1fr); }
         .actions-grid { grid-template-columns: repeat(2, 1fr); }
         .analytics-grid { grid-template-columns: 1fr; }
         .dashboard-bottom-row { grid-template-columns: 1fr; }
@@ -763,6 +784,12 @@
         <div class="stat-icon"><i class="ph ph-clock-clockwise"></i></div>
         <div class="stat-title">Ôn hôm nay</div>
         <div class="stat-value" id="stat-today">0</div>
+    </div>
+    
+    <div class="stat-card card-new-today animate-fade-in delay-5">
+        <div class="stat-icon"><i class="ph ph-shooting-star"></i></div>
+        <div class="stat-title">Từ mới hôm nay</div>
+        <div class="stat-value" id="stat-new-today">0</div>
     </div>
 </section>
 
@@ -910,10 +937,10 @@
         <div class="recent-fails-list" id="recent-fails-container"></div>
     </div>
 
-    <!-- Daily Goal -->
+    <!-- Daily Review Goal -->
     <div class="goal-card">
         <div class="analytics-card-header">
-            <span><i class="ph ph-target" style="color: var(--color-primary);"></i> Daily Goal</span>
+            <span><i class="ph ph-target" style="color: var(--color-primary);"></i> Mục tiêu Ôn tập</span>
         </div>
         <div class="goal-container">
             <div class="goal-ring-wrap">
@@ -922,21 +949,52 @@
                     <circle cx="44" cy="44" r="37" stroke="var(--surface-sunken)" stroke-width="7" fill="transparent"/>
                     <!-- Red (Wrong reviews) ring -->
                     <circle cx="44" cy="44" r="37" stroke="var(--color-danger)" stroke-width="7" fill="transparent"
-                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-ring-wrong"
+                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-review-ring-wrong"
                             stroke-linecap="round" transform="rotate(-90 44 44)" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);"/>
                     <!-- Green (Correct reviews) ring -->
                     <circle cx="44" cy="44" r="37" stroke="var(--color-success)" stroke-width="7" fill="transparent"
-                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-ring-correct"
+                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-review-ring-correct"
                             stroke-linecap="round" transform="rotate(-90 44 44)" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);"/>
                 </svg>
-                <div class="goal-percent-display" id="goal-percent-text">0%</div>
+                <div class="goal-percent-display" id="goal-review-percent-text">0%</div>
             </div>
             <div class="goal-details">
-                <div class="goal-status" id="goal-status-text">Hôm nay: 0 / 20 từ</div>
-                <div class="goal-subtext" id="goal-subtext">Đã đúng 0 từ, sai 0 từ.</div>
+                <div class="goal-status" id="goal-review-status-text">Hôm nay: 0 / 20 lượt</div>
+                <div class="goal-subtext" id="goal-review-subtext">Đã đúng 0, sai 0.</div>
                 <a href="/flashcard" class="btn btn-primary btn-sm" style="margin-top: var(--sp-2); align-self: flex-start;">
                     <i class="ph ph-play"></i> Tiếp tục ôn
                 </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily New Words Goal -->
+    <div class="goal-card goal-new-card">
+        <div class="analytics-card-header">
+            <span><i class="ph ph-sparkle" style="color: #0D9488;"></i> Từ mới Hôm nay</span>
+        </div>
+        <div class="goal-container">
+            <div class="goal-ring-wrap">
+                <svg width="88" height="88" viewBox="0 0 88 88">
+                    <!-- Background circle -->
+                    <circle cx="44" cy="44" r="37" stroke="var(--surface-sunken)" stroke-width="7" fill="transparent"/>
+                    <!-- Red (Wrong reviews) ring -->
+                    <circle cx="44" cy="44" r="37" stroke="var(--color-danger)" stroke-width="7" fill="transparent"
+                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-new-ring-wrong"
+                            stroke-linecap="round" transform="rotate(-90 44 44)" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);"/>
+                    <!-- Green (Correct reviews) ring -->
+                    <circle cx="44" cy="44" r="37" stroke="var(--color-success)" stroke-width="7" fill="transparent"
+                            stroke-dasharray="232.5" stroke-dashoffset="232.5" id="goal-new-ring-correct"
+                            stroke-linecap="round" transform="rotate(-90 44 44)" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);"/>
+                </svg>
+                <div class="goal-percent-display" id="goal-new-percent-text">0%</div>
+            </div>
+            <div class="goal-details">
+                <div class="goal-status" id="goal-new-status-text">Hôm nay: 0 / 5 từ</div>
+                <div class="goal-subtext" id="goal-new-subtext">Đã đúng 0, sai 0.</div>
+                <button onclick="studyNewWords()" class="btn btn-sm" style="margin-top: var(--sp-2); align-self: flex-start; background: #0D9488; color: white;">
+                    <i class="ph ph-sparkle"></i> Học từ mới
+                </button>
             </div>
         </div>
     </div>
@@ -1140,8 +1198,12 @@
                     <input type="text" id="setting-username" placeholder="Nhập tên của bạn..." style="width: 100%; padding: var(--sp-2-5); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-primary);">
                 </div>
                 <div class="form-group">
-                    <label><i class="ph ph-target"></i> Mục tiêu hàng ngày (từ/ngày)</label>
+                    <label><i class="ph ph-target"></i> Mục tiêu ôn tập hàng ngày (lượt/ngày)</label>
                     <input type="number" id="setting-daily-goal" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label><i class="ph ph-sparkle"></i> Mục tiêu từ mới hàng ngày (từ/ngày)</label>
+                    <input type="number" id="setting-daily-new-goal" min="1" max="100">
                 </div>
                 <div class="form-group">
                     <label><i class="ph ph-cards-three"></i> Số từ mỗi phiên học</label>
@@ -1240,6 +1302,7 @@
             }
             
             animateCount(document.getElementById('stat-today'), stats.reviewed_today);
+            animateCount(document.getElementById('stat-new-today'), stats.new_words_reviewed_today || 0);
             
             const badgeEl = document.getElementById('stat-learned-badge');
             if (badgeEl && stats.mastered_this_week !== undefined) {
@@ -1583,68 +1646,109 @@
     function renderDailyProgress(data) {
         const today = data.today;
         
-        const goalStatusText = document.getElementById('goal-status-text');
-        if (goalStatusText) {
-            goalStatusText.textContent = `Hôm nay: ${today.reviewed_today} / ${today.goal} từ`;
+        // 1. Review Goal progress
+        const reviewStatusText = document.getElementById('goal-review-status-text');
+        if (reviewStatusText) {
+            reviewStatusText.textContent = `Hôm nay: ${today.review_reviewed_today || 0} / ${today.review_goal || 20} lượt`;
         }
         
-        const goalSubtext = document.getElementById('goal-subtext');
-        if (goalSubtext) {
-            goalSubtext.textContent = `Đúng ${today.correct_today}, sai ${today.wrong_today} (${today.accuracy_today}%)`;
+        const reviewSubtext = document.getElementById('goal-review-subtext');
+        if (reviewSubtext) {
+            reviewSubtext.textContent = `Đúng ${today.review_correct_today || 0}, sai ${today.review_wrong_today || 0} (${today.review_accuracy_today || 0}%)`;
+        }
+        
+        // 2. New Words Goal progress
+        const newStatusText = document.getElementById('goal-new-status-text');
+        if (newStatusText) {
+            newStatusText.textContent = `Hôm nay: ${today.new_words_reviewed_today || 0} / ${today.new_goal || 5} từ`;
+        }
+        
+        const newSubtext = document.getElementById('goal-new-subtext');
+        if (newSubtext) {
+            newSubtext.textContent = `Đúng ${today.new_correct_today || 0}, sai ${today.new_wrong_today || 0} (${today.new_accuracy_today || 0}%)`;
         }
         
         // Update today's accuracy badge in the "Ôn hôm nay" stat card
         const todayBadge = document.getElementById('stat-today-badge');
         if (todayBadge) {
-            todayBadge.textContent = `${today.accuracy_today}% Acc`;
+            todayBadge.textContent = `${today.review_accuracy_today || 0}% Acc`;
             todayBadge.style.display = 'block';
         }
         
-        const ringCorrect = document.getElementById('goal-ring-correct');
-        const ringWrong = document.getElementById('goal-ring-wrong');
-        const text = document.getElementById('goal-percent-text');
+        const circumference = 232.5;
         
-        if (text) {
-            text.textContent = `${today.goal_percent}%`;
-            
-            // Confetti on 100%
-            if (today.goal_percent >= 100 && typeof confetti === 'function') {
+        // A. Review goal rings
+        const ringReviewCorrect = document.getElementById('goal-review-ring-correct');
+        const ringReviewWrong = document.getElementById('goal-review-ring-wrong');
+        const textReview = document.getElementById('goal-review-percent-text');
+        
+        if (textReview) {
+            textReview.textContent = `${today.review_goal_percent || 0}%`;
+        }
+        
+        let displayReviewCorrect = today.review_correct_today || 0;
+        let displayReviewWrong = today.review_wrong_today || 0;
+        const reviewReviewed = today.review_reviewed_today || 0;
+        const reviewGoal = today.review_goal || 20;
+        
+        if (reviewReviewed > reviewGoal && reviewGoal > 0) {
+            const scale = reviewGoal / reviewReviewed;
+            displayReviewCorrect = (today.review_correct_today || 0) * scale;
+            displayReviewWrong = (today.review_wrong_today || 0) * scale;
+        }
+        
+        const reviewCorrectPercent = reviewGoal > 0 ? (displayReviewCorrect / reviewGoal * 100) : 0;
+        const reviewWrongPercent = reviewGoal > 0 ? (displayReviewWrong / reviewGoal * 100) : 0;
+        
+        if (ringReviewCorrect) {
+            const offsetCorrect = circumference - (circumference * reviewCorrectPercent / 100);
+            ringReviewCorrect.style.strokeDashoffset = offsetCorrect;
+        }
+        
+        if (ringReviewWrong) {
+            const offsetWrong = circumference - (circumference * reviewWrongPercent / 100);
+            ringReviewWrong.style.strokeDashoffset = offsetWrong;
+            const angle = -90 + (reviewCorrectPercent * 3.6);
+            ringReviewWrong.setAttribute('transform', `rotate(${angle} 44 44)`);
+        }
+        
+        // B. New Words goal rings
+        const ringNewCorrect = document.getElementById('goal-new-ring-correct');
+        const ringNewWrong = document.getElementById('goal-new-ring-wrong');
+        const textNew = document.getElementById('goal-new-percent-text');
+        
+        if (textNew) {
+            textNew.textContent = `${today.new_goal_percent || 0}%`;
+        }
+        
+        const totalArcPercent = today.new_goal_percent || 0;
+        const newReviews = today.new_total_reviews || 0;
+        const newCorrectRatio = newReviews > 0 ? (today.new_correct_today / newReviews) : 1.0;
+        const newWrongRatio = newReviews > 0 ? (today.new_wrong_today / newReviews) : 0.0;
+        
+        const newCorrectPercent = totalArcPercent * newCorrectRatio;
+        const newWrongPercent = totalArcPercent * newWrongRatio;
+        
+        if (ringNewCorrect) {
+            const offsetCorrect = circumference - (circumference * newCorrectPercent / 100);
+            ringNewCorrect.style.strokeDashoffset = offsetCorrect;
+        }
+        
+        if (ringNewWrong) {
+            const offsetWrong = circumference - (circumference * newWrongPercent / 100);
+            ringNewWrong.style.strokeDashoffset = offsetWrong;
+            const angle = -90 + (newCorrectPercent * 3.6);
+            ringNewWrong.setAttribute('transform', `rotate(${angle} 44 44)`);
+        }
+        
+        // Confetti if either reaches 100%
+        if ((today.review_goal_percent >= 100 || today.new_goal_percent >= 100) && typeof confetti === 'function') {
+            if (!window.confettiTriggeredToday) {
+                window.confettiTriggeredToday = true;
                 setTimeout(() => {
                     confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
                 }, 500);
             }
-        }
-        
-        const circumference = 232.5;
-        const goal = today.goal;
-        const correct = today.correct_today;
-        const wrong = today.wrong_today;
-        const reviewed = today.reviewed_today;
-        
-        let displayCorrect = correct;
-        let displayWrong = wrong;
-        
-        // If reviewed count exceeds daily goal, scale down values to fit a single 100% circle
-        if (reviewed > goal && goal > 0) {
-            const scale = goal / reviewed;
-            displayCorrect = correct * scale;
-            displayWrong = wrong * scale;
-        }
-        
-        const correctPercent = goal > 0 ? (displayCorrect / goal * 100) : 0;
-        const wrongPercent = goal > 0 ? (displayWrong / goal * 100) : 0;
-        
-        if (ringCorrect) {
-            const offsetCorrect = circumference - (circumference * correctPercent / 100);
-            ringCorrect.style.strokeDashoffset = offsetCorrect;
-        }
-        
-        if (ringWrong) {
-            const offsetWrong = circumference - (circumference * wrongPercent / 100);
-            ringWrong.style.strokeDashoffset = offsetWrong;
-            // Rotate the wrong ring so it starts exactly where correct ring ends
-            const angle = -90 + (correctPercent * 3.6);
-            ringWrong.setAttribute('transform', `rotate(${angle} 44 44)`);
         }
     }
 
@@ -1922,6 +2026,7 @@
             const response = await fetch('/api/settings');
             const settings = await response.json();
             document.getElementById('setting-daily-goal').value = settings.daily_goal || 20;
+            document.getElementById('setting-daily-new-goal').value = settings.daily_new_goal || 5;
             document.getElementById('setting-session-size').value = settings.session_size || 20;
             document.getElementById('setting-perf-pool-size').value = settings.perf_pool_size || 20;
             document.getElementById('setting-matching-pairs').value = settings.matching_pairs || 6;
@@ -1944,16 +2049,25 @@
         document.getElementById('settings-modal').style.display = 'none';
     }
 
+    function studyNewWords() {
+        sessionStorage.setItem('lastFilter', JSON.stringify({
+            filters: ['smart_priority'],
+            statuses: ['new']
+        }));
+        window.location.href = '/flashcard';
+    }
+
     async function saveSettings() {
         const usernameVal = document.getElementById('setting-username').value.trim();
         const dailyGoal = parseInt(document.getElementById('setting-daily-goal').value);
+        const dailyNewGoal = parseInt(document.getElementById('setting-daily-new-goal').value);
         const sessionSize = parseInt(document.getElementById('setting-session-size').value);
         const perfPoolSize = parseInt(document.getElementById('setting-perf-pool-size').value);
         const matchingPairs = parseInt(document.getElementById('setting-matching-pairs').value);
         const ttsSpeedNormal = document.getElementById('setting-tts-speed-normal').value;
         const ttsSpeedSlow = document.getElementById('setting-tts-speed-slow').value;
         
-        if (isNaN(dailyGoal) || dailyGoal < 1 || isNaN(sessionSize) || sessionSize < 1 || isNaN(perfPoolSize) || perfPoolSize < 5) {
+        if (isNaN(dailyGoal) || dailyGoal < 1 || isNaN(dailyNewGoal) || dailyNewGoal < 1 || isNaN(sessionSize) || sessionSize < 1 || isNaN(perfPoolSize) || perfPoolSize < 5) {
             showToast("Vui lòng nhập giá trị hợp lệ!", "error");
             return;
         }
@@ -1965,6 +2079,7 @@
                 body: JSON.stringify({
                     user_name: usernameVal,
                     daily_goal: dailyGoal,
+                    daily_new_goal: dailyNewGoal,
                     session_size: sessionSize,
                     perf_pool_size: perfPoolSize,
                     matching_pairs: matchingPairs,

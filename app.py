@@ -659,25 +659,90 @@ def session_queue():
 
 def get_daily_progress(db):
     today = datetime.now().strftime('%Y-%m-%d')
-    rows = db.execute("""
-        SELECT COUNT(*) as count, SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) as correct
-        FROM review_history
-        WHERE reviewed_at LIKE ?
-    """, (f'{today}%',)).fetchone()
     
-    reviewed = rows['count'] or 0
-    correct  = rows['correct'] or 0
-    wrong    = reviewed - correct
-    goal     = int(get_setting(db, 'daily_goal', '20'))
+    # Get all reviews today
+    rows = db.execute("""
+        SELECT r.word_id, r.is_correct, w.first_learned_at
+        FROM review_history r
+        LEFT JOIN words w ON r.word_id = w.id
+        WHERE r.reviewed_at LIKE ?
+    """, (f'{today}%',)).fetchall()
+    
+    total_reviewed = len(rows)
+    total_correct = sum(1 for r in rows if r['is_correct'] == 1)
+    total_wrong = total_reviewed - total_correct
+    total_accuracy = round(total_correct / total_reviewed * 100, 1) if total_reviewed > 0 else 0
+    
+    # Separate into new and old reviews
+    # A review is "new" if the word was first learned today
+    # A review is "old" if the word was first learned before today
+    new_reviews_count = 0
+    new_correct = 0
+    
+    old_reviews_count = 0
+    old_correct = 0
+    
+    for r in rows:
+        first_learned = r['first_learned_at']
+        is_new = False
+        if first_learned and first_learned.startswith(today):
+            is_new = True
+            
+        if is_new:
+            new_reviews_count += 1
+            if r['is_correct'] == 1:
+                new_correct += 1
+        else:
+            old_reviews_count += 1
+            if r['is_correct'] == 1:
+                old_correct += 1
+                
+    # Distinct new words learned today
+    new_words_row = db.execute(
+        "SELECT COUNT(*) as cnt FROM words WHERE substr(first_learned_at, 1, 10) = ?",
+        (today,)
+    ).fetchone()
+    new_words = new_words_row['cnt'] if new_words_row else 0
+    
+    goal = int(get_setting(db, 'daily_goal', '20'))
+    new_goal = int(get_setting(db, 'daily_new_goal', '5'))
+    
+    old_wrong = old_reviews_count - old_correct
+    old_accuracy = round(old_correct / old_reviews_count * 100, 1) if old_reviews_count > 0 else 0
+    old_percent = min(100, round(old_reviews_count / goal * 100)) if goal > 0 else 0
+    
+    new_wrong = new_reviews_count - new_correct
+    new_accuracy = round(new_correct / new_reviews_count * 100, 1) if new_reviews_count > 0 else 0
+    new_percent = min(100, round(new_words / new_goal * 100)) if new_goal > 0 else 0
     
     return {
-        'reviewed_today': reviewed,
-        'correct_today': correct,
-        'wrong_today': wrong,
-        'accuracy_today': round(correct / reviewed * 100, 1) if reviewed > 0 else 0,
+        # Original fields (backward compatibility)
+        'reviewed_today': total_reviewed,
+        'new_words_reviewed_today': new_words,
+        'correct_today': total_correct,
+        'wrong_today': total_wrong,
+        'accuracy_today': total_accuracy,
         'goal': goal,
-        'goal_percent': min(100, round(reviewed / goal * 100)) if goal > 0 else 0,
+        'goal_percent': min(100, round(total_reviewed / goal * 100)) if goal > 0 else 0,
+        
+        # New split fields
+        # Review (old words) goal/progress
+        'review_goal': goal,
+        'review_reviewed_today': old_reviews_count,
+        'review_correct_today': old_correct,
+        'review_wrong_today': old_wrong,
+        'review_accuracy_today': old_accuracy,
+        'review_goal_percent': old_percent,
+        
+        # New words goal/progress
+        'new_goal': new_goal,
+        'new_correct_today': new_correct,
+        'new_wrong_today': new_wrong,
+        'new_accuracy_today': new_accuracy,
+        'new_goal_percent': new_percent,
+        'new_total_reviews': new_reviews_count,
     }
+
 
 
 @app.route('/api/analytics/weak-words')
@@ -1269,7 +1334,7 @@ def get_settings():
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     data = request.get_json() or {}
-    allowed = {'daily_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme', 'user_name', 'tts_speed_normal', 'tts_speed_slow', 'perf_pool_size'}
+    allowed = {'daily_goal', 'daily_new_goal', 'session_size', 'matching_pairs', 'new_word_ratio', 'theme', 'user_name', 'tts_speed_normal', 'tts_speed_slow', 'perf_pool_size'}
     conn = get_db()
     try:
         for key, value in data.items():

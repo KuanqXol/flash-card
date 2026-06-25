@@ -1111,6 +1111,12 @@ async function openDetailModal(id) {
             dateAddedEl.querySelector('span').textContent = `Ngày thêm: ${word.date_added || 'Chưa rõ'}`;
         }
         
+        const firstLearnedEl = document.getElementById('detail-word-first-learned');
+        if (firstLearnedEl) {
+            const firstLearnedVal = word.first_learned_at ? formatRelativeTime(word.first_learned_at) : 'Chưa học';
+            firstLearnedEl.querySelector('span').textContent = `Ngày gặp lần đầu: ${firstLearnedVal}`;
+        }
+        
         // Populate translation
         const translationContainer = document.getElementById('detail-word-translation');
         if (translationContainer) {
