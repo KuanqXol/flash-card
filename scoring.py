@@ -267,6 +267,7 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None, directi
                 self_correct_count = self_correct_count + ?,
                 self_wrong_count = self_wrong_count + ?,
                 last_reviewed = ?,
+                first_learned_at = COALESCE(first_learned_at, ?),
                 flashcard_seen = ?, flashcard_correct = ?, flashcard_wrong = ?,
                 mcq_seen = ?, mcq_correct = ?, mcq_wrong = ?,
                 matching_seen = ?, matching_correct = ?, matching_wrong = ?,
@@ -281,7 +282,7 @@ def update_score(word_id: int, exercise: str, is_correct: bool, db=None, directi
         """, (
             new_score, new_status, new_total_score, c_count_inc, w_count_inc,
             new_streak, new_consec_wrong, last_failed_at, needs_review,
-            self_c_inc, self_w_inc, now_str,
+            self_c_inc, self_w_inc, now_str, now_str,
             fc_seen, fc_corr, fc_wrong,
             mcq_seen, mcq_corr, mcq_wrong,
             mat_seen, mat_corr, mat_wrong,
@@ -402,7 +403,7 @@ def mark_as_learned(db: sqlite3.Connection, word_id: int) -> dict:
     """Manually mark a word as mastered (formerly learned)."""
     cursor = db.cursor()
     now_str = datetime.now().isoformat()
-    cursor.execute("UPDATE words SET knowledge_score = 95, status = 'mastered' WHERE id = ?", (word_id,))
+    cursor.execute("UPDATE words SET knowledge_score = 95, status = 'mastered', first_learned_at = COALESCE(first_learned_at, ?) WHERE id = ?", (now_str, word_id))
     cursor.execute("INSERT INTO word_events (word_id, event, timestamp) VALUES (?, ?, ?)", (word_id, 'manual_mastered', now_str))
     db.commit()
     return {'success': True}
@@ -419,13 +420,13 @@ def mark_as_learning(db: sqlite3.Connection, word_id: int) -> dict:
     now_str = datetime.now().isoformat()
     
     if old_status == 'new':
-        cursor.execute("UPDATE words SET knowledge_score = 55, status = 'learning' WHERE id = ?", (word_id,))
+        cursor.execute("UPDATE words SET knowledge_score = 55, status = 'learning', first_learned_at = COALESCE(first_learned_at, ?) WHERE id = ?", (now_str, word_id))
         cursor.execute("INSERT INTO word_events (word_id, event, timestamp) VALUES (?, ?, ?)", (word_id, 'start_learning', now_str))
     elif old_status == 'mastered':
-        cursor.execute("UPDATE words SET knowledge_score = 70, status = 'learning' WHERE id = ?", (word_id,))
+        cursor.execute("UPDATE words SET knowledge_score = 70, status = 'learning', first_learned_at = COALESCE(first_learned_at, ?) WHERE id = ?", (now_str, word_id))
         cursor.execute("INSERT INTO word_events (word_id, event, timestamp) VALUES (?, ?, ?)", (word_id, 'unmastered', now_str))
     else:
-        cursor.execute("UPDATE words SET status = 'learning' WHERE id = ?", (word_id,))
+        cursor.execute("UPDATE words SET status = 'learning', first_learned_at = COALESCE(first_learned_at, ?) WHERE id = ?", (now_str, word_id))
         
     db.commit()
     return {'success': True}
